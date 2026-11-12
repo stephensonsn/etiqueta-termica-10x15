@@ -1,0 +1,556 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Etiquetas 10x15</title>
+<style>
+  :root {
+    --fundo: #F8FAFC; --cartao: #FFFFFF; --texto: #0F172A; --suave: #475569; --borda: #DBE3EF; --linha: #EEF2F7;
+    --primaria: #1E40AF; --sobre-primaria: #FFFFFF; --realce: #EFF6FF;
+    --verde: #166534; --verde-fundo: #DCFCE7; --laranja: #9A3412; --laranja-fundo: #FFEDD5;
+    --vermelho: #B91C1C; --vermelho-fundo: #FEE2E2; --cinza-fundo: #E2E8F0;
+    --raio: 10px; --gap: 16px;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--fundo); color: var(--texto); font: 15px/1.45 -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .num { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-variant-numeric: tabular-nums; }
+  button, input, select { font: inherit; }
+  button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible { outline: 3px solid #93C5FD; outline-offset: 2px; }
+
+  header { display: flex; flex-wrap: wrap; align-items: center; gap: 12px var(--gap); padding: 14px 20px; background: var(--cartao); border-bottom: 1px solid var(--borda); }
+  header h1 { font-size: 18px; margin: 0; margin-right: auto; }
+  .selo { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 999px; font-size: 13px; font-weight: 600; white-space: nowrap; }
+  .selo.verde { background: var(--verde-fundo); color: var(--verde); }
+  .selo.laranja { background: var(--laranja-fundo); color: var(--laranja); }
+  .selo.vermelho { background: var(--vermelho-fundo); color: var(--vermelho); }
+  .selo.cinza { background: var(--cinza-fundo); color: var(--suave); }
+  .chave { display: inline-flex; border: 1px solid var(--borda); border-radius: 8px; overflow: hidden; }
+  .chave button { border: 0; background: var(--cartao); color: var(--suave); padding: 8px 14px; font-weight: 600; cursor: pointer; min-height: 40px; }
+  .chave button[aria-pressed="true"] { background: var(--primaria); color: var(--sobre-primaria); }
+
+  main { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: var(--gap); padding: var(--gap) 20px 32px; max-width: 1400px; margin: 0 auto; }
+  section, details.cartao { background: var(--cartao); border: 1px solid var(--borda); border-radius: var(--raio); padding: 16px; }
+  section h2, details.cartao > summary { font-size: 15px; font-weight: 700; margin: 0 0 12px; }
+  details.cartao > summary { cursor: pointer; margin: 0; }
+  details.cartao[open] > summary { margin-bottom: 14px; }
+  .larga { grid-column: 1 / -1; }
+  .opcao { display: flex; align-items: center; gap: 10px; margin-top: 14px; cursor: pointer; }
+  .abas[hidden] { display: none; }
+  .guia { border-color: #FDBA74; background: #FFF7ED; }
+  .guia[hidden] { display: none; }
+  .trilha { list-style: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 0 0 14px; padding: 0; }
+  .trilha li { padding: 8px 12px; border-radius: 8px; background: #FFEDD5; color: var(--suave); font-weight: 600; text-align: center; white-space: nowrap; }
+  .trilha li[aria-current="step"] { background: var(--primaria); color: var(--sobre-primaria); }
+  .trilha li.feita { background: var(--verde-fundo); color: var(--verde); }
+  .pergunta { font-weight: 600; margin: 0 0 10px; }
+  .escolhas { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--gap); }
+  .escolhas button { text-align: left; background: var(--cartao); border: 2px solid var(--borda); border-radius: 10px; padding: 14px; cursor: pointer; display: grid; gap: 4px; align-content: start; min-height: 96px; }
+  .escolhas button[aria-checked="true"] { border-color: var(--primaria); background: var(--realce); }
+  .escolhas span { color: var(--suave); font-size: 13px; }
+  .passos-lista { margin: 0; padding-left: 20px; }
+  .passos-lista li { margin-bottom: 4px; }
+  .rodape-guia { border-top: 1px solid #FED7AA; padding-top: 14px; }
+  .rodape-guia #gu-pular { margin-left: auto; }
+  .ajuda { color: var(--suave); font-size: 13px; margin: 8px 0 0; }
+
+  button.acao { border: 1px solid var(--borda); background: var(--cartao); color: var(--texto); border-radius: 8px; padding: 8px 14px; font-weight: 600; cursor: pointer; min-height: 40px; white-space: nowrap; }
+  button.acao.primaria { background: var(--primaria); border-color: var(--primaria); color: var(--sobre-primaria); }
+  button.acao:disabled { opacity: .45; cursor: default; }
+  button.acao.mini { min-height: 34px; padding: 4px 12px; }
+
+  /* abas e barra de ações da lista */
+  .abas { display: flex; gap: 4px; border-bottom: 1px solid var(--borda); margin-bottom: 12px; }
+  .abas button { border: 0; background: none; padding: 10px 12px; font-weight: 600; color: var(--suave); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; min-height: 44px; }
+  .abas button[aria-selected="true"] { color: var(--primaria); border-bottom-color: var(--primaria); }
+  .barra { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 8px; }
+  .barra label { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; margin-right: auto; min-height: 40px; cursor: pointer; }
+  input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--primaria); cursor: pointer; }
+
+  ul.lista { list-style: none; margin: 0; padding: 0; max-height: 560px; overflow: auto; }
+  ul.lista li { display: grid; grid-template-columns: 22px 40px minmax(0, 1fr) auto auto; gap: 12px; align-items: center; padding: 10px 8px; border-top: 1px solid var(--linha); cursor: pointer; }
+  ul.lista li:first-child { border-top: 0; }
+  ul.lista li[aria-current="true"] { background: var(--realce); }
+  ul.lista img { width: 40px; height: 60px; object-fit: cover; border: 1px solid var(--borda); border-radius: 4px; background: #fff; }
+  ul.lista .linha1 { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  ul.lista .linha2 { color: var(--suave); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .vazio-lista { color: var(--suave); padding: 20px 8px; }
+  #aviso { min-height: 22px; font-weight: 600; margin: 10px 0 0; }
+  #aviso.erro { color: var(--vermelho); } #aviso.ok { color: var(--verde); }
+
+  /* prévia */
+  .papel-area { display: flex; justify-content: center; }
+  .papel { position: relative; width: min(100%, 380px); aspect-ratio: 100 / 150; background: #fff; border: 1px solid #94A3B8; border-radius: 6px; overflow: hidden; box-shadow: 0 2px 8px rgba(15, 23, 42, .12); }
+  .papel img { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; }
+  .papel .vazio { position: absolute; inset: 0; display: grid; place-items: center; padding: 24px; text-align: center; color: var(--suave); }
+  .legenda { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px var(--gap); margin-top: 12px; }
+  .legenda small { display: block; color: var(--suave); }
+  .legenda strong { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* conexões: uma linha por jeito de ligar a impressora */
+  .conexoes { border: 1px solid var(--borda); border-radius: 8px; }
+  .conexao { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 12px 14px; border-top: 1px solid var(--linha); }
+  .conexao:first-child { border-top: 0; }
+  .conexao[hidden] { display: none; }
+  .conexao .nome { font-weight: 600; }
+  .conexao .detalhe { color: var(--suave); font-size: 13px; overflow: hidden; text-overflow: ellipsis; }
+  .conexao .lado { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+  .conexao input { width: 150px; padding: 6px 10px; border: 1px solid var(--borda); border-radius: 8px; min-height: 34px; }
+
+  .grade4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--gap); }
+  .campo label { display: block; font-weight: 600; margin-bottom: 4px; }
+  .campo input { width: 100%; padding: 8px 10px; border: 1px solid var(--borda); border-radius: 8px; min-height: 40px; }
+  .campo small { display: block; color: var(--suave); margin-top: 4px; }
+  .botoes { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; align-items: center; }
+  pre { margin: 12px 0 0; padding: 12px; background: #0F172A; color: #E2E8F0; border-radius: 8px; font-size: 12px; overflow: auto; max-height: 260px; white-space: pre-wrap; }
+
+  @media (max-width: 1100px) { .grade4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 820px) {
+    main { grid-template-columns: minmax(0, 1fr); padding: 12px 12px 24px; } header { padding: 12px; }
+    .grade4, .escolhas { grid-template-columns: minmax(0, 1fr); }
+    .trilha li { font-size: 13px; padding: 8px 4px; overflow: hidden; text-overflow: ellipsis; }
+    header .selo { white-space: normal; }
+    ul.lista li { grid-template-columns: 22px 40px minmax(0, 1fr) auto; }
+    ul.lista li .acao { grid-column: 3 / -1; justify-self: start; }
+    .conexao { grid-template-columns: minmax(0, 1fr); } .conexao .lado { justify-content: flex-start; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Etiquetas 10x15</h1>
+  <span class="selo cinza" id="selo-fila">Impressora</span>
+  <div class="chave" role="group" aria-label="Quando imprimir o que vem do Mercado Livre">
+    <button type="button" id="modo-direto" aria-pressed="false">Imprimir direto</button>
+    <button type="button" id="modo-conferir" aria-pressed="false">Conferir antes</button>
+  </div>
+</header>
+
+<main>
+  <section class="larga guia" id="guia" hidden>
+    <h2 id="guia-titulo">Configuração da impressora</h2>
+    <ol class="trilha" aria-label="Etapas">
+      <li id="tr-1">1. Conexão</li><li id="tr-2">2. Impressora</li><li id="tr-3">3. Teste</li>
+    </ol>
+    <div id="et-1">
+      <p class="pergunta">Como a impressora está ligada a este computador?</p>
+      <div class="escolhas" role="radiogroup" aria-label="Tipo de conexão">
+        <button type="button" role="radio" data-met="usb"><strong>Cabo USB</strong><span>O mais simples. A impressora fica ligada no computador.</span></button>
+        <button type="button" role="radio" data-met="ble"><strong>Bluetooth</strong><span>Sem fio. O computador liga nela sozinho.</span></button>
+        <button type="button" role="radio" data-met="rede"><strong>Rede</strong><span>Só para impressoras com Wi-Fi ou cabo de rede.</span></button>
+      </div>
+    </div>
+    <div id="et-2" hidden>
+      <p class="pergunta" id="et-2-titulo"></p>
+      <ol class="passos-lista" id="et-2-passos"></ol>
+      <div class="botoes" id="et-2-acao"></div>
+      <p class="ajuda" id="et-2-estado" role="status" aria-live="polite"></p>
+    </div>
+    <div id="et-3" hidden>
+      <p class="pergunta">Imprima uma etiqueta de teste para conferir.</p>
+      <ol class="passos-lista">
+        <li>Clique em Imprimir teste. Sai uma etiqueta com moldura e uma linha a cada 10 mm.</li>
+        <li>A moldura deve aparecer inteira, sem cortar nas bordas.</li>
+        <li>Se saiu certo, clique em Concluir. Se não saiu, volte e confira a conexão.</li>
+      </ol>
+      <div class="botoes"><button class="acao" type="button" id="gu-teste">Imprimir teste</button></div>
+      <p class="ajuda" id="et-3-estado" role="status" aria-live="polite"></p>
+    </div>
+    <div class="botoes rodape-guia">
+      <button class="acao" type="button" id="gu-voltar">Voltar</button>
+      <button class="acao primaria" type="button" id="gu-avancar">Continuar</button>
+      <button class="acao" type="button" id="gu-pular">Fazer depois</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>Fila de impressão</h2>
+    <div class="abas" role="tablist" id="abas">
+      <button type="button" role="tab" id="aba-fila" aria-selected="true">Para imprimir</button>
+      <button type="button" role="tab" id="aba-feitas" aria-selected="false">Enviadas</button>
+    </div>
+    <div class="barra">
+      <label><input type="checkbox" id="todas"> <span id="rot-todas">Selecionar todas</span></label>
+      <button class="acao" id="bt-descartar" hidden>Tirar da lista</button>
+      <button class="acao" id="bt-arquivo">Abrir arquivo</button>
+      <button class="acao primaria" id="bt-imprimir" disabled>Imprimir selecionadas</button>
+      <input type="file" id="arquivo" accept=".txt,.zpl,.zip" multiple hidden>
+    </div>
+    <ul class="lista" id="lista" aria-label="Etiquetas"></ul>
+    <p class="vazio-lista" id="lista-vazia"></p>
+    <p class="ajuda" id="vigia"></p>
+    <p id="aviso" role="status" aria-live="polite"></p>
+  </section>
+
+  <section>
+    <h2>Prévia no papel 100 x 150 mm</h2>
+    <div class="papel-area">
+      <div class="papel" id="papel"><div class="vazio">Clique numa etiqueta da lista para ver como ela vai sair.</div></div>
+    </div>
+    <div class="legenda">
+      <div><small>Envio</small><strong class="num" id="lg-id">—</strong></div>
+      <div><small>Situação</small><strong id="lg-estado">—</strong></div>
+      <div><small>Conteúdo</small><strong id="lg-tipo">—</strong></div>
+      <div><small>Recebido</small><strong class="num" id="lg-hora">—</strong></div>
+    </div>
+  </section>
+
+  <section class="larga" id="sec-impressora">
+    <h2>Impressora</h2>
+    <p class="ajuda" style="margin:-6px 0 12px">A etiqueta vai sempre pela conexão marcada como Em uso. <button class="acao mini" type="button" id="refazer">Refazer a configuração</button></p>
+    <div class="conexoes">
+      <div class="conexao" id="cx-usb">
+        <div><div class="nome">Cabo USB</div><div class="detalhe" id="cx-usb-det">Procurando…</div></div>
+        <div class="lado" id="cx-usb-lado"></div>
+      </div>
+      <div class="conexao" id="cx-ble">
+        <div><div class="nome">Bluetooth</div><div class="detalhe" id="cx-ble-det">Sem fio. O computador liga na impressora sozinho e reconecta se cair</div></div>
+        <div class="lado" id="cx-ble-lado"></div>
+      </div>
+      <div class="conexao" id="cx-bt" hidden>
+        <div><div class="nome">Bluetooth pareado no macOS</div><div class="detalhe" id="cx-bt-det"></div></div>
+        <div class="lado" id="cx-bt-lado"></div>
+      </div>
+      <div class="conexao" id="cx-rede">
+        <div><div class="nome">Rede (Wi-Fi ou cabo)</div><div class="detalhe">Só para impressoras com rede. Informe o endereço IP; a porta padrão é 9100</div></div>
+        <div class="lado" id="cx-rede-lado"><input id="cx-host" class="num" placeholder="192.168.0.50" aria-label="Endereço IP da impressora"></div>
+      </div>
+    </div>
+  </section>
+
+  <details class="cartao larga">
+    <summary>Ajustes de impressão</summary>
+    <div class="chave" role="group" aria-label="Formato da etiqueta">
+      <button type="button" id="fmt-junto" aria-pressed="false">Envio e documento fiscal juntos</button>
+      <button type="button" id="fmt-cheio" aria-pressed="false">Em etiquetas separadas</button>
+    </div>
+    <div class="grade4" style="margin-top:14px">
+      <div class="campo"><label for="c-x">Deslocar na horizontal (mm)</label><input id="c-x" class="num" type="number" step="0.5"><small>Positivo vai para a direita</small></div>
+      <div class="campo"><label for="c-y">Deslocar na vertical (mm)</label><input id="c-y" class="num" type="number" step="0.5"><small>Positivo vai para baixo</small></div>
+      <div class="campo"><label for="c-dens">Escuro da impressão</label><input id="c-dens" class="num" type="number" step="1"><small>De 0 a 15; o padrão é 6</small></div>
+      <div class="campo"><label for="c-vel">Velocidade</label><input id="c-vel" class="num" type="number" step="1"><small>De 2 a 8; mais lento sai mais nítido</small></div>
+    </div>
+    <label class="opcao"><input type="checkbox" id="limpar"> <span>Mandar para a Lixeira o arquivo de etiqueta baixado, depois que ele entrar na fila</span></label>
+    <label class="opcao"><input type="checkbox" id="hist"> <span>Guardar histórico das etiquetas impressas e o registro em arquivo neste computador</span></label>
+    <div class="botoes">
+      <button class="acao primaria" id="bt-salvar">Salvar ajustes</button>
+      <button class="acao" data-teste="regua">Imprimir régua de teste</button>
+    </div>
+    <p class="ajuda">A régua imprime uma moldura na borda e uma linha a cada 10 mm, para conferir se a impressão está no lugar.</p>
+  </details>
+
+  <details class="cartao larga">
+    <summary>Registro técnico</summary>
+    <div class="botoes" style="margin-top:0">
+      <button class="acao" data-teste="autoteste">Imprimir autoteste da impressora</button>
+      <button class="acao" data-teste="detectar">Recalibrar o sensor de papel</button>
+      <button class="acao" data-teste="reiniciar">Reiniciar a impressora e limpar a memória dela</button>
+    </div>
+    <pre id="log"></pre>
+  </details>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let dados = null, foco = null, aba = 'fila', camposSujos = false, ocupado = false;
+const marcadas = new Set();
+const ROTULO = { enviando: ['Enviando…', 'cinza'], aguardando: ['Para imprimir', 'laranja'], impresso: ['Enviada', 'verde'], erro: ['Parada na fila', 'vermelho'], descartado: ['Tirada da lista', 'cinza'] };
+const naFila = (p) => p.estado === 'aguardando' || p.estado === 'erro' || p.estado === 'enviando';
+
+async function api(rota, corpo, cru) {
+  const r = await fetch(rota, corpo === undefined ? {} : { method: 'POST', body: cru ? corpo : JSON.stringify(corpo) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.erro || 'Falha na ponte');
+  return j;
+}
+function aviso(txt, tipo) { $('aviso').textContent = txt; $('aviso').className = tipo || ''; }
+const hora = (iso) => new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+const el = (tag, props = {}, ...filhos) => { const e = Object.assign(document.createElement(tag), props); e.append(...filhos); return e; };
+
+function desenhar() {
+  const { config, pedidos, log, fila } = dados;
+  $('modo-conferir').setAttribute('aria-pressed', config.imprimir === 'conferir');
+  $('modo-direto').setAttribute('aria-pressed', config.imprimir === 'direto');
+  $('fmt-junto').setAttribute('aria-pressed', config.modo === 'junto');
+  $('fmt-cheio').setAttribute('aria-pressed', config.modo === 'cheio');
+  $('selo-fila').textContent = fila.texto;
+  $('selo-fila').className = 'selo ' + (fila.ok ? 'verde' : 'vermelho');
+  if (!camposSujos) {
+    $('c-x').value = config.calib.deslocXmm; $('c-y').value = config.calib.deslocYmm;
+    $('c-dens').value = config.calib.densidade; $('c-vel').value = config.calib.velocidade;
+  }
+  const visiveis = pedidos.filter((p) => p.estado !== 'descartado' && (aba === 'fila' ? naFila(p) : p.estado === 'impresso'));
+  for (const j of [...marcadas]) if (!visiveis.some((p) => p.jid === j)) marcadas.delete(j);
+  $('hist').checked = !!config.guardarHistorico; $('limpar').checked = !!config.limparDownloads;
+  $('aba-fila').textContent = 'Para imprimir (' + pedidos.filter(naFila).length + ')';
+  $('aba-feitas').textContent = 'Enviadas (' + pedidos.filter((p) => p.estado === 'impresso').length + ')';
+  $('aba-fila').setAttribute('aria-selected', aba === 'fila'); $('aba-feitas').setAttribute('aria-selected', aba === 'feitas');
+  if (!foco || !visiveis.some((p) => p.jid === foco)) foco = (visiveis[0] || {}).jid || null;
+
+  $('lista').replaceChildren(...visiveis.map((p) => {
+    const cb = el('input', { type: 'checkbox', checked: marcadas.has(p.jid) });
+    cb.setAttribute('aria-label', 'Selecionar etiqueta ' + (p.id || 'de teste'));
+    cb.onclick = (e) => { e.stopPropagation(); cb.checked ? marcadas.add(p.jid) : marcadas.delete(p.jid); desenhar(); };
+    const bt = el('button', { className: 'acao mini', type: 'button', textContent: p.estado === 'impresso' ? 'Imprimir de novo' : 'Imprimir', disabled: ocupado });
+    bt.onclick = (e) => { e.stopPropagation(); imprimir([p.jid]); };
+    const li = el('li', {},
+      cb,
+      el('img', { src: '/api/previa/' + p.jid + '.png', alt: '' }),
+      el('div', { style: 'min-width:0' },
+        el('div', { className: 'linha1 num', textContent: p.id || 'Teste' }),
+        el('div', { className: 'linha2', textContent: hora(p.hora) + ' · ' + p.tipo + (p.erro ? ' · ' + p.erro : '') })),
+      el('span', { className: 'selo ' + ROTULO[p.estado][1], textContent: ROTULO[p.estado][0] }),
+      bt);
+    li.setAttribute('aria-current', p.jid === foco);
+    li.onclick = () => { foco = p.jid; desenhar(); };
+    return li;
+  }));
+  $('lista-vazia').hidden = visiveis.length > 0;
+  $('lista-vazia').textContent = aba === 'fila'
+    ? (config.imprimir === 'direto' ? 'Fila vazia. O que você mandar imprimir no Mercado Livre ou gerar na Shopee sai direto na impressora; só aparece aqui o que ficar parado.' : 'Fila vazia. O que você mandar imprimir no Mercado Livre ou gerar na Shopee aparece aqui para conferir antes.')
+    : 'Nada enviado ainda. As últimas etiquetas enviadas ficam aqui para reimprimir, por exemplo depois de um papel travado.';
+  const n = marcadas.size;
+  $('todas').checked = visiveis.length > 0 && n === visiveis.length;
+  $('todas').indeterminate = n > 0 && n < visiveis.length;
+  $('todas').disabled = !visiveis.length;
+  $('rot-todas').textContent = n ? n + (n === 1 ? ' selecionada' : ' selecionadas') : 'Selecionar todas';
+  $('bt-imprimir').disabled = !n || ocupado;
+  $('bt-imprimir').textContent = n > 1 ? 'Imprimir as ' + n + ' em sequência' : 'Imprimir selecionada';
+  $('bt-descartar').hidden = !(n && aba === 'fila');
+
+  const p = pedidos.find((x) => x.jid === foco);
+  const papel = $('papel');
+  if (p) {
+    let img = papel.querySelector('img');
+    if (!img) { papel.replaceChildren(); img = document.createElement('img'); papel.append(img); }
+    const src = '/api/previa/' + p.jid + '.png';
+    if (!img.src.endsWith(src)) img.src = src;
+    img.alt = 'Prévia da etiqueta ' + (p.id || 'de teste');
+    img.style.transform = `translate(${config.calib.deslocXmm}%, ${config.calib.deslocYmm / 1.5}%)`;
+  } else if (!papel.querySelector('.vazio')) {
+    papel.replaceChildren(el('div', { className: 'vazio', textContent: 'Clique numa etiqueta da lista para ver como ela vai sair.' }));
+  }
+  $('lg-id').textContent = p ? (p.id || 'Teste') : '—'; $('lg-tipo').textContent = p ? p.tipo : '—'; $('lg-hora').textContent = p ? hora(p.hora) : '—';
+  $('lg-estado').textContent = p ? ROTULO[p.estado][0] + (p.impressoes > 1 ? ' (' + p.impressoes + ' vezes)' : '') : '—';
+  $('log').textContent = log.join('\n') || 'Sem registros ainda.';
+  desenharGuia();
+  $('vigia').textContent = dados.vigia.ativo ? 'A ponte também pega sozinha o arquivo de etiqueta que cair na pasta Downloads (é assim que a Shopee entrega).' : 'Entrada automática da pasta Downloads parada: ' + dados.vigia.texto + '. Use Abrir arquivo.';
+}
+
+// ---------- conexões ----------
+let cxHostDigitado = false;
+function desenharConexoes() {
+  const { config, conexoes } = dados;
+  const tipo = config.conexao.tipo;
+  const emUso = () => el('span', { className: 'selo verde', textContent: 'Em uso' });
+  const botao = (txt, fn, primaria) => { const b = el('button', { className: 'acao mini' + (primaria ? ' primaria' : ''), type: 'button', textContent: txt }); b.onclick = fn; return b; };
+  const usar = (cx, txt) => botao(txt || 'Usar', () => fazer('Trocando a conexão', () => api('/api/config', { conexao: cx })));
+
+  const bleLigado = !!dados.bleVivo;
+  if (!bleCar) bleEstado(bleLigado ? 'Conectada' + (config.conexao.bleNome ? ' em ' + config.conexao.bleNome : '') + '. Liga sozinha e reconecta se cair. Este modelo não avisa papel travado nem tampa aberta' : config.conexao.bleNome ? 'Procurando ' + config.conexao.bleNome + '… Deixe a impressora ligada e perto do computador' : 'Clique em Escolher impressora (uma vez só, no Google Chrome)');
+  const usb = conexoes.usb.find((u) => u.ligada) || conexoes.usb[0];
+  $('cx-usb-det').textContent = !usb ? 'Nenhuma impressora encontrada no USB' : usb.ligada ? usb.nome + ' ligada no cabo' : usb.nome + ' está desligada ou sem cabo';
+  $('cx-usb-lado').replaceChildren(...(tipo === 'usb' && usb && usb.ligada ? [emUso()] : usb && usb.ligada && tipo !== 'usb' ? [usar({ tipo: 'usb', fila: usb.fila })] : []));
+
+  $('cx-ble-lado').replaceChildren(...[
+    tipo === 'ble' && bleLigado ? emUso() : null,
+    tipo !== 'ble' && bleLigado ? usar({ tipo: 'ble' }) : null,
+    botao(config.conexao.bleNome ? 'Trocar de impressora' : 'Escolher impressora', bleProcurar, !config.conexao.bleNome),
+  ].filter(Boolean));
+
+  const bt = conexoes.bluetooth[0];
+  $('cx-bt').hidden = !bt && tipo !== 'bluetooth';
+  $('cx-bt-det').textContent = bt ? bt.nome : 'A porta sumiu: pareie de novo nos Ajustes do Sistema';
+  $('cx-bt-lado').replaceChildren(...(tipo === 'bluetooth' ? [emUso()] : bt ? [usar({ tipo: 'bluetooth', dispositivo: bt.dispositivo })] : []));
+
+  if (!cxHostDigitado && document.activeElement !== $('cx-host')) $('cx-host').value = config.conexao.host || '';
+  const ladoRede = $('cx-rede-lado');
+  [...ladoRede.children].forEach((c) => { if (c !== $('cx-host')) c.remove(); });
+  if (tipo === 'rede' && !cxHostDigitado) ladoRede.append(emUso());
+  else ladoRede.append(botao('Usar', () => { cxHostDigitado = false; fazer('Trocando a conexão', () => api('/api/config', { conexao: { tipo: 'rede', host: $('cx-host').value.trim(), portaRede: 9100 } })); }));
+}
+$('cx-host').oninput = () => { cxHostDigitado = true; desenharConexoes(); };
+
+// ---------- Bluetooth 4.0 direto pelo Chrome (Web Bluetooth) ----------
+// O painel vira a ligação com a impressora: busca os trabalhos na ponte e escreve em pedaços.
+const SERVICOS_BLE = [0xff00, 0xfff0, 0xffe0, 0xae30, 0xae00, 0x18f0, 0xfee7,
+  '49535343-fe7d-4ae5-8fa9-9fafd205e455', 'e7810a71-73ae-499d-8c15-faa9aef0c3f2', '0000ffe5-0000-1000-8000-00805f9b34fb'];
+let bleCar = null, bleOcupado = false;
+const bleEstado = (t) => { $('cx-ble-det').textContent = t; };
+async function bleConectar(dispositivo) {
+  bleEstado('Conectando em ' + (dispositivo.name || 'impressora') + '…');
+  const gatt = await dispositivo.gatt.connect();
+  let achada = null;
+  for (const srv of await gatt.getPrimaryServices()) {
+    for (const c of await srv.getCharacteristics()) {
+      if (c.properties.writeWithoutResponse || c.properties.write) { if (!achada || c.properties.writeWithoutResponse) achada = c; }
+    }
+    if (achada) break;
+  }
+  if (!achada) throw new Error('a impressora não mostrou um canal de escrita por Bluetooth');
+  bleCar = achada;
+  dispositivo.addEventListener('gattserverdisconnected', () => { bleCar = null; bleEstado('Desconectada. Clique em Conectar'); if (dados) desenharConexoes(); });
+  bleEstado('Conectada: ' + (dispositivo.name || 'impressora') + '. Deixe este painel aberto para imprimir');
+}
+async function bleProcurar() {
+  if (!navigator.bluetooth) return bleEstado('Este navegador não tem Bluetooth. Abra o painel no Google Chrome');
+  try {
+    await bleConectar(await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: SERVICOS_BLE }));
+    // conectou: já passa a usar esta conexão, sem um segundo botão
+    await api('/api/config', { conexao: { tipo: 'ble', bleNome: bleCar.service.device.name || '' } });
+    atualizar();
+  } catch (e) { bleEstado(e.name === 'NotFoundError' ? 'Nenhuma impressora escolhida' : 'Não conectou: ' + e.message); }
+}
+// ao reabrir o painel, tenta voltar à impressora já autorizada antes
+(async () => {
+  try {
+    if (!navigator.bluetooth || !navigator.bluetooth.getDevices) return;
+    for (const d of await navigator.bluetooth.getDevices()) { try { await bleConectar(d); break; } catch (_) { bleEstado('Clique em Conectar para religar a impressora'); } }
+    if (dados) desenharConexoes();
+  } catch (_) { /* sem permissão guardada */ }
+})();
+async function bleEnviar(bytes) {
+  const comResposta = !bleCar.properties.writeWithoutResponse;
+  const TAM = comResposta ? 180 : 120;
+  for (let i = 0; i < bytes.length; i += TAM) {
+    const parte = bytes.subarray(i, i + TAM);
+    if (comResposta) await bleCar.writeValueWithResponse(parte);
+    else { await bleCar.writeValueWithoutResponse(parte); if ((i / TAM) % 8 === 7) await new Promise((r) => setTimeout(r, 25)); }
+    if ((i / TAM) % 40 === 0) bleEstado('Enviando etiqueta: ' + Math.round((i / bytes.length) * 100) + '%');
+  }
+}
+setInterval(async () => {
+  if (!bleCar || bleOcupado || !dados || dados.config.conexao.tipo !== 'ble') return;
+  bleOcupado = true;
+  try {
+    const t = await api('/api/ble/proximo');
+    if (t.id) {
+      try {
+        await bleEnviar(Uint8Array.from(atob(t.dados), (ch) => ch.charCodeAt(0)));
+        await api('/api/ble/feito', { id: t.id, ok: true });
+        bleEstado('Etiqueta enviada. Deixe este painel aberto para imprimir');
+      } catch (e) { await api('/api/ble/feito', { id: t.id, ok: false, erro: e.message }); bleEstado('Falhou ao enviar: ' + e.message); }
+    }
+  } catch (_) { /* ponte fora do ar: o aviso geral já aparece */ }
+  bleOcupado = false;
+}, 1000);
+
+// ---------- assistente de configuração (primeira vez ou quando pedido) ----------
+let guiaAberto = null, etapa = 1, metodo = null;
+const PASSOS = {
+  usb: { titulo: 'Ligue a impressora no cabo USB', passos: ['Ligue a impressora na tomada e no USB do computador.', 'Em Ajustes do Sistema, Impressoras e Scanners, adicione a impressora (com o driver do fabricante).', 'Quando ela aparecer abaixo, clique em Usar esta impressora.'] },
+  ble: { titulo: 'Conecte a impressora por Bluetooth', passos: ['Ligue a impressora e deixe o Bluetooth do computador ligado.', 'Clique em Escolher impressora e selecione a sua na lista do navegador (precisa ser o Google Chrome).', 'Não é preciso parear nos Ajustes do Sistema nem digitar código.'] },
+  rede: { titulo: 'Informe o endereço da impressora na rede', passos: ['Ligue a impressora na mesma rede deste computador.', 'Descubra o endereço IP dela (aparece na etiqueta de autoteste ou no roteador).', 'Digite o endereço e clique em Usar este endereço.'] },
+};
+function etapaPronta() {
+  if (!dados) return false;
+  const t = dados.config.conexao.tipo;
+  if (etapa === 1) return !!metodo;
+  if (etapa === 2) return t === metodo && dados.fila.ok;
+  return true;
+}
+function desenharGuia() {
+  const { config, fila, conexoes } = dados;
+  if (guiaAberto === null) guiaAberto = !config.configurado;
+  $('guia').hidden = !guiaAberto;
+  if (!guiaAberto) return;
+  if (!metodo) metodo = config.configurado ? config.conexao.tipo === 'bluetooth' ? 'ble' : config.conexao.tipo : null;
+  [1, 2, 3].forEach((n) => {
+    $('et-' + n).hidden = etapa !== n;
+    const li = $('tr-' + n);
+    li.className = n < etapa ? 'feita' : '';
+    if (n === etapa) li.setAttribute('aria-current', 'step'); else li.removeAttribute('aria-current');
+  });
+  document.querySelectorAll('[data-met]').forEach((b) => b.setAttribute('aria-checked', b.dataset.met === metodo));
+  if (etapa === 2 && metodo) {
+    const P = PASSOS[metodo];
+    $('et-2-titulo').textContent = P.titulo;
+    if ($('et-2-passos').dataset.met !== metodo) {
+      $('et-2-passos').dataset.met = metodo;
+      $('et-2-passos').replaceChildren(...P.passos.map((t) => el('li', { textContent: t })));
+      const acao = $('et-2-acao');
+      if (metodo === 'usb') acao.replaceChildren(Object.assign(el('button', { className: 'acao primaria', type: 'button', textContent: 'Usar esta impressora' }), { onclick: () => { const u = dados.conexoes.usb.find((x) => x.ligada); if (u) fazer('Ligando no cabo', () => api('/api/config', { conexao: { tipo: 'usb', fila: u.fila } })); } }));
+      if (metodo === 'ble') acao.replaceChildren(Object.assign(el('button', { className: 'acao primaria', type: 'button', textContent: 'Escolher impressora' }), { onclick: bleProcurar }));
+      if (metodo === 'rede') { const campo = el('input', { className: 'num', placeholder: '192.168.0.50', style: 'padding:8px 10px;border:1px solid var(--borda);border-radius:8px;min-height:40px' }); campo.setAttribute('aria-label', 'Endereço IP da impressora'); acao.replaceChildren(campo, Object.assign(el('button', { className: 'acao primaria', type: 'button', textContent: 'Usar este endereço' }), { onclick: () => fazer('Gravando o endereço', () => api('/api/config', { conexao: { tipo: 'rede', host: campo.value.trim(), portaRede: 9100 } })) })); }
+    }
+    const usb = conexoes.usb.find((x) => x.ligada);
+    const certo = config.conexao.tipo === metodo && fila.ok;
+    $('et-2-estado').textContent = certo ? 'Conectada: ' + fila.texto + '. Pode continuar.'
+      : metodo === 'usb' ? (usb ? 'Encontrada no cabo: ' + usb.nome : 'Nenhuma impressora encontrada no cabo ainda. Procurando…')
+        : metodo === 'ble' ? (navigator.bluetooth ? (config.conexao.tipo === 'ble' ? fila.texto : 'Aguardando você escolher a impressora.') : 'Este navegador não tem Bluetooth: abra este painel no Google Chrome.')
+          : 'Aguardando o endereço.';
+  }
+  $('gu-voltar').hidden = etapa === 1;
+  $('gu-avancar').textContent = etapa === 3 ? 'Concluir' : 'Continuar';
+  $('gu-avancar').disabled = !etapaPronta();
+}
+document.querySelectorAll('[data-met]').forEach((b) => { b.onclick = () => { metodo = b.dataset.met; desenharGuia(); }; });
+$('gu-voltar').onclick = () => { etapa = Math.max(1, etapa - 1); desenharGuia(); };
+$('gu-avancar').onclick = async () => {
+  if (etapa < 3) { etapa++; desenharGuia(); return; }
+  await api('/api/config', { configurado: true }); guiaAberto = false; etapa = 1; atualizar();
+};
+$('gu-pular').onclick = async () => { await api('/api/config', { configurado: true }); guiaAberto = false; etapa = 1; atualizar(); };
+$('gu-teste').onclick = async () => {
+  $('et-3-estado').textContent = 'Enviando a etiqueta de teste…';
+  try { await api('/api/teste', { tipo: 'regua' }); $('et-3-estado').textContent = 'Teste enviado. Confira a etiqueta que saiu.'; }
+  catch (e) { $('et-3-estado').textContent = 'Não saiu: ' + e.message; }
+};
+$('refazer').onclick = () => { guiaAberto = true; etapa = 1; metodo = null; desenharGuia(); $('guia').scrollIntoView({ behavior: 'smooth', block: 'start' }); };
+
+// ---------- ações ----------
+async function atualizar() {
+  try { dados = await api('/api/estado'); desenhar(); desenharConexoes(); }
+  catch (e) { aviso('A ponte não respondeu. Rode o instalar.sh para religar.', 'erro'); }
+}
+async function fazer(texto, fn) {
+  aviso(texto + '…');
+  try { await fn(); aviso(texto + ': feito.', 'ok'); } catch (e) { aviso(e.message, 'erro'); }
+  atualizar();
+}
+async function imprimir(jids) {
+  if (ocupado || !jids.length) return;
+  ocupado = true; desenhar();
+  let feitas = 0, falhas = 0;
+  for (const [i, j] of jids.entries()) {
+    aviso('Imprimindo ' + (i + 1) + ' de ' + jids.length + '…');
+    try { await api('/api/pedido/' + j + '/imprimir', {}); feitas++; marcadas.delete(j); } catch (e) { falhas++; aviso(e.message, 'erro'); }
+    await atualizar();
+  }
+  ocupado = false;
+  if (!falhas) aviso(feitas === 1 ? 'Etiqueta enviada à impressora.' : feitas + ' etiquetas enviadas à impressora, em sequência.', 'ok');
+  else aviso(feitas + ' enviadas, ' + falhas + ' com erro. Veja a situação na lista.', 'erro');
+  desenhar();
+}
+const mudar = (obj) => fazer('Salvando', () => api('/api/config', obj));
+const ordem = () => dados.pedidos.filter((p) => marcadas.has(p.jid)).map((p) => p.jid).reverse(); // mais antiga primeiro
+$('modo-conferir').onclick = () => mudar({ imprimir: 'conferir' });
+$('modo-direto').onclick = () => mudar({ imprimir: 'direto' });
+$('fmt-junto').onclick = () => mudar({ modo: 'junto' });
+$('fmt-cheio').onclick = () => mudar({ modo: 'cheio' });
+$('aba-fila').onclick = () => { aba = 'fila'; marcadas.clear(); desenhar(); };
+$('aba-feitas').onclick = () => { aba = 'feitas'; marcadas.clear(); desenhar(); };
+$('todas').onchange = () => {
+  const vis = dados.pedidos.filter((p) => p.estado !== 'descartado' && (aba === 'fila' ? naFila(p) : p.estado === 'impresso'));
+  if ($('todas').checked) vis.forEach((p) => marcadas.add(p.jid)); else marcadas.clear();
+  desenhar();
+};
+$('bt-imprimir').onclick = () => imprimir(ordem());
+$('bt-descartar').onclick = () => fazer('Tirando da lista', async () => { for (const j of [...marcadas]) await api('/api/pedido/' + j + '/descartar', {}); marcadas.clear(); });
+$('bt-salvar').onclick = () => { camposSujos = false; mudar({ calib: { deslocXmm: +$('c-x').value, deslocYmm: +$('c-y').value, densidade: +$('c-dens').value, velocidade: +$('c-vel').value } }); };
+for (const id of ['c-x', 'c-y', 'c-dens', 'c-vel']) $(id).oninput = () => { camposSujos = true; };
+document.querySelectorAll('[data-teste]').forEach((b) => { b.onclick = () => fazer(b.textContent, () => api('/api/teste', { tipo: b.dataset.teste })); });
+const lerArquivos = async (lista) => {
+  for (const f of lista) await fazer('Montando a prévia de ' + f.name, async () => { const r = await api('/api/zpl', await f.arrayBuffer(), true); r.forEach((p) => marcadas.add(p.jid)); if (r[0]) foco = r[0].jid; });
+  aba = 'fila';
+};
+$('bt-arquivo').onclick = () => $('arquivo').click();
+$('hist').onchange = () => mudar({ guardarHistorico: $('hist').checked });
+$('limpar').onchange = () => mudar({ limparDownloads: $('limpar').checked });
+$('arquivo').onchange = (e) => { lerArquivos([...e.target.files]); e.target.value = ''; };
+document.addEventListener('dragover', (e) => e.preventDefault());
+document.addEventListener('drop', (e) => { e.preventDefault(); lerArquivos([...e.dataTransfer.files]); });
+atualizar(); setInterval(() => { if (!ocupado) atualizar(); }, 2000);
+</script>
+</body>
+</html>

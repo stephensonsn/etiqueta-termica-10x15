@@ -1,0 +1,29 @@
+{
+  "name": "etiqueta-termica-10x15",
+  "version": "0.1.0",
+  "description": "Imprime etiquetas do Mercado Livre e da Shopee com DANFE/DACE resumido em impressoras térmicas TSPL 10x15, direto do navegador",
+  "main": "src/servidor.js",
+  "scripts": {
+    "start": "node src/servidor.js",
+    "test": "node teste/teste.js"
+  },
+  "keywords": [
+    "mercado-livre",
+    "shopee",
+    "etiqueta",
+    "zpl",
+    "tspl",
+    "impressora-termica",
+    "danfe",
+    "dace"
+  ],
+  "author": "stephensonsn",
+  "license": "MIT",
+  "dependencies": {
+    "pngjs": "^7.0.0",
+    "zpl-renderer-js": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

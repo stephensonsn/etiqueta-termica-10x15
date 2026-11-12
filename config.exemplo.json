@@ -1,0 +1,29 @@
+{
+  "fila": "",
+  "porta": 9100,
+  "modo": "junto",
+  "tentativas": 3,
+  "janelaDuplicadoSeg": 8,
+  "imprimir": "direto",
+  "calib": {
+    "deslocXmm": 0,
+    "deslocYmm": 0,
+    "densidade": 6,
+    "velocidade": 8,
+    "gapMm": 2,
+    "offsetMm": 2,
+    "faixaLinhas": 0,
+    "crlfInicial": true
+  },
+  "conexao": {
+    "tipo": "usb",
+    "dispositivo": "",
+    "host": "",
+    "portaRede": 9100,
+    "bleNome": ""
+  },
+  "vigiarDownloads": true,
+  "guardarHistorico": false,
+  "limparDownloads": true,
+  "configurado": false
+}

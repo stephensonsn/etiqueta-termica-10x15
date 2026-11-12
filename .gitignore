@@ -1,0 +1,7 @@
+node_modules/
+logs/
+recebidos/
+previa/
+config.json
+conector-bluetooth/conector-bluetooth
+.DS_Store
