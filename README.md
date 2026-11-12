@@ -4,7 +4,12 @@ Imprime as etiquetas de envio do **Mercado Livre** e da **Shopee** em impressora
 
 Você clica em *Imprimir etiquetas* no Mercado Livre, ou gera a etiqueta na Shopee, e ela sai na impressora. Sem abrir arquivo .txt, sem site conversor, sem mandar dados de cliente para fora do computador.
 
-![Etiqueta de exemplo, com dados fictícios](docs/exemplo-mercado-livre.png)
+| Mercado Livre | Shopee |
+|:---:|:---:|
+| <img src="docs/exemplo-mercado-livre.png" alt="Etiqueta do Mercado Livre com a DACE resumida no rodapé" width="380"> | <img src="docs/exemplo-shopee.png" alt="Etiqueta da Shopee com a DACE resumida no rodapé" width="380"> |
+| Envio em cima, destinatário no meio e a faixa fiscal com a chave em código de barras. | A etiqueta já vem pronta da Shopee, com a DACE resumida; a ponte encaixa no 10x15. |
+
+As duas imagens acima são o que sai na impressora, em tamanho 100 x 150 mm. **Todos os dados são fictícios**: foram geradas a partir dos arquivos em [`exemplos/`](exemplos/), que imitam o formato de cada marketplace.
 
 > Estado do projeto: funciona no **macOS**. Windows ainda não tem instalador (veja [Windows](#windows)). Testado em uma impressora: Oásis Market OIA-8370-B.
 
@@ -206,7 +211,7 @@ node src/imprimir.js arquivo.txt --previa   # gera a prévia em previa/ sem impr
 | `src/impressora.js` | Fila, conexões, vigia da pasta Downloads, reenvio. |
 | `src/painel.html` | O painel. |
 | `conector-bluetooth/main.swift` | Conector Bluetooth do macOS. |
-| `exemplos/` | Etiqueta de exemplo com dados fictícios. |
+| `exemplos/` | Etiquetas de exemplo com dados fictícios, nos formatos do Mercado Livre e da Shopee. |
 | `empacotar-mac.sh` | Monta o instalador `.dmg` do macOS. |
 | `driver-mac/` | Driver de sistema: filtro TSPL, modelo de impressora e instalador. |
 

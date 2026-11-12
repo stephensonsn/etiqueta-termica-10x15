@@ -44,7 +44,17 @@ const medir = (im) => {
   const separadas = await e.montar(zpl, 'cheio');
   assert.strictEqual(separadas.length, 2, 'modo separado: duas etiquetas');
 
+  // Shopee: a etiqueta chega como imagem pronta (~DG + ^XG) e só é encaixada no 10x15
+  const shopee = fs.readFileSync(path.join(__dirname, '..', 'exemplos', 'shopee-exemplo.txt'), 'utf8');
+  assert.strictEqual(e.separarEnvios(shopee).length, 1, 'Shopee: um envio');
+  const [sh] = await e.montar(shopee, 'junto');
+  assert.strictEqual(sh.tipo, 'envio + DACE (Shopee)');
+  assert.deepStrictEqual([sh.img.l, sh.img.a], [800, 1200]);
+  const ms = medir(sh.img);
+  assert.ok(ms.topo >= 16 && ms.baixo >= 0, `Shopee cabe na altura (${ms.topo}/${ms.baixo})`);
+
   fs.mkdirSync(path.join(__dirname, '..', 'docs'), { recursive: true });
+  fs.writeFileSync(path.join(__dirname, '..', 'docs', 'exemplo-shopee.png'), e.paraPng(sh.img));
   fs.writeFileSync(path.join(__dirname, '..', 'docs', 'exemplo-mercado-livre.png'), e.paraPng(junta.img));
   console.log('ok: todos os testes passaram');
 })().catch((err) => { console.error('FALHOU:', err.message); process.exit(1); });
