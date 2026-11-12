@@ -204,34 +204,37 @@ final class Conector: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
         }.resume()
     }
 
-    // Envio no ritmo que o Bluetooth permite: manda pedaços do tamanho máximo enquanto a
-    // impressora aceita e retoma assim que ela avisa que pode receber mais (controle de fluxo
-    // do próprio Bluetooth). Uma etiqueta leva cerca de 2 segundos.
+    // Envio com teto de velocidade. O Bluetooth do computador consegue mandar ~40 KB por segundo,
+    // mas o módulo da impressora repassa os dados por uma serial lenta: nessa velocidade ele
+    // perde bytes e nada imprime (a impressora fica esperando o resto da imagem). O ritmo abaixo
+    // (10 KB por segundo, uns 8 s por etiqueta) é o que comprovadamente imprime.
+    let bytesPorSegundo = 10_000.0
     var bomba: Timer?
     func escrever() {
         bomba?.invalidate()
-        // o relógio é só uma garantia caso o aviso de "pode mandar mais" não chegue
-        bomba = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in self?.bombear() }
-        bombear()
+        bomba = Timer.scheduledTimer(withTimeInterval: 0.01, repeats: true) { [weak self] _ in self?.bombear() }
     }
     func bombear() {
         guard let p = impressora, let c = canal, let id = idTrabalho else { bomba?.invalidate(); bomba = nil; return }
         let semResposta = c.properties.contains(.writeWithoutResponse)
-        let tamanho = max(20, p.maximumWriteValueLength(for: semResposta ? .withoutResponse : .withResponse))
-        while posicao < dados.count {
-            if semResposta && !p.canSendWriteWithoutResponse { return } // retoma em peripheralIsReady
+        let tamanho = max(20, min(180, p.maximumWriteValueLength(for: semResposta ? .withoutResponse : .withResponse)))
+        // quanto já poderia ter saído até agora, pelo teto de velocidade
+        let permitido = Int(Date().timeIntervalSince(inicioEnvio) * bytesPorSegundo) + tamanho
+        while posicao < dados.count && posicao < permitido {
+            if semResposta && !p.canSendWriteWithoutResponse { return } // tenta de novo no próximo tique
             let fim = min(posicao + tamanho, dados.count)
             p.writeValue(dados.subdata(in: posicao..<fim), for: c, type: semResposta ? .withoutResponse : .withResponse)
             posicao = fim
             ultimoAvanco = Date()
             if !semResposta { return } // retoma em didWriteValueFor
         }
+        guard posicao >= dados.count else { return }
         bomba?.invalidate(); bomba = nil
         registrar("etiqueta \(id) enviada (\(dados.count) bytes em \(String(format: "%.1f", Date().timeIntervalSince(inicioEnvio))) s)")
         confirmar(id, ok: true, erro: "")
     }
 
-    func peripheralIsReady(toSendWriteWithoutResponse p: CBPeripheral) { if idTrabalho != nil { bombear() } }
+    func peripheralIsReady(toSendWriteWithoutResponse p: CBPeripheral) {}
 
     func peripheral(_ p: CBPeripheral, didWriteValueFor c: CBCharacteristic, error: Error?) {
         if let e = error, let id = idTrabalho { bomba?.invalidate(); bomba = nil; confirmar(id, ok: false, erro: e.localizedDescription); return }
