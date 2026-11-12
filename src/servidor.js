@@ -7,7 +7,8 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { bleInformar, lerZplDeArquivo, iniciarVigia, bleProximo, bleFeito, receberZpl, imprimirPedido, descartarPedido, diagnostico, salvarConfig, estado, log, cfg, RAIZ } = require('./impressora');
+const net = require('net');
+const { enviarBruto, bleInformar, lerZplDeArquivo, iniciarVigia, bleProximo, bleFeito, receberZpl, imprimirPedido, descartarPedido, diagnostico, salvarConfig, estado, log, cfg, RAIZ } = require('./impressora');
 
 const DISPOSITIVO = {
   deviceType: 'printer',
@@ -148,6 +149,20 @@ const servidor = http.createServer(async (req, res) => {
     res.writeHead(500, h); res.end('');
   }
 });
+
+// Porta para o driver de sistema: o macOS entrega aqui o trabalho já em TSPL (fila "socket://127.0.0.1:porta").
+// O macOS não aceita programas de entrega de terceiros, então a entrega usa o envio por rede que já vem nele.
+const portaDriver = cfg.portaDriver || 9102;
+net.createServer((c) => {
+  const partes = [];
+  let total = 0;
+  c.setTimeout(120000, () => c.destroy());
+  c.on('data', (d) => { total += d.length; if (total > 64 * 1024 * 1024) c.destroy(); else partes.push(d); });
+  c.on('error', () => {});
+  c.on('end', () => {
+    fila = fila.then(() => enviarBruto(Buffer.concat(partes))).catch((e) => log(`ERRO no trabalho do driver: ${e.message}`));
+  });
+}).on('error', (e) => log(`ERRO na porta do driver (${portaDriver}): ${e.message}`)).listen(portaDriver, '127.0.0.1');
 
 servidor.on('error', (e) => { log(`ERRO do servidor: ${e.message}`); process.exit(1); });
 servidor.listen(cfg.porta, '127.0.0.1', () => { iniciarVigia(); log(`ponte ativa em http://127.0.0.1:${cfg.porta} -> fila ${cfg.fila} (imprimir=${cfg.imprimir}); painel em http://127.0.0.1:${cfg.porta}/painel`); });

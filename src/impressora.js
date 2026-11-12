@@ -485,6 +485,15 @@ setInterval(async () => {
   repetindo = false;
 }, 5000);
 
+// Trabalho pronto em TSPL, vindo do driver de sistema: confere o mínimo e manda pela conexão escolhida.
+let seqBruto = 0;
+async function enviarBruto(bytes) {
+  const inicio = bytes.toString('latin1', 0, Math.min(bytes.length, 4096));
+  if (bytes.length < 20 || !/SIZE \d/.test(inicio)) throw new Error('o trabalho não é TSPL');
+  await enviar(() => bytes, `${carimbo()}-driver-${++seqBruto}`);
+  log(`trabalho do driver de sistema enviado (${bytes.length} bytes)`);
+}
+
 // ---------- diagnóstico ----------
 async function diagnostico(tipo) {
   if (tipo === 'regua') {
@@ -519,4 +528,4 @@ function estado() {
   return { config: cfg, limites: LIMITES, bleVivo: bleVivo(), driver: driverDoFabricante(), vigia, fila: situacaoFila(), conexoes: listarConexoes(), pedidos, log: ultimasLinhas.slice(-25).reverse() };
 }
 
-module.exports = { bleInformar, lerZplDeArquivo, iniciarVigia, bleProximo, bleFeito, receberZpl, imprimirPedido, descartarPedido, diagnostico, salvarConfig, estado, log, cfg, RAIZ };
+module.exports = { enviarBruto, bleInformar, lerZplDeArquivo, iniciarVigia, bleProximo, bleFeito, receberZpl, imprimirPedido, descartarPedido, diagnostico, salvarConfig, estado, log, cfg, RAIZ };

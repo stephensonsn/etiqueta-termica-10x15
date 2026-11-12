@@ -7,3 +7,4 @@ conector-bluetooth/conector-bluetooth
 .DS_Store
 build/
 dist/
+driver-mac/rastertotspl

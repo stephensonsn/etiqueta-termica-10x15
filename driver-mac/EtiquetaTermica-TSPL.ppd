@@ -1,0 +1,121 @@
+*PPD-Adobe: "4.3"
+*% Modelo de impressora para termicas TSPL 203 dpi. Projeto etiqueta-termica-10x15 (MIT).
+*FormatVersion: "4.3"
+*FileVersion: "1.0"
+*LanguageVersion: English
+*LanguageEncoding: ISOLatin1
+*PCFileName: "ETIQTSPL.PPD"
+*Manufacturer: "Etiqueta Termica"
+*Product: "(Etiqueta Termica TSPL)"
+*ModelName: "Etiqueta Termica TSPL 203dpi"
+*ShortNickName: "Etiqueta Termica TSPL"
+*NickName: "Etiqueta Termica TSPL 10x15 (203 dpi), 1.0"
+*PSVersion: "(3010.000) 0"
+*LanguageLevel: "3"
+*ColorDevice: False
+*DefaultColorSpace: Gray
+*FileSystem: False
+*Throughput: "1"
+*LandscapeOrientation: Plus90
+*TTRasterizer: Type42
+*cupsVersion: 1.4
+*cupsModelNumber: 0
+*cupsManualCopies: False
+*cupsFilter: "application/vnd.cups-raster 0 /Library/Printers/EtiquetaTermica/rastertotspl"
+
+*OpenUI *PageSize/Tamanho da etiqueta: PickOne
+*OrderDependency: 10 AnySetup *PageSize
+*DefaultPageSize: w283h425
+*PageSize w283h425/100 x 150 mm (etiqueta de envio): "<</PageSize[283 425]/ImagingBBox null>>setpagedevice"
+*PageSize w283h283/100 x 100 mm: "<</PageSize[283 283]/ImagingBBox null>>setpagedevice"
+*PageSize w288h432/4 x 6 pol: "<</PageSize[288 432]/ImagingBBox null>>setpagedevice"
+*PageSize w283h212/100 x 75 mm: "<</PageSize[283 212]/ImagingBBox null>>setpagedevice"
+*PageSize w227h142/80 x 50 mm: "<</PageSize[227 142]/ImagingBBox null>>setpagedevice"
+*PageSize w170h85/60 x 30 mm: "<</PageSize[170 85]/ImagingBBox null>>setpagedevice"
+*CloseUI: *PageSize
+
+*OpenUI *PageRegion/Tamanho da etiqueta: PickOne
+*OrderDependency: 10 AnySetup *PageRegion
+*DefaultPageRegion: w283h425
+*PageRegion w283h425/100 x 150 mm (etiqueta de envio): "<</PageSize[283 425]/ImagingBBox null>>setpagedevice"
+*PageRegion w283h283/100 x 100 mm: "<</PageSize[283 283]/ImagingBBox null>>setpagedevice"
+*PageRegion w288h432/4 x 6 pol: "<</PageSize[288 432]/ImagingBBox null>>setpagedevice"
+*PageRegion w283h212/100 x 75 mm: "<</PageSize[283 212]/ImagingBBox null>>setpagedevice"
+*PageRegion w227h142/80 x 50 mm: "<</PageSize[227 142]/ImagingBBox null>>setpagedevice"
+*PageRegion w170h85/60 x 30 mm: "<</PageSize[170 85]/ImagingBBox null>>setpagedevice"
+*CloseUI: *PageRegion
+
+*DefaultImageableArea: w283h425
+*ImageableArea w283h425/100 x 150 mm (etiqueta de envio): "0 0 283 425"
+*ImageableArea w283h283/100 x 100 mm: "0 0 283 283"
+*ImageableArea w288h432/4 x 6 pol: "0 0 288 432"
+*ImageableArea w283h212/100 x 75 mm: "0 0 283 212"
+*ImageableArea w227h142/80 x 50 mm: "0 0 227 142"
+*ImageableArea w170h85/60 x 30 mm: "0 0 170 85"
+
+*DefaultPaperDimension: w283h425
+*PaperDimension w283h425/100 x 150 mm (etiqueta de envio): "283 425"
+*PaperDimension w283h283/100 x 100 mm: "283 283"
+*PaperDimension w288h432/4 x 6 pol: "288 432"
+*PaperDimension w283h212/100 x 75 mm: "283 212"
+*PaperDimension w227h142/80 x 50 mm: "227 142"
+*PaperDimension w170h85/60 x 30 mm: "170 85"
+
+*OpenUI *Resolution/Resolucao: PickOne
+*OrderDependency: 20 AnySetup *Resolution
+*DefaultResolution: 203dpi
+*Resolution 203dpi/203 dpi: "<</HWResolution[203 203]/cupsBitsPerColor 8/cupsColorSpace 0/cupsColorOrder 0>>setpagedevice"
+*CloseUI: *Resolution
+
+*OpenUI *EtDensidade/Escuro da impressao: PickOne
+*OrderDependency: 30 AnySetup *EtDensidade
+*DefaultEtDensidade: 6
+*EtDensidade 0/0: ""
+*EtDensidade 1/1: ""
+*EtDensidade 2/2: ""
+*EtDensidade 3/3: ""
+*EtDensidade 4/4: ""
+*EtDensidade 5/5: ""
+*EtDensidade 6/6: ""
+*EtDensidade 7/7: ""
+*EtDensidade 8/8: ""
+*EtDensidade 9/9: ""
+*EtDensidade 10/10: ""
+*EtDensidade 11/11: ""
+*EtDensidade 12/12: ""
+*EtDensidade 13/13: ""
+*EtDensidade 14/14: ""
+*EtDensidade 15/15: ""
+*CloseUI: *EtDensidade
+
+*OpenUI *EtVelocidade/Velocidade: PickOne
+*OrderDependency: 30 AnySetup *EtVelocidade
+*DefaultEtVelocidade: 6
+*EtVelocidade 2/2 pol/s: ""
+*EtVelocidade 3/3 pol/s: ""
+*EtVelocidade 4/4 pol/s: ""
+*EtVelocidade 5/5 pol/s: ""
+*EtVelocidade 6/6 pol/s: ""
+*EtVelocidade 7/7 pol/s: ""
+*EtVelocidade 8/8 pol/s: ""
+*CloseUI: *EtVelocidade
+
+*OpenUI *EtLimiar/Preto a partir de: PickOne
+*OrderDependency: 30 AnySetup *EtLimiar
+*DefaultEtLimiar: 150
+*EtLimiar 110/Mais claro: ""
+*EtLimiar 150/Normal: ""
+*EtLimiar 190/Mais escuro: ""
+*CloseUI: *EtLimiar
+
+*OpenUI *EtEspaco/Espaco entre etiquetas: PickOne
+*OrderDependency: 30 AnySetup *EtEspaco
+*DefaultEtEspaco: 2
+*EtEspaco 0/Papel continuo: ""
+*EtEspaco 2/2 mm: ""
+*EtEspaco 3/3 mm: ""
+*CloseUI: *EtEspaco
+
+*DefaultFont: Courier
+*Font Courier: Standard "(1.05)" Standard ROM
+*% fim

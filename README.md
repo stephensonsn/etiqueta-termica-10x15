@@ -129,11 +129,36 @@ A fila do macOS aceita trabalhos com a impressora desligada. A ponte cancela o t
 **O número encosta na borda da caixa preta.**
 A letra do renderizador é mais larga que a da Zebra. A ponte mede o texto e centraliza com folga.
 
-## Isto é um driver?
+## Driver de sistema (imprimir de qualquer programa)
 
-Para as etiquetas do Mercado Livre e da Shopee, sim: o projeto gera os comandos da impressora e conversa com ela por cabo, Bluetooth ou rede, sem depender do driver do fabricante.
+O projeto tem duas partes independentes:
 
-Não é um driver de sistema. Ele não faz a impressora aparecer no *Imprimir* dos outros programas (Pré-Visualização, Word, navegador). Para isso continua valendo o driver do fabricante:
+1. **A ponte**, que imprime as etiquetas do Mercado Livre e da Shopee. Não precisa de driver nenhum.
+2. **O driver de sistema** (opcional), em `driver-mac/`. Com ele a impressora aparece no *Imprimir* de qualquer programa do Mac (Pré-Visualização, Word, navegador) como "Etiqueta Termica 10x15".
+
+O driver foi escrito do zero para este projeto: um filtro (`rastertotspl.c`) que transforma a página desenhada pelo macOS em comandos TSPL, e um modelo de impressora (`.ppd`) com os tamanhos de etiqueta, o escuro e a velocidade. O trabalho é entregue à ponte por uma porta local, e a ponte manda pela conexão escolhida no painel. Por isso **qualquer programa imprime também por Bluetooth**, o que o driver do fabricante para Mac não faz.
+
+Para instalar (pede a senha de administrador, porque grava em `/Library/Printers`):
+
+```bash
+sudo ./driver-mac/instalar-driver.sh
+```
+
+Para remover:
+
+```bash
+sudo ./driver-mac/instalar-driver.sh remover
+```
+
+Observações:
+
+- A ponte precisa estar instalada e no ar; o driver só funciona junto com ela.
+- A Apple marca esse tipo de driver (filtro e modelo do CUPS) como em fim de vida. Funciona hoje, mas pode deixar de funcionar numa versão futura do macOS.
+- Ao imprimir de outros programas o macOS redimensiona a página em frações de ponto; para etiquetas de marketplace use sempre a ponte, que mantém os códigos de barras exatos.
+
+### E o driver do fabricante?
+
+Continua valendo se você preferir. Ele não vem neste projeto:
 
 - Oásis Market, página oficial de drivers: <https://www.oasismarket.com.br/index.php?c=category&id=12>
 - O assistente de configuração e o instalador verificam se ele está instalado e avisam. Se estiver, usam a fila dele; se não estiver, seguem sem ele e mostram o link.
@@ -182,6 +207,7 @@ node src/imprimir.js arquivo.txt --previa   # gera a prévia em previa/ sem impr
 | `conector-bluetooth/main.swift` | Conector Bluetooth do macOS. |
 | `exemplos/` | Etiqueta de exemplo com dados fictícios. |
 | `empacotar-mac.sh` | Monta o instalador `.dmg` do macOS. |
+| `driver-mac/` | Driver de sistema: filtro TSPL, modelo de impressora e instalador. |
 
 ## Créditos
 
