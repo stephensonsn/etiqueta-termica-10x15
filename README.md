@@ -9,7 +9,7 @@ Você clica em *Imprimir etiquetas* no Mercado Livre, ou gera a etiqueta na Shop
 | <img src="docs/exemplo-mercado-livre.png" alt="Etiqueta do Mercado Livre com a DACE resumida no rodapé" width="380"> | <img src="docs/exemplo-shopee.png" alt="Etiqueta da Shopee com a DACE resumida no rodapé" width="380"> |
 | Envio em cima, destinatário no meio e a faixa fiscal com a chave em código de barras. | A etiqueta já vem pronta da Shopee, com a DACE resumida; a ponte encaixa no 10x15. |
 
-As duas imagens acima são o que sai na impressora, em tamanho 100 x 150 mm. **Todos os dados são fictícios**: foram geradas a partir dos arquivos em [`exemplos/`](exemplos/), que imitam o formato de cada marketplace.
+As duas imagens acima são o que sai na impressora, em tamanho 100 x 150 mm. **Todos os dados são fictícios**: foram geradas a partir dos arquivos em [`exemplos/`](exemplos/), que imitam o formato de cada marketplace. Nas etiquetas de verdade o logotipo do Mercado Livre e o da Shopee saem no canto de cima, porque vêm no arquivo que o próprio site gera; nos exemplos eles foram deixados de fora por serem marcas registradas.
 
 > Estado do projeto: funciona no **macOS**. Windows ainda não tem instalador (veja [Windows](#windows)). Testado em uma impressora: Oásis Market OIA-8370-B.
 
