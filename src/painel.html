@@ -145,7 +145,7 @@
       <ol class="passos-lista" id="et-2-passos"></ol>
       <div class="botoes" id="et-2-acao"></div>
       <p class="ajuda" id="et-2-estado" role="status" aria-live="polite"></p>
-      <p class="ajuda" id="et-2-driver" hidden>Quer o driver do fabricante mesmo assim (para imprimir de outros programas)? <a href="https://www.oasismarket.com.br/index.php?c=category&id=12" target="_blank" rel="noopener">Baixar no site oficial da Oásis Market</a>.</p>
+      <p class="ajuda" id="et-2-driver" hidden><strong id="et-2-driver-estado"></strong> <span id="et-2-driver-texto"></span> <a href="https://www.oasismarket.com.br/uploadfile/202607/1403a8aabf95f261e142ac195a20649b.zip" id="et-2-driver-link" rel="noopener">Baixar o driver da OIA-8370</a> · <a href="https://www.oasismarket.com.br/index.php?c=category&id=12" target="_blank" rel="noopener">outros modelos, no site oficial</a></p>
     </div>
     <div id="et-3" hidden>
       <p class="pergunta">Imprima uma etiqueta de teste para conferir.</p>
@@ -482,6 +482,9 @@ function desenharGuia() {
         : instalado ? 'Driver já instalado (' + instalado.nome + '), mas a impressora está desligada ou sem cabo.'
           : 'Nenhuma impressora encontrada no cabo ainda. Procurando…';
     $('et-2-driver').hidden = metodo !== 'usb';
+    $('et-2-driver-estado').textContent = dados.driver.instalado ? 'Driver do fabricante: instalado.' : 'Driver do fabricante: não instalado.';
+    $('et-2-driver-texto').textContent = dados.driver.instalado ? 'Nada a fazer.' : 'As etiquetas do Mercado Livre e da Shopee imprimem sem ele. Ele só é preciso para imprimir de outros programas.';
+    $('et-2-driver-link').hidden = dados.driver.instalado;
     $('et-2-estado').textContent = certo ? 'Conectada: ' + fila.texto + '. Pode continuar.'
       : metodo === 'usb' ? textoUsb
         : metodo === 'ble' ? (navigator.bluetooth ? (config.conexao.tipo === 'ble' ? fila.texto : 'Aguardando você escolher a impressora.') : 'Este navegador não tem Bluetooth: abra este painel no Google Chrome.')

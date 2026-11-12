@@ -18,8 +18,12 @@ elif command -v swiftc >/dev/null 2>&1; then ok "Conector Bluetooth será compil
 else falta "Bluetooth sem navegador indisponível neste Mac: use o cabo, ou o Bluetooth pelo Google Chrome (o painel explica)"; fi
 [ -d "/Applications/Google Chrome.app" ] && ok "Google Chrome instalado (usado para escolher a impressora Bluetooth)" || falta "Google Chrome não encontrado: só é preciso para Bluetooth. Baixe em https://www.google.com/chrome"
 lpstat -r >/dev/null 2>&1 && ok "Sistema de impressão do macOS ativo" || falta "Sistema de impressão do macOS parado: reinicie o computador"
-if lpstat -v 2>/dev/null | grep -q "usb://"; then ok "Driver de impressora USB já instalado: o assistente vai reconhecer e só ligar a impressão direta"
-else ok "Sem driver de impressora USB instalado: não precisa, a instalação funciona sem ele"; fi
+if [ -e /Library/Printers/LabelPOS/rastertodlabel ] || ls /Library/Printers/PPDs/Contents/Resources/Label_TSPL* >/dev/null 2>&1; then
+  ok "Driver do fabricante instalado: o assistente reconhece e só liga a impressão direta"
+else
+  ok "Driver do fabricante não instalado: as etiquetas do Mercado Livre e da Shopee imprimem sem ele"
+  echo "          (opcional, para imprimir de outros programas: https://www.oasismarket.com.br/index.php?c=category&id=12)"
+fi
 [ "$FALTAS" -eq 0 ] && echo "Tudo certo para instalar." || echo "$FALTAS item(ns) acima pedem atenção; a instalação continua com o que está disponível."
 echo
 echo "Instalando em: $DEST"

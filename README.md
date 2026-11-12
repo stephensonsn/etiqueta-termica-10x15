@@ -129,6 +129,15 @@ A fila do macOS aceita trabalhos com a impressora desligada. A ponte cancela o t
 **O número encosta na borda da caixa preta.**
 A letra do renderizador é mais larga que a da Zebra. A ponte mede o texto e centraliza com folga.
 
+## Isto é um driver?
+
+Para as etiquetas do Mercado Livre e da Shopee, sim: o projeto gera os comandos da impressora e conversa com ela por cabo, Bluetooth ou rede, sem depender do driver do fabricante.
+
+Não é um driver de sistema. Ele não faz a impressora aparecer no *Imprimir* dos outros programas (Pré-Visualização, Word, navegador). Para isso continua valendo o driver do fabricante:
+
+- Oásis Market, página oficial de drivers: <https://www.oasismarket.com.br/index.php?c=category&id=12>
+- O assistente de configuração e o instalador verificam se ele está instalado e avisam. Se estiver, usam a fila dele; se não estiver, seguem sem ele e mostram o link.
+
 ## Impressoras compatíveis
 
 Deve funcionar com térmicas de 10x15 cm, 203 dpi, que falem **TSPL**.

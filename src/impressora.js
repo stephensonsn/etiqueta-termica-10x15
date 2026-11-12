@@ -506,8 +506,17 @@ async function diagnostico(tipo) {
   return { tipo };
 }
 
+// O driver do fabricante está instalado neste Mac? (filtro e modelos que o instalador dele grava)
+function driverDoFabricante() {
+  try {
+    const filtro = fs.existsSync('/Library/Printers/LabelPOS/rastertodlabel');
+    const modelos = fs.readdirSync('/Library/Printers/PPDs/Contents/Resources').filter((n) => /^Label_TSPL/i.test(n)).length;
+    return { instalado: filtro || modelos > 0, modelos };
+  } catch (_) { return { instalado: false, modelos: 0 }; }
+}
+
 function estado() {
-  return { config: cfg, limites: LIMITES, bleVivo: bleVivo(), vigia, fila: situacaoFila(), conexoes: listarConexoes(), pedidos, log: ultimasLinhas.slice(-25).reverse() };
+  return { config: cfg, limites: LIMITES, bleVivo: bleVivo(), driver: driverDoFabricante(), vigia, fila: situacaoFila(), conexoes: listarConexoes(), pedidos, log: ultimasLinhas.slice(-25).reverse() };
 }
 
 module.exports = { bleInformar, lerZplDeArquivo, iniciarVigia, bleProximo, bleFeito, receberZpl, imprimirPedido, descartarPedido, diagnostico, salvarConfig, estado, log, cfg, RAIZ };
