@@ -1,0 +1,18 @@
+ETIQUETA TÉRMICA 10x15 — instalação no macOS
+
+1. Dê dois cliques em "Instalar.command".
+   Se o macOS disser que não pode abrir porque é de um desenvolvedor não identificado:
+   clique com o botão direito no arquivo, escolha Abrir e confirme em Abrir.
+2. O painel abre no navegador. Siga as 3 etapas: conexão, impressora e etiqueta de teste.
+   - Cabo USB: ligue a impressora e clique em "Usar esta impressora". Se o driver do
+     fabricante já estiver instalado, o assistente reconhece. Sem ele também funciona.
+   - Bluetooth: abra o painel no Google Chrome e clique em "Escolher impressora".
+3. No Mercado Livre: Preferências de venda > Impressora térmica, formato ZPL, e ligue
+   "Imprimir pelo navegador". Depois é só clicar em Imprimir etiquetas.
+4. Na Shopee: gere a etiqueta "Térmica ZPL". O arquivo baixado imprime sozinho.
+
+Painel: http://127.0.0.1:9100/painel
+Para remover: dois cliques em "Desinstalar.command".
+Driver do fabricante (opcional, para outros programas): baixe no site oficial,
+https://www.oasismarket.com.br/index.php?c=category&id=12
+Projeto e ajuda: https://github.com/stephensonsn/etiqueta-termica-10x15

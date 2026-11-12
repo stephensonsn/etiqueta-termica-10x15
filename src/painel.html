@@ -145,6 +145,7 @@
       <ol class="passos-lista" id="et-2-passos"></ol>
       <div class="botoes" id="et-2-acao"></div>
       <p class="ajuda" id="et-2-estado" role="status" aria-live="polite"></p>
+      <p class="ajuda" id="et-2-driver" hidden>Quer o driver do fabricante mesmo assim (para imprimir de outros programas)? <a href="https://www.oasismarket.com.br/index.php?c=category&id=12" target="_blank" rel="noopener">Baixar no site oficial da Oásis Market</a>.</p>
     </div>
     <div id="et-3" hidden>
       <p class="pergunta">Imprima uma etiqueta de teste para conferir.</p>
@@ -230,7 +231,7 @@
       <div class="campo"><label for="c-dens">Escuro da impressão</label><input id="c-dens" class="num" type="number" step="1"><small>De 0 a 15; o padrão é 6</small></div>
       <div class="campo"><label for="c-vel">Velocidade</label><input id="c-vel" class="num" type="number" step="1"><small>De 2 a 8; mais lento sai mais nítido</small></div>
     </div>
-    <label class="opcao"><input type="checkbox" id="limpar"> <span>Mandar para a Lixeira o arquivo de etiqueta baixado, depois que ele entrar na fila</span></label>
+    <label class="opcao"><input type="checkbox" id="limpar"> <span>Apagar de vez o arquivo de etiqueta baixado (.zip ou .txt), depois que todas as etiquetas dele imprimirem</span></label>
     <label class="opcao"><input type="checkbox" id="hist"> <span>Guardar histórico das etiquetas impressas e o registro em arquivo neste computador</span></label>
     <div class="botoes">
       <button class="acao primaria" id="bt-salvar">Salvar ajustes</button>
@@ -350,7 +351,7 @@ function desenharConexoes() {
   if (!bleCar) bleEstado(bleLigado ? 'Conectada' + (config.conexao.bleNome ? ' em ' + config.conexao.bleNome : '') + '. Liga sozinha e reconecta se cair. Este modelo não avisa papel travado nem tampa aberta' : config.conexao.bleNome ? 'Procurando ' + config.conexao.bleNome + '… Deixe a impressora ligada e perto do computador' : 'Clique em Escolher impressora (uma vez só, no Google Chrome)');
   const usb = conexoes.usb.find((u) => u.ligada) || conexoes.usb[0];
   $('cx-usb-det').textContent = !usb ? 'Nenhuma impressora encontrada no USB' : usb.ligada ? usb.nome + ' ligada no cabo' : usb.nome + ' está desligada ou sem cabo';
-  $('cx-usb-lado').replaceChildren(...(tipo === 'usb' && usb && usb.ligada ? [emUso()] : usb && usb.ligada && tipo !== 'usb' ? [usar({ tipo: 'usb', fila: usb.fila })] : []));
+  $('cx-usb-lado').replaceChildren(...(tipo === 'usb' && usb && usb.ligada && !usb.semFila ? [emUso()] : usb && usb.ligada && (tipo !== 'usb' || usb.semFila) ? [usar(usb.semFila ? { tipo: 'usb', uri: usb.uri } : { tipo: 'usb', fila: usb.fila })] : []));
 
   $('cx-ble-lado').replaceChildren(...[
     tipo === 'ble' && bleLigado ? emUso() : null,
@@ -438,7 +439,7 @@ setInterval(async () => {
 // ---------- assistente de configuração (primeira vez ou quando pedido) ----------
 let guiaAberto = null, etapa = 1, metodo = null;
 const PASSOS = {
-  usb: { titulo: 'Ligue a impressora no cabo USB', passos: ['Ligue a impressora na tomada e no USB do computador.', 'Em Ajustes do Sistema, Impressoras e Scanners, adicione a impressora (com o driver do fabricante).', 'Quando ela aparecer abaixo, clique em Usar esta impressora.'] },
+  usb: { titulo: 'Ligue a impressora no cabo USB', passos: ['Ligue a impressora na tomada e no USB do computador.', 'Espere ela aparecer abaixo (leva alguns segundos).', 'Clique em Usar esta impressora. Se o driver do fabricante já estiver instalado, o assistente reconhece e usa; se não estiver, funciona sem ele.'] },
   ble: { titulo: 'Conecte a impressora por Bluetooth', passos: ['Ligue a impressora e deixe o Bluetooth do computador ligado.', 'Clique em Escolher impressora e selecione a sua na lista do navegador (precisa ser o Google Chrome).', 'Não é preciso parear nos Ajustes do Sistema nem digitar código.'] },
   rede: { titulo: 'Informe o endereço da impressora na rede', passos: ['Ligue a impressora na mesma rede deste computador.', 'Descubra o endereço IP dela (aparece na etiqueta de autoteste ou no roteador).', 'Digite o endereço e clique em Usar este endereço.'] },
 };
@@ -469,14 +470,20 @@ function desenharGuia() {
       $('et-2-passos').dataset.met = metodo;
       $('et-2-passos').replaceChildren(...P.passos.map((t) => el('li', { textContent: t })));
       const acao = $('et-2-acao');
-      if (metodo === 'usb') acao.replaceChildren(Object.assign(el('button', { className: 'acao primaria', type: 'button', textContent: 'Usar esta impressora' }), { onclick: () => { const u = dados.conexoes.usb.find((x) => x.ligada); if (u) fazer('Ligando no cabo', () => api('/api/config', { conexao: { tipo: 'usb', fila: u.fila } })); } }));
+      if (metodo === 'usb') acao.replaceChildren(Object.assign(el('button', { className: 'acao primaria', type: 'button', textContent: 'Usar esta impressora' }), { onclick: () => { const u = dados.conexoes.usb.find((x) => x.ligada); if (u) fazer('Ligando no cabo', () => api('/api/config', { conexao: u.semFila ? { tipo: 'usb', uri: u.uri } : { tipo: 'usb', fila: u.fila } })); } }));
       if (metodo === 'ble') acao.replaceChildren(Object.assign(el('button', { className: 'acao primaria', type: 'button', textContent: 'Escolher impressora' }), { onclick: bleProcurar }));
       if (metodo === 'rede') { const campo = el('input', { className: 'num', placeholder: '192.168.0.50', style: 'padding:8px 10px;border:1px solid var(--borda);border-radius:8px;min-height:40px' }); campo.setAttribute('aria-label', 'Endereço IP da impressora'); acao.replaceChildren(campo, Object.assign(el('button', { className: 'acao primaria', type: 'button', textContent: 'Usar este endereço' }), { onclick: () => fazer('Gravando o endereço', () => api('/api/config', { conexao: { tipo: 'rede', host: campo.value.trim(), portaRede: 9100 } })) })); }
     }
     const usb = conexoes.usb.find((x) => x.ligada);
+    const instalado = conexoes.usb.find((x) => !x.semFila);
     const certo = config.conexao.tipo === metodo && fila.ok;
+    const textoUsb = usb && !usb.semFila ? 'Driver já instalado: ' + usb.nome + '. Clique em Usar esta impressora para ligar a impressão direta.'
+      : usb ? 'Impressora no cabo: ' + usb.nome + '. Não tem driver instalado, e não precisa: clique em Usar esta impressora.'
+        : instalado ? 'Driver já instalado (' + instalado.nome + '), mas a impressora está desligada ou sem cabo.'
+          : 'Nenhuma impressora encontrada no cabo ainda. Procurando…';
+    $('et-2-driver').hidden = metodo !== 'usb';
     $('et-2-estado').textContent = certo ? 'Conectada: ' + fila.texto + '. Pode continuar.'
-      : metodo === 'usb' ? (usb ? 'Encontrada no cabo: ' + usb.nome : 'Nenhuma impressora encontrada no cabo ainda. Procurando…')
+      : metodo === 'usb' ? textoUsb
         : metodo === 'ble' ? (navigator.bluetooth ? (config.conexao.tipo === 'ble' ? fila.texto : 'Aguardando você escolher a impressora.') : 'Este navegador não tem Bluetooth: abra este painel no Google Chrome.')
           : 'Aguardando o endereço.';
   }

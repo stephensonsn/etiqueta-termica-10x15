@@ -32,7 +32,7 @@ Mercado Livre (botão Imprimir etiquetas)          Shopee (gera o .zip Térmica 
 ```
 
 - **Mercado Livre.** O site procura o programa *Zebra Browser Print* em `http://127.0.0.1:9100`. A ponte responde nesse endereço com as mesmas rotas (`/default`, `/available`, `/write`, `/read`), então o site acredita que há uma Zebra e manda o ZPL.
-- **Shopee.** Não tem impressão direta: ela gera um .zip. A ponte vigia a pasta Downloads, lê o arquivo assim que ele chega, imprime e manda o arquivo para a Lixeira.
+- **Shopee.** Não tem impressão direta: ela gera um .zip. A ponte vigia a pasta Downloads, lê o arquivo assim que ele chega, imprime e, com tudo impresso, apaga o arquivo (dá para desligar em Ajustes).
 - **Uma fila só.** Os dois caem na mesma fila. No modo direto ela fica vazia; só aparece no painel o que ficou parado.
 
 ### O layout
@@ -44,6 +44,10 @@ Mercado Livre (botão Imprimir etiquetas)          Shopee (gera o .zip Térmica 
 - Se nome, endereço ou complemento forem longos, a letra do destinatário diminui até 2,5 mm. Se nem assim couber, envio e documento fiscal saem em etiquetas separadas, em vez de cortar texto.
 
 ## Instalação no macOS
+
+**Jeito simples:** baixe o `EtiquetaTermica-<versão>.dmg` na página de [Releases](https://github.com/stephensonsn/etiqueta-termica-10x15/releases), abra e dê dois cliques em *Instalar.command*. Não tem pré-requisito: ele já traz o Node.js e o conector Bluetooth, e começa com uma checagem do computador que mostra o que está pronto, o que falta e como resolver. Como o instalador não é assinado pela Apple, na primeira vez é preciso clicar com o botão direito e escolher *Abrir*.
+
+**Pelo código-fonte:**
 
 Você precisa de:
 
@@ -67,7 +71,7 @@ Passo a passo:
    ./instalar.sh
    ```
 4. Na primeira vez o instalador abre o painel (<http://127.0.0.1:9100/painel>) com o **assistente de configuração**: você escolhe a conexão (cabo, Bluetooth ou rede), seleciona a impressora e imprime uma etiqueta de teste.
-5. **Só para o cabo USB:** adicione a impressora em *Ajustes do Sistema → Impressoras e Scanners*, com o driver do fabricante. A ponte usa a fila em modo bruto; o driver serve apenas para o macOS criar a fila.
+5. **Cabo USB:** ligue a impressora e clique em *Usar esta impressora*. Se o driver do fabricante já estiver instalado, o assistente reconhece e usa a fila dele. Se não estiver, a ponte cria a própria fila e funciona sem driver. O driver do fabricante só é necessário para imprimir de outros programas; ele não vem neste projeto e deve ser baixado no [site oficial](https://www.oasismarket.com.br/index.php?c=category&id=12).
 6. **Só para Bluetooth:** abra o painel no Google Chrome, clique em *Escolher impressora* na linha Bluetooth e selecione a sua. É uma vez só; daí em diante o computador liga nela sozinho.
 
 ### Ligar no Mercado Livre
@@ -168,6 +172,7 @@ node src/imprimir.js arquivo.txt --previa   # gera a prévia em previa/ sem impr
 | `src/painel.html` | O painel. |
 | `conector-bluetooth/main.swift` | Conector Bluetooth do macOS. |
 | `exemplos/` | Etiqueta de exemplo com dados fictícios. |
+| `empacotar-mac.sh` | Monta o instalador `.dmg` do macOS. |
 
 ## Créditos
 

@@ -5,3 +5,5 @@ previa/
 config.json
 conector-bluetooth/conector-bluetooth
 .DS_Store
+build/
+dist/

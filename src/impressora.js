@@ -51,6 +51,14 @@ function salvarConfig(novo) {
     const n = novo.conexao;
     if (n.tipo === 'usb') {
       cxCache.quando = 0;
+      if (n.uri) {
+        // cria uma fila em modo bruto para a impressora que está no cabo (dispensa o driver do fabricante)
+        const achada = listarConexoes().usb.find((u) => u.semFila && u.uri === n.uri);
+        if (!achada) throw new Error('impressora não encontrada no cabo USB');
+        execFileSync('/usr/sbin/lpadmin', ['-p', 'Etiqueta_10x15', '-E', '-v', achada.uri, '-m', 'raw', '-D', 'Etiqueta 10x15'], { timeout: 15000 });
+        n.fila = 'Etiqueta_10x15';
+        cxCache.quando = 0;
+      }
       if (n.fila !== undefined && !listarConexoes().usb.some((u) => u.fila === n.fila)) throw new Error('fila USB não encontrada no macOS');
       if (n.fila) cfg.fila = n.fila;
       cfg.conexao.tipo = 'usb';
@@ -115,8 +123,17 @@ function listarConexoesAgora() {
     const noCabo = execFileSync('/usr/sbin/lpinfo', ['--include-schemes', 'usb', '-v'], { timeout: 5000, env }).toString();
     const serie = (u) => (u.match(/serial=([^&\s]+)/) || [])[1];
     for (const u of usb) {
+      u.serie = serie(u.uri) || '';
       u.ligada = serie(u.uri) ? noCabo.includes(`serial=${serie(u.uri)}`) : noCabo.includes(encodeURI(u.nome)) || noCabo.includes(u.nome);
       delete u.uri;
+    }
+    // impressora no cabo que o macOS ainda não conhece: a ponte cria a fila sozinha, sem driver do fabricante
+    for (const l of noCabo.split('\n')) {
+      const m = l.match(/(usb:\/\/\S+)/);
+      if (!m) continue;
+      const s2 = serie(m[1]);
+      if (usb.some((u) => u.ligada && (!s2 || u.serie === s2))) continue;
+      usb.push({ fila: '', nome: decodeURIComponent(m[1].replace(/^usb:\/\/+/, '').split('?')[0]).split('/').pop(), ligada: true, semFila: true, uri: m[1] });
     }
   } catch (_) { /* sem CUPS */ }
   let bluetooth = [];
@@ -329,6 +346,7 @@ async function imprimirPedido(jid) {
     if (cobertura(img) < 0.01) throw new Error('etiqueta saiu quase em branco na montagem; não foi enviada');
     await enviar((tipo) => (tipo === 'ble' ? paraTsplCompacto(img, cfg.calib) : paraTspl(img, cfg.calib)), `${p.jid}-${p.id || 'teste'}-${p.tipo}`.replace(/[^\w.+-]+/g, '_'));
     p.estado = 'impresso'; p.erro = ''; p.impressoes++;
+    apagarSeImprimiu(p.arquivo);
     // as últimas enviadas ficam na memória (até 40) para reimprimir depois de um papel travado;
     // sem "guardar histórico", nada disso vai para o disco além da prévia temporária
   } catch (e) {
@@ -390,6 +408,19 @@ function lerZplDeArquivo(caminho) {
   return zpl;
 }
 
+// Apaga de vez o arquivo baixado quando todas as etiquetas que vieram dele já imprimiram.
+// Enquanto alguma estiver parada na fila, o arquivo fica. Só vale para arquivos que a vigia importou.
+function apagarSeImprimiu(arquivo) {
+  if (!arquivo || !cfg.limparDownloads) return;
+  const dele = pedidos.filter((p) => p.arquivo === arquivo);
+  if (!dele.length || !dele.every((p) => p.estado === 'impresso')) return;
+  try {
+    fs.rmSync(arquivo, { force: true });
+    for (const p of dele) p.arquivo = '';
+    log(`arquivo apagado depois de imprimir: ${path.basename(arquivo)}`);
+  } catch (e) { log(`não deu para apagar ${path.basename(arquivo)}: ${e.message}`); }
+}
+
 // Vigia a pasta Downloads: etiqueta baixada do Mercado Livre ou da Shopee entra sozinha.
 // Idempotente: cada arquivo (nome + tamanho + data) é processado uma vez só, mesmo após reiniciar.
 const PASTA = path.join(require('os').homedir(), 'Downloads');
@@ -419,12 +450,10 @@ async function varrerDownloads(inicial) {
           const zpl = lerZplDeArquivo(caminho);
           if (zpl) {
             log(`arquivo novo em Downloads: ${nome}`);
-            await receberZpl(zpl, { origem: 'Downloads' });
-            if (cfg.limparDownloads) {
-              // o arquivo já virou etiqueta: vai para a Lixeira (dá para recuperar), não fica acumulando
-              try { fs.renameSync(caminho, path.join(require('os').homedir(), '.Trash', `${Date.now()}-${nome}`)); }
-              catch (e) { log(`não deu para mover ${nome} para a Lixeira: ${e.message}`); }
-            }
+            const feitos = await receberZpl(zpl, { origem: 'Downloads' });
+            // o arquivo só é apagado depois que TODAS as etiquetas dele imprimirem (ver apagarSeImprimiu)
+            for (const p of feitos) p.arquivo = caminho;
+            apagarSeImprimiu(caminho);
           }
         } catch (e) { log(`ERRO ao ler ${nome}: ${e.message}`); }
       }
