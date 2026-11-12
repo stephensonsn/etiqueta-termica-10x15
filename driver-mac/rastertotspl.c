@@ -50,39 +50,68 @@ int main(int argc, char *argv[]) {
   while (cupsRasterReadHeader2(ras, &h)) {
     pagina++;
     if (h.cupsWidth == 0 || h.cupsHeight == 0 || h.cupsBytesPerLine == 0) break;
-    unsigned larg = h.cupsWidth > LARGURA_MAX ? LARGURA_MAX : h.cupsWidth;
-    double largMm = h.cupsPageSize[0] > 0 ? h.cupsPageSize[0] * 25.4 / 72.0 : (double)h.cupsWidth / PONTOS_POR_MM;
-    double altMm = h.cupsPageSize[1] > 0 ? h.cupsPageSize[1] * 25.4 / 72.0 : (double)h.cupsHeight / PONTOS_POR_MM;
-    /* a imagem não pode passar da altura real da etiqueta, senão a impressora corta e desloca */
-    unsigned altMax = (unsigned)(altMm * 203.0 / 25.4);
-    unsigned alt = h.cupsHeight > altMax && altMax > 0 ? altMax : h.cupsHeight;
-    unsigned bytesLinha = (larg + 7) / 8;
-
-    unsigned char *linha = malloc(h.cupsBytesPerLine);
-    unsigned char *img = malloc((size_t)bytesLinha * alt);
-    if (!linha || !img) { fputs("ERROR: sem memória\n", stderr); return 1; }
-    memset(img, 0xFF, (size_t)bytesLinha * alt); /* no TSPL, bit 1 = branco */
-
-    unsigned bpp = h.cupsBitsPerPixel;
+    /* 1) lê a página inteira em tons de cinza (0 = preto, 255 = branco), seja qual for o formato de entrada */
+    unsigned W = h.cupsWidth, H = h.cupsHeight, bpp = h.cupsBitsPerPixel;
     int pretoEhAlto = (h.cupsColorSpace == CUPS_CSPACE_K); /* em K, valor alto = tinta */
-    for (unsigned y = 0; y < h.cupsHeight; y++) {
+    unsigned char *linha = malloc(h.cupsBytesPerLine);
+    unsigned char *cinza = malloc((size_t)W * H);
+    if (!linha || !cinza) { fputs("ERROR: sem memória\n", stderr); return 1; }
+    memset(cinza, 255, (size_t)W * H);
+    for (unsigned y = 0; y < H; y++) {
       if (cupsRasterReadPixels(ras, linha, h.cupsBytesPerLine) == 0) break;
-      if (y >= alt) continue;
-      for (unsigned x = 0; x < larg; x++) {
-        int preto;
-        if (bpp == 1) {
-          int bit = (linha[x >> 3] >> (7 - (x & 7))) & 1;
-          preto = pretoEhAlto ? bit : !bit;
-        } else if (bpp == 8) {
-          preto = pretoEhAlto ? linha[x] > (255 - limiar) : linha[x] < limiar;
-        } else { /* 24 ou 32 bits: usa a luminosidade */
-          unsigned char *p = linha + (size_t)x * (bpp / 8);
-          int lum = (p[0] * 299 + p[1] * 587 + p[2] * 114) / 1000;
-          preto = lum < limiar;
-        }
-        if (preto) img[(size_t)y * bytesLinha + (x >> 3)] &= (unsigned char)~(0x80 >> (x & 7));
+      for (unsigned x = 0; x < W; x++) {
+        int v;
+        if (bpp == 1) { int bit = (linha[x >> 3] >> (7 - (x & 7))) & 1; v = (pretoEhAlto ? bit : !bit) ? 0 : 255; }
+        else if (bpp == 8) v = pretoEhAlto ? 255 - linha[x] : linha[x];
+        else { unsigned char *p = linha + (size_t)x * (bpp / 8); v = (p[0] * 299 + p[1] * 587 + p[2] * 114) / 1000; }
+        cinza[(size_t)y * W + x] = (unsigned char)v;
       }
     }
+    free(linha);
+
+    /* 2) tamanho de saída. Se o programa mandou uma página maior que a etiqueta (A4, Carta),
+          reduz para caber em 100 x 150 mm em vez de imprimir cortado ou numa tira comprida */
+    double largMm = h.cupsPageSize[0] > 0 ? h.cupsPageSize[0] * 25.4 / 72.0 : (double)W / PONTOS_POR_MM;
+    double altMm = h.cupsPageSize[1] > 0 ? h.cupsPageSize[1] * 25.4 / 72.0 : (double)H / PONTOS_POR_MM;
+    unsigned larg = W, alt = H;
+    double escala = 1.0;
+    if (largMm > 110.0 || W > LARGURA_MAX) {
+      double ex = 800.0 / W, ey = 1198.0 / H;
+      escala = ex < ey ? ex : ey;
+      larg = (unsigned)(W * escala); alt = (unsigned)(H * escala);
+      if (larg < 1) larg = 1;
+      if (alt < 1) alt = 1;
+      largMm = 100.0; altMm = 150.0;
+      fprintf(stderr, "INFO: página maior que a etiqueta: reduzida para %.0f%% para caber em 100 x 150 mm\n", escala * 100);
+    }
+    /* a imagem não pode passar da altura real da etiqueta, senão a impressora corta e desloca */
+    unsigned altMax = (unsigned)(altMm * 203.0 / 25.4);
+    if (altMax > 0 && alt > altMax) alt = altMax;
+    unsigned bytesLinha = (larg + 7) / 8;
+    unsigned char *img = malloc((size_t)bytesLinha * alt);
+    if (!img) { fputs("ERROR: sem memória\n", stderr); return 1; }
+    memset(img, 0xFF, (size_t)bytesLinha * alt); /* no TSPL, bit 1 = branco */
+
+    /* 3) cinza -> preto e branco; na redução, cada ponto de saída é a média da área de origem */
+    for (unsigned y = 0; y < alt; y++) {
+      for (unsigned x = 0; x < larg; x++) {
+        int v;
+        if (escala == 1.0) v = cinza[(size_t)y * W + x];
+        else {
+          unsigned x0 = (unsigned)(x / escala), x1 = (unsigned)((x + 1) / escala), y0 = (unsigned)(y / escala), y1 = (unsigned)((y + 1) / escala);
+          if (x1 <= x0) x1 = x0 + 1;
+          if (y1 <= y0) y1 = y0 + 1;
+          if (x1 > W) x1 = W;
+          if (y1 > H) y1 = H;
+          unsigned long soma = 0, qtd = 0;
+          for (unsigned yy = y0; yy < y1; yy++) for (unsigned xx = x0; xx < x1; xx++) { soma += cinza[(size_t)yy * W + xx]; qtd++; }
+          v = qtd ? (int)(soma / qtd) : 255;
+        }
+        /* na redução o traço fino clareia: aceita um cinza mais claro como preto */
+        if (v < (escala == 1.0 ? limiar : limiar + 40)) img[(size_t)y * bytesLinha + (x >> 3)] &= (unsigned char)~(0x80 >> (x & 7));
+      }
+    }
+    free(cinza);
 
     if (pagina == 1) {
       /* a impressora perde o começo do trabalho pelo USB: o enchimento garante que o SIZE chegue */
@@ -94,7 +123,6 @@ int main(int argc, char *argv[]) {
     fwrite(img, 1, (size_t)bytesLinha * alt, stdout);
     printf("\r\nPRINT 1,%d\r\n", copias);
     fprintf(stderr, "INFO: página %d: %ux%u pontos, %u bit(s) por ponto, %.0fx%.0f mm\n", pagina, larg, alt, bpp, largMm, altMm);
-    free(linha);
     free(img);
   }
   cupsRasterClose(ras);
