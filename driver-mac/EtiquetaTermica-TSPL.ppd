@@ -32,6 +32,8 @@
 *PageSize w283h212/100 x 75 mm: "<</PageSize[283 212]/ImagingBBox null>>setpagedevice"
 *PageSize w227h142/80 x 50 mm: "<</PageSize[227 142]/ImagingBBox null>>setpagedevice"
 *PageSize w170h85/60 x 30 mm: "<</PageSize[170 85]/ImagingBBox null>>setpagedevice"
+*PageSize A4/A4 (reduzido para caber na etiqueta): "<</PageSize[595 842]/ImagingBBox null>>setpagedevice"
+*PageSize Letter/Carta (reduzido para caber na etiqueta): "<</PageSize[612 792]/ImagingBBox null>>setpagedevice"
 *CloseUI: *PageSize
 
 *OpenUI *PageRegion/Tamanho da etiqueta: PickOne
@@ -43,6 +45,8 @@
 *PageRegion w283h212/100 x 75 mm: "<</PageSize[283 212]/ImagingBBox null>>setpagedevice"
 *PageRegion w227h142/80 x 50 mm: "<</PageSize[227 142]/ImagingBBox null>>setpagedevice"
 *PageRegion w170h85/60 x 30 mm: "<</PageSize[170 85]/ImagingBBox null>>setpagedevice"
+*PageRegion A4/A4 (reduzido para caber na etiqueta): "<</PageSize[595 842]/ImagingBBox null>>setpagedevice"
+*PageRegion Letter/Carta (reduzido para caber na etiqueta): "<</PageSize[612 792]/ImagingBBox null>>setpagedevice"
 *CloseUI: *PageRegion
 
 *DefaultImageableArea: w283h425
@@ -52,6 +56,8 @@
 *ImageableArea w283h212/100 x 75 mm: "0 0 283 212"
 *ImageableArea w227h142/80 x 50 mm: "0 0 227 142"
 *ImageableArea w170h85/60 x 30 mm: "0 0 170 85"
+*ImageableArea A4/A4 (reduzido para caber na etiqueta): "0 0 595 842"
+*ImageableArea Letter/Carta (reduzido para caber na etiqueta): "0 0 612 792"
 
 *DefaultPaperDimension: w283h425
 *PaperDimension w283h425/100 x 150 mm (etiqueta de envio): "283 425"
@@ -60,6 +66,8 @@
 *PaperDimension w283h212/100 x 75 mm: "283 212"
 *PaperDimension w227h142/80 x 50 mm: "227 142"
 *PaperDimension w170h85/60 x 30 mm: "170 85"
+*PaperDimension A4/A4 (reduzido para caber na etiqueta): "595 842"
+*PaperDimension Letter/Carta (reduzido para caber na etiqueta): "612 792"
 
 *OpenUI *Resolution/Resolucao: PickOne
 *OrderDependency: 20 AnySetup *Resolution

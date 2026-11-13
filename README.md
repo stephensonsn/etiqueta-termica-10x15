@@ -158,7 +158,8 @@ sudo ./driver-mac/instalar-driver.sh remover
 Observações:
 
 - A ponte precisa estar instalada e no ar; o driver só funciona junto com ela.
-- Alguns programas (o Acrobat, por exemplo) continuam em A4 mesmo com a impressora escolhida. Escolha o papel "100 x 150 mm" em *Configurar página*. Se a página chegar maior que a etiqueta mesmo assim, o filtro reduz para caber em 100 x 150 mm em vez de imprimir cortado.
+- **Documentos A4 ou Carta:** escolha o papel "A4" na janela de impressão (é o que os programas já fazem sozinhos com um PDF A4). O driver corta as margens em branco e reduz só o necessário para caber em 100 x 150 mm, centralizado. Um documento pequeno sai em tamanho real; uma página cheia sai reduzida.
+- **Página em branco não gasta etiqueta:** se o programa mandar em tamanho real um documento A4 para o papel de 100 x 150 mm, só chega um canto vazio da página. O driver recusa o trabalho e avisa na fila de impressão, em vez de soltar uma etiqueta em branco.
 - A Apple marca esse tipo de driver (filtro e modelo do CUPS) como em fim de vida. Funciona hoje, mas pode deixar de funcionar numa versão futura do macOS.
 - Ao imprimir de outros programas o macOS redimensiona a página em frações de ponto; para etiquetas de marketplace use sempre a ponte, que mantém os códigos de barras exatos.
 
