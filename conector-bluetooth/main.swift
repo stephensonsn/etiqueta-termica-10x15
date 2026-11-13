@@ -37,6 +37,11 @@ final class Conector: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
     var consultaQuando = Date.distantPast
     var jaRespondeu = false
     var contador = 0
+    var tentativas = 0
+    var canalInfo: CBCharacteristic?   // canal de leitura usado como sinal de vida
+    var pulsoPedido: Date?
+    var retomar = false                // reenviar o trabalho atual depois de reconectar
+    var jaIdentificou = false
     var consultasSemResposta = 0
     var inicioEnvio = Date()
 
@@ -96,12 +101,14 @@ final class Conector: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
 
     func centralManager(_ c: CBCentralManager, didDisconnectPeripheral p: CBPeripheral, error: Error?) {
         registrar("a impressora desconectou; reconectando")
-        if let id = idTrabalho { confirmar(id, ok: false, erro: "a impressora desconectou no meio do envio") }
+        bomba?.invalidate(); bomba = nil
+        if let id = idTrabalho, !(retomar && tentativas < 2) { confirmar(id, ok: false, erro: "a impressora desconectou no meio do envio"); retomar = false }
         reiniciarBusca()
     }
 
     func reiniciarBusca() {
-        impressora = nil; canal = nil; ocupado = false; idTrabalho = nil; estado = nil; jaRespondeu = false
+        impressora = nil; canal = nil; canalInfo = nil; pulsoPedido = nil; estado = nil; jaRespondeu = false
+        if !retomar { ocupado = false; idTrabalho = nil }
         informar()
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in self?.procurar() }
     }
@@ -135,7 +142,15 @@ final class Conector: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
             registrar("conectada em \(p.name ?? "impressora") (canal \(c.uuid.uuidString)); consultando o estado")
             consultarEstado()
             // identificação do módulo Bluetooth (modelo, versão), só para o registro
-            for ch in (p.services ?? []).flatMap({ $0.characteristics ?? [] }) where ch.properties.contains(.read) && ch.uuid.uuidString.hasPrefix("2A") { p.readValue(for: ch) }
+            let legiveis = (p.services ?? []).flatMap({ $0.characteristics ?? [] }).filter { $0.properties.contains(.read) && $0.uuid.uuidString.hasPrefix("2A") }
+            canalInfo = legiveis.first
+            if !jaIdentificou { for ch in legiveis { p.readValue(for: ch) }; DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in self?.jaIdentificou = true } }
+            // trabalho interrompido por ligação morta: manda de novo, do começo
+            if retomar, idTrabalho != nil {
+                retomar = false; tentativas += 1; posicao = 0; ultimoAvanco = Date(); inicioEnvio = Date()
+                registrar("reenviando a etiqueta depois de reconectar")
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in self?.escrever() }
+            }
         } else {
             registrar("a impressora não mostrou canal de escrita")
             central.cancelPeripheralConnection(p)
@@ -151,7 +166,9 @@ final class Conector: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
     }
 
     func peripheral(_ p: CBPeripheral, didUpdateValueFor ch: CBCharacteristic, error: Error?) {
+        pulsoPedido = nil // qualquer resposta prova que a ligação está viva
         guard let v = ch.value, let b = v.first else { return }
+        if ch.uuid.uuidString.hasPrefix("2A2") && jaIdentificou { return } // leitura de sinal de vida: não polui o registro
         if v.count != 1 || ch.uuid.uuidString.hasPrefix("2A2") {
             let texto = String(data: v, encoding: .utf8)?.trimmingCharacters(in: .controlCharacters) ?? ""
             registrar("resposta em \(ch.uuid.uuidString) (\(v.count) bytes): " + v.prefix(40).map { String(format: "%02x", $0) }.joined(separator: " ") + (texto.isEmpty ? "" : " = \(texto)"))
@@ -177,13 +194,25 @@ final class Conector: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
 
     // ---------- trabalhos ----------
     func tique() {
-        // envio parado há mais de 20 s: desiste e reconecta
-        if ocupado, Date().timeIntervalSince(ultimoAvanco) > 20, let p = impressora {
-            registrar("envio travado; reiniciando a conexão")
+        // envio parado há mais de 4 s: a ligação morreu. Reconecta e manda de novo, sem falhar o trabalho
+        if idTrabalho != nil, Date().timeIntervalSince(ultimoAvanco) > 4, let p = impressora {
+            registrar("envio parado; reiniciando a conexão para mandar de novo")
+            retomar = true
             central.cancelPeripheralConnection(p)
             return
         }
         contador += 1
+        // sinal de vida a cada 10 s: depois de horas parada a ligação pode estar morta sem avisar,
+        // e a primeira etiqueta ficava esperando. Uma leitura sem resposta em 3 s força a reconexão.
+        if idTrabalho == nil, canal != nil, let p = impressora {
+            if let pedido = pulsoPedido, Date().timeIntervalSince(pedido) > 3 {
+                registrar("a impressora não respondeu ao sinal de vida; reconectando")
+                pulsoPedido = nil
+                central.cancelPeripheralConnection(p)
+                return
+            }
+            if contador % 10 == 0, pulsoPedido == nil, let ch = canalInfo { pulsoPedido = Date(); p.readValue(for: ch) }
+        }
         if contador % 3 == 0 { informar() }
         guard canal != nil, !ocupado else { return }
         if contador % 4 == 0 { consultarEstado() }
@@ -197,7 +226,7 @@ final class Conector: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
                     self.ocupado = false
                     return
                 }
-                self.idTrabalho = id; self.dados = bytes; self.posicao = 0; self.ultimoAvanco = Date(); self.inicioEnvio = Date()
+                self.idTrabalho = id; self.dados = bytes; self.posicao = 0; self.ultimoAvanco = Date(); self.inicioEnvio = Date(); self.tentativas = 0
                 registrar("enviando etiqueta \(id) (\(bytes.count) bytes)")
                 self.escrever()
             }

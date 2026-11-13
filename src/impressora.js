@@ -316,6 +316,7 @@ function cobertura(img) {
 const pedidos = []; // mais novo primeiro
 const imagens = new Map(); // jid -> imagem em memória
 const recentes = new Map(); // evita o mesmo envio duas vezes em sequência (clique duplo)
+const porNumero = new Map(); // número do envio -> por onde e quando chegou
 let seq = 0;
 
 function carimbo() {
@@ -377,6 +378,18 @@ async function receberZpl(zpl, { origem = 'manual', imprimir = cfg.imprimir === 
       continue;
     }
     recentes.set(hash, Date.now());
+    // O Mercado Livre manda a mesma etiqueta por dois caminhos ao mesmo tempo: direto para a ponte
+    // e como arquivo baixado. O texto não é idêntico (o site tira quebras de linha), então a
+    // comparação é pelo número do envio: o segundo que chegar em até 3 minutos, vindo de outro
+    // caminho, é ignorado.
+    const numero = (envio.match(/"id":"(\d+)"/) || [])[1];
+    const outro = numero && porNumero.get(numero);
+    if (outro && outro.origem !== origem && Date.now() - outro.quando < 180000) {
+      log(`envio ${numero} já veio por ${outro.origem}; ignorada a cópia que chegou por ${origem}`);
+      feitos.ignorados = (feitos.ignorados || 0) + 1;
+      continue;
+    }
+    if (numero) porNumero.set(numero, { origem, quando: Date.now() });
     const etiquetas = await montar(envio, modo);
     const id = etiquetas[0].id || `sem-id-${n + 1}`;
     if (cfg.guardarHistorico) fs.writeFileSync(path.join(RAIZ, 'recebidos', `${carimbo()}-${id}.zpl`), envio);
@@ -454,6 +467,10 @@ async function varrerDownloads(inicial) {
             // o arquivo só é apagado depois que TODAS as etiquetas dele imprimirem (ver apagarSeImprimiu)
             for (const p of feitos) p.arquivo = caminho;
             apagarSeImprimiu(caminho);
+            // arquivo só com cópias do que já veio pelo site: não tem mais serventia
+            if (!feitos.length && feitos.ignorados && cfg.limparDownloads) {
+              try { fs.rmSync(caminho, { force: true }); log(`arquivo apagado (cópia do que já foi impresso): ${nome}`); } catch (_) { /* fica */ }
+            }
           }
         } catch (e) { log(`ERRO ao ler ${nome}: ${e.message}`); }
       }

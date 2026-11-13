@@ -9,8 +9,8 @@ const A = 1200;         // altura da etiqueta em pontos (150 mm)
 const ENVIO_L = 832;    // o ZPL do ML passa um pouco de 800; renderiza com folga
 const ENVIO_A = 1218;
 const LINHAS_MAX = 1198; // 150 mm a 203 dpi
-const MX = 24;           // margem lateral de segurança (3 mm de cada lado)
-const MY = 16;           // margem de cima e de baixo (2 mm)
+const MX = 36;           // margem lateral de segurança (4,5 mm de cada lado)
+const MY = 32;           // margem de cima e de baixo (4 mm)
 const UTIL = L - 2 * MX; // largura útil, centralizada
 
 // ---------- utilidades de ZPL ----------
