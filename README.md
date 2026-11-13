@@ -98,7 +98,7 @@ Em <http://127.0.0.1:9100/painel>, acessível só do próprio computador.
 |---|---|
 | **Imprimir direto / Conferir antes** | Direto: o que chega já imprime. Conferir: fica na fila até você clicar. |
 | **Fila de impressão** | O que está esperando ou parado, com o motivo. Marque várias e imprima em sequência. |
-| **Enviadas** | As últimas 40, para reimprimir depois de um papel travado. Ficam só na memória. |
+| **Enviadas** | As últimas 40, para reimprimir depois de um papel travado. Ficam só na memória. Inclui o que foi impresso de outros programas pelo driver de sistema. |
 | **Prévia** | A imagem exata que vai para a impressora. |
 | **Impressora** | Cabo USB, Bluetooth ou rede. |
 | **Ajustes de impressão** | Deslocamento, escuro, velocidade, formato junto ou separado, régua de teste. |

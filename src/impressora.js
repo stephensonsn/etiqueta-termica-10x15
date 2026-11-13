@@ -485,13 +485,44 @@ setInterval(async () => {
   repetindo = false;
 }, 5000);
 
-// Trabalho pronto em TSPL, vindo do driver de sistema: confere o mínimo e manda pela conexão escolhida.
+// Trabalho vindo do driver de sistema (qualquer programa do Mac). Cada página vira um item da
+// fila, com prévia, igual às etiquetas dos marketplaces: aparece no painel, pode ser reimpressa
+// e, se a impressora não estiver disponível, fica parada e sai sozinha quando ela voltar.
+function paginasDoTspl(bytes) {
+  const paginas = [];
+  const txt = bytes.toString('latin1');
+  const re = /BITMAP \d+,\d+,(\d+),(\d+),[012],/g;
+  let m;
+  while ((m = re.exec(txt))) {
+    const lb = Number(m[1]), alt = Number(m[2]);
+    const ini = m.index + m[0].length;
+    if (!lb || !alt || ini + lb * alt > bytes.length) break;
+    const img = { l: 800, a: 1200, bits: new Uint8Array(800 * 1200) };
+    for (let y = 0; y < alt && y < 1200; y++) {
+      for (let x = 0; x < lb * 8 && x < 800; x++) {
+        if (!((bytes[ini + y * lb + (x >> 3)] >> (7 - (x & 7))) & 1)) img.bits[y * 800 + x] = 1; // no TSPL, bit 0 = preto
+      }
+    }
+    paginas.push(img);
+    re.lastIndex = ini + lb * alt;
+  }
+  return paginas;
+}
 let seqBruto = 0;
 async function enviarBruto(bytes) {
   const inicio = bytes.toString('latin1', 0, Math.min(bytes.length, 4096));
   if (bytes.length < 20 || !/SIZE \d/.test(inicio)) throw new Error('o trabalho não é TSPL');
-  await enviar(() => bytes, `${carimbo()}-driver-${++seqBruto}`);
-  log(`trabalho do driver de sistema enviado (${bytes.length} bytes)`);
+  const paginas = paginasDoTspl(bytes);
+  if (!paginas.length) { // comando sem imagem: manda como veio
+    await enviar(() => bytes, `${carimbo()}-driver-${++seqBruto}`);
+    return;
+  }
+  const n = ++seqBruto;
+  for (const [i, img] of paginas.entries()) {
+    const p = registrar(`Documento ${n}${paginas.length > 1 ? ` (pág. ${i + 1})` : ''}`, 'impresso por outro programa', 'driver', img);
+    if (cfg.imprimir === 'direto') await imprimirPedido(p.jid).catch((e) => { p.repetir = true; log(`ERRO ao imprimir ${p.id}: ${e.message} (vai tentar de novo sozinho)`); });
+  }
+  log(`${cfg.imprimir === 'direto' ? 'impresso' : 'aguardando conferência'}: documento ${n} do driver de sistema (${paginas.length} página(s))`);
 }
 
 // ---------- diagnóstico ----------
