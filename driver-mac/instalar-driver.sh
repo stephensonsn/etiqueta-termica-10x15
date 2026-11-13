@@ -27,7 +27,7 @@ install -o root -g wheel -m 755 "$AQUI/rastertotspl" "$DIR/rastertotspl"
 install -o root -g wheel -m 644 "$AQUI/EtiquetaTermica-TSPL.ppd" "$PPD"
 
 passo "criando a impressora $FILA"
-lpadmin -p "$FILA" -E -v "socket://127.0.0.1:9102" -P "$PPD" -D "Etiqueta Termica 10x15" -o PageSize=w283h425 -o printer-error-policy=abort-job 2>>"$REG" || { passo "ERRO ao criar a impressora"; remover; exit 1; }
+lpadmin -p "$FILA" -E -v "socket://127.0.0.1:9102" -P "$PPD" -D "Etiqueta Termica 10x15" -o PageSize=w283h425 -o printer-error-policy=abort-job -o fit-to-page-default=true 2>>"$REG" || { passo "ERRO ao criar a impressora"; remover; exit 1; }
 
 # conferência: a fila existe e aceita trabalhos
 if lpstat -p "$FILA" >/dev/null 2>&1 && lpstat -a "$FILA" >/dev/null 2>&1; then

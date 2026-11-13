@@ -141,7 +141,7 @@ O projeto tem duas partes independentes:
 1. **A ponte**, que imprime as etiquetas do Mercado Livre e da Shopee. Não precisa de driver nenhum.
 2. **O driver de sistema** (opcional), em `driver-mac/`. Com ele a impressora aparece no *Imprimir* de qualquer programa do Mac (Pré-Visualização, Word, navegador) como "Etiqueta Termica 10x15".
 
-O driver foi escrito do zero para este projeto: um filtro (`rastertotspl.c`) que transforma a página desenhada pelo macOS em comandos TSPL, e um modelo de impressora (`.ppd`) com os tamanhos de etiqueta, o escuro e a velocidade. O trabalho é entregue à ponte por uma porta local, e a ponte manda pela conexão escolhida no painel. Por isso **qualquer programa imprime também por Bluetooth**, o que o driver do fabricante para Mac não faz.
+O driver foi escrito do zero para este projeto: um filtro (`rastertotspl.c`) que transforma a página desenhada pelo macOS em comandos TSPL, e um modelo de impressora (`.ppd`) com o papel de 100 x 150 mm, o escuro e a velocidade. O trabalho é entregue à ponte por uma porta local, e a ponte manda pela conexão escolhida no painel. Por isso **qualquer programa imprime também por Bluetooth**, o que o driver do fabricante para Mac não faz.
 
 Para instalar (pede a senha de administrador, porque grava em `/Library/Printers`):
 
@@ -158,8 +158,8 @@ sudo ./driver-mac/instalar-driver.sh remover
 Observações:
 
 - A ponte precisa estar instalada e no ar; o driver só funciona junto com ela.
-- **Documentos A4 ou Carta:** escolha o papel "A4" na janela de impressão (é o que os programas já fazem sozinhos com um PDF A4). O driver corta as margens em branco e reduz só o necessário para caber em 100 x 150 mm, centralizado. Um documento pequeno sai em tamanho real; uma página cheia sai reduzida.
-- **Página em branco não gasta etiqueta:** se o programa mandar em tamanho real um documento A4 para o papel de 100 x 150 mm, só chega um canto vazio da página. O driver recusa o trabalho e avisa na fila de impressão, em vez de soltar uma etiqueta em branco.
+- **Um tamanho só:** a impressora aparece com um único papel, "Etiqueta 100 x 150 mm", que é o que ela tem. Para imprimir um documento maior (A4, Carta), marque *Ajustar* ou *Ajustar ao papel* na janela de impressão do programa.
+- **Página em branco não gasta etiqueta:** se o programa mandar em tamanho real um documento A4 para o papel de 100 x 150 mm, só chega um canto vazio da página. O driver recusa o trabalho e avisa na fila de impressão, em vez de soltar uma etiqueta em branco. Se o programa insistir em mandar uma página maior que a etiqueta, o driver corta as margens em branco e reduz o conteúdo para caber.
 - A Apple marca esse tipo de driver (filtro e modelo do CUPS) como em fim de vida. Funciona hoje, mas pode deixar de funcionar numa versão futura do macOS.
 - Ao imprimir de outros programas o macOS redimensiona a página em frações de ponto; para etiquetas de marketplace use sempre a ponte, que mantém os códigos de barras exatos.
 
