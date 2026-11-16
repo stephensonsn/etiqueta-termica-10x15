@@ -1,0 +1,15 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {test}=require('node:test');
+const {generate,parseCSV}=require('../scripts/etiquetas-sku');
+const one={sku:'TT-SQ-QUE-001',barcode:'SQ0002',descricao:'Squishy queijo',quantidade:2};
+test('duas colunas imprime dois SKUs e uma linha',()=>{const d=generate([one]);assert.equal(d.manifest.rows,1);assert.equal(d.manifest.labels,2);assert.equal((d.tspl.match(/BARCODE /g)||[]).length,2);assert.equal((d.tspl.match(/PRINT 1,1/g)||[]).length,1);});
+test('bloqueia 34x23mm tres colunas se area imprimivel e 100mm',()=>{assert.throws(()=>generate([one],{columns:3,printableWidthMm:100}),/BLOQUEADO/);});
+test('libera tres colunas somente com largura declarada suficiente',()=>{const d=generate([one],{columns:3,printableWidthMm:110,paperWidthMm:110});assert.equal(d.manifest.layout.columns,3);});
+test('nao aceita codigo de barras longo',()=>{assert.throws(()=>generate([{...one,barcode:'TT-SQ-UNI-BUN-001'}]),/alias interno curto/);});
+test('nao aceita alias compartilhado por SKUs diferentes',()=>{assert.throws(()=>generate([one,{...one,sku:'TT-DIFF'}]),/atribuido a SKUs diferentes/);});
+test('nao aceita caracter de controle no SKU',()=>{assert.throws(()=>generate([{...one,sku:'ABC\nDEF'}]),/SKU invalido/);});
+test('nao aceita quantidades nao inteiras e acima de 500',()=>{assert.throws(()=>generate([{...one,quantidade:1.2}]),/quantidade invalida/);assert.throws(()=>generate([{...one,quantidade:501}]),/quantidade invalida/);});
+test('CSV com aspas e virgulas no titulo',()=>{const r=parseCSV('sku,barcode,descricao,quantidade\nTT-X,TT001,"Squishy, rosa",4\n');assert.equal(r[0].descricao,'Squishy, rosa');assert.equal(r[0].quantidade,'4');});
+test('TSPL nao permite interpolar comando via descricao',()=>{const d=generate([{...one,descricao:'Teste "\r\nPRINT 999'}]);assert.equal((d.tspl.match(/PRINT 1,1/g)||[]).length,1);assert.doesNotMatch(d.tspl,/\r\nPRINT 999/);});
+test('tamanho da pagina correto',()=>{const d=generate([one]);assert.match(d.tspl,/SIZE 74 mm,23 mm/);assert.match(d.tspl,/GAP 2 mm,0 mm/);});
