@@ -370,21 +370,22 @@ async function receberZpl(zpl, { origem = 'manual', imprimir = cfg.imprimir === 
   if (!envios.length) throw new Error('ZPL sem etiqueta (^XA...^XZ)');
   const feitos = [];
   for (const [n, envio] of envios.entries()) {
-    const hash = crypto.createHash('sha1').update(envio).digest('hex').slice(0, 10);
+    // SHA1 normalizado: remove espaços e quebras de linha para que API e Downloads
+    // com o mesmo conteúdo (mas formatação diferente) tenham o mesmo hash.
+    const normalizado = envio.replace(/[\s\r\n]+/g, '');
+    const hash = crypto.createHash('sha1').update(normalizado).digest('hex').slice(0, 10);
     const antes = recentes.get(hash);
-    const janela = origem === 'Downloads' ? 180 : cfg.janelaDuplicadoSeg;
-    if (antes && Date.now() - antes < janela * 1000) {
-      log(`ignorado envio repetido em menos de ${janela}s via ${origem} (${hash})`);
+    // Janela de 180s para TODOS os caminhos: ML manda por API e Downloads quase simultaneamente
+    if (antes && Date.now() - antes < 180000) {
+      log(`ignorado envio repetido (SHA1 ${hash}) via ${origem} — já recebido há ${Math.round((Date.now() - antes) / 1000)}s`);
+      feitos.ignorados = (feitos.ignorados || 0) + 1;
       continue;
     }
     recentes.set(hash, Date.now());
-    // O Mercado Livre manda a mesma etiqueta por dois caminhos ao mesmo tempo: direto para a ponte
-    // e como arquivo baixado. O texto não é idêntico (o site tira quebras de linha), então a
-    // comparação é pelo número do envio: o segundo que chegar em até 3 minutos, vindo de outro
-    // caminho, é ignorado.
-    const numero = (envio.match(/"id":"(\d+)"/) || [])[1];
+    // Extrai o número do envio para dedup secundária (caso o SHA1 difira por dados variáveis)
+    const numero = (envio.match(/"id"\s*:\s*"(\d+)"/) || envio.match(/ID:(\d+)/i) || envio.match(/Envio\s+(\d{10,})/i) || [])[1];
     const outro = numero && porNumero.get(numero);
-    if (outro && outro.origem !== origem && Date.now() - outro.quando < 180000) {
+    if (outro && Date.now() - outro.quando < 180000) {
       log(`envio ${numero} já veio por ${outro.origem}; ignorada a cópia que chegou por ${origem}`);
       feitos.ignorados = (feitos.ignorados || 0) + 1;
       continue;
