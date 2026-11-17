@@ -10,6 +10,8 @@ const os = require('os');
 const net = require('net');
 let siteVisto = 0; // última vez que o site do Mercado Livre procurou a impressora
 const { enviarBruto, bleInformar, lerZplDeArquivo, iniciarVigia, bleProximo, bleFeito, receberZpl, imprimirPedido, descartarPedido, diagnostico, salvarConfig, estado, log, cfg, RAIZ } = require('./impressora');
+const loja = require('./loja');
+loja.iniciar({ cfg, log, RAIZ });
 
 const DISPOSITIVO = {
   deviceType: 'printer',
@@ -80,6 +82,7 @@ const servidor = http.createServer(async (req, res) => {
         return res.end(fs.readFileSync(path.join(__dirname, 'estoque.html')));
       }
       if (req.method === 'GET' && rota === '/api/estado') return json({ ...estado(), siteVisto });
+      if (req.method === 'GET' && rota === '/api/loja') return json(loja.estadoLoja());
       if (req.method === 'GET' && rota === '/api/ble/proximo') return json(bleProximo() || {});
       const mPrevia = rota.match(/^\/api\/previa\/([0-9]+-[0-9]+)\.png$/);
       if (req.method === 'GET' && mPrevia) {
@@ -105,6 +108,11 @@ const servidor = http.createServer(async (req, res) => {
         const txt = await corpo(req);
         try {
           if (rota === '/api/config') return json(salvarConfig(JSON.parse(txt || '{}')));
+          // ---------- loja virtual (WooCommerce) ----------
+          if (rota === '/api/loja/config') { loja.salvarConfig(JSON.parse(txt || '{}')); salvarConfig({}); return json(loja.estadoLoja()); }
+          if (rota === '/api/loja/sincronizar') { const n = await loja.sincronizar(); return json({ ...loja.estadoLoja(), importados: n }); }
+          if (rota === '/api/loja/bipe') return json(await loja.bipar(JSON.parse(txt || '{}')));
+          if (rota === '/api/loja/codigo') return json(await loja.definirCodigo(JSON.parse(txt || '{}')));
           if (rota === '/api/ble/estado') { const b = JSON.parse(txt || '{}'); bleInformar({ bt: Number.isInteger(b.bt) ? b.bt : undefined, conectada: b.conectada === true, nome: String(b.nome || '').slice(0, 60), jaRespondeu: b.jaRespondeu === true, respondeAgora: b.respondeAgora === true, estado: Number.isInteger(b.estado) ? b.estado : undefined }); return json({}); }
           if (rota === '/api/ble/feito') { const b = JSON.parse(txt || '{}'); bleFeito(Number(b.id), b.ok === true, String(b.erro || '').slice(0, 200)); return json({}); }
           if (rota === '/api/teste') return json(await diagnostico(JSON.parse(txt || '{}').tipo));

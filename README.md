@@ -112,6 +112,18 @@ Em <http://127.0.0.1:9100/estoque> dá para cadastrar produtos e imprimir etique
 - **Espaço entre colunas** e **margem esquerda** são ajustáveis: em rolos de várias colunas cada etiqueta começa em largura + espaço, senão a última coluna sai cortada.
 - Ao trocar de rolo (de 100 x 150 para 34 x 23, por exemplo), a ponte recalibra o sensor de papel sozinha antes de imprimir. Sem isso a impressão "sobe" a cada linha e a impressora pode travar.
 
+## Loja virtual (WooCommerce): estoque e leitor de código de barras
+
+A tela de estoque (<http://127.0.0.1:9100/estoque>) liga na loja WordPress + WooCommerce:
+
+- **Produtos do site:** traz os produtos e as variações (cores), com SKU, código de barras e estoque.
+- **Leitor de código de barras:** o leitor USB ou Bluetooth funciona como teclado. Escolha **Entrada** (chegou mercadoria), **Saída** (vendeu ou separou) ou **Consultar** e bipe. A ponte lê o estoque atual no site, soma ou tira e grava de volta; vendas feitas no site no meio do caminho não se perdem.
+- **Código de barras no site:** o código digitado na tabela vai para o campo "GTIN, UPC, EAN ou ISBN" do produto no WooCommerce.
+- **Etiquetas:** "Usar os produtos da loja nas etiquetas" leva os produtos com código de barras para a impressão de etiquetas de produto.
+- **Site fora do ar:** o movimento fica guardado e é reenviado sozinho a cada minuto, uma vez só.
+
+Para ligar: no WordPress, *WooCommerce → Configurações → Avançado → API REST → Adicionar chave*, permissão **Leitura/Gravação**. Cole a chave e o segredo na tela de estoque. Eles ficam só no `config.json` deste computador, que não vai para o git. Sem a chave, a tela só lê o catálogo público (sem quantidade em estoque).
+
 ## Calibração
 
 `node ferramentas/grade-calibracao.js` imprime uma grade com régua em milímetros nas quatro bordas e linhas a cada 10 mm. Pela foto dela dá para medir quanto está sendo cortado de cada lado e se a impressão sai torta. O script espera a impressora conectar (até 15 minutos) antes de enviar.
