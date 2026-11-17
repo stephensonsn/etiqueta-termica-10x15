@@ -113,6 +113,7 @@ const servidor = http.createServer(async (req, res) => {
           if (rota === '/api/loja/sincronizar') { const n = await loja.sincronizar(); return json({ ...loja.estadoLoja(), importados: n }); }
           if (rota === '/api/loja/bipe') return json(await loja.bipar(JSON.parse(txt || '{}')));
           if (rota === '/api/loja/codigo') return json(await loja.definirCodigo(JSON.parse(txt || '{}')));
+          if (rota === '/api/loja/gerar-ean') return json(await loja.gerarEan13(JSON.parse(txt || '{}')));
           if (rota === '/api/ble/estado') { const b = JSON.parse(txt || '{}'); bleInformar({ bt: Number.isInteger(b.bt) ? b.bt : undefined, conectada: b.conectada === true, nome: String(b.nome || '').slice(0, 60), jaRespondeu: b.jaRespondeu === true, respondeAgora: b.respondeAgora === true, estado: Number.isInteger(b.estado) ? b.estado : undefined }); return json({}); }
           if (rota === '/api/ble/feito') { const b = JSON.parse(txt || '{}'); bleFeito(Number(b.id), b.ok === true, String(b.erro || '').slice(0, 200)); return json({}); }
           if (rota === '/api/teste') return json(await diagnostico(JSON.parse(txt || '{}').tipo));

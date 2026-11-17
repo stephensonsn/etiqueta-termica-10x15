@@ -1,6 +1,7 @@
 // Converte a etiqueta ZPL do Mercado Livre (envio + DACE) em UMA etiqueta 10x15 cm
 // e gera o comando TSPL para a impressora térmica. Tudo local: nada sai da máquina.
 'use strict';
+const ean = require('./ean13');
 const { PNG } = require('pngjs');
 const { zplToBase64Async } = require('zpl-renderer-js');
 
@@ -516,11 +517,14 @@ function modulosCode128(txt) {
   return 11 + simbolos * 11 + 11 + 13;
 }
 
+// posições verticais da etiqueta de produto, em pontos, para 25 mm de altura (200 pontos)
+const LAYOUT_SKU = { nome: 30, cor: 52, barras: 80, altBarras: 58, codigo: 142, sku: 166 };
+
 function paraTsplSku(etiquetas, opts = {}) {
   const {
-    larguraMm = 34, alturaMm = 23, colunas = 3,
-    espacoColunasMm = 2.5,   // espaço entre uma etiqueta e a do lado, no rolo
-    margemEsqMm = 0,         // da borda do rolo até a 1ª coluna
+    larguraMm = 35, alturaMm = 25, colunas = 3,
+    espacoColunasMm = 2.2,   // espaço entre uma etiqueta e a do lado, no rolo
+    margemEsqMm = 1,         // da borda do rolo até a 1ª coluna
     gapMm = 2, densidade = 8, velocidade = 4,
   } = opts;
   if (!Array.isArray(etiquetas) || !etiquetas.length) throw new Error('lista de etiquetas vazia');
@@ -543,10 +547,10 @@ function paraTsplSku(etiquetas, opts = {}) {
     cmds.push(`TEXT ${x},${y},"${fonte}",0,${mult},${mult},"${t}"`);
   };
 
-  // layout vertical para 23 mm (184 pontos), com 2 mm livres em cima e embaixo
-  const esc = hEt / 184; // acompanha alturas diferentes de 23 mm
-  const Y = { nome: 16, cor: 38, barras: 66, altBarras: 46, codigo: 118, sku: 146 };
-  for (const k of Object.keys(Y)) Y[k] = Math.round(Y[k] * esc);
+  // layout vertical para 25 mm (200 pontos), com folga em cima e embaixo; a prévia da tela usa
+  // os mesmos números (LAYOUT_SKU), para o que aparece na tela ser o que sai no papel
+  const esc = hEt / 200;
+  const Y = {}; for (const [k, v] of Object.entries(LAYOUT_SKU)) Y[k] = Math.round(v * esc);
 
   const cmds = [
     '\r\n'.repeat(1024) + `SIZE ${larguraTotalMm} mm,${alturaMm} mm`,
@@ -559,22 +563,30 @@ function paraTsplSku(etiquetas, opts = {}) {
     etiquetas.slice(i, i + colunas).forEach((et, c) => {
       const col = x0 + c * passo;
       const codigo = String(et.barcode || '').replace(/[^\x20-\x7e]/g, '').replace(/"/g, '');
-      texto(cmds, col, Y.nome, 2, limpar(et.nome || 'PRODUTO', 30));
-      texto(cmds, col, Y.cor, 3, limpar(et.cor, 20));
-      if (codigo) {
-        // barra estreita de 2 pontos; se não couber, 1 ponto
+      // nome: fonte média se couber; senão fonte pequena, cortado no fim de uma palavra
+      const nome = limpar(et.nome || 'PRODUTO', 80);
+      const cabe = (f) => Math.floor((wCol - 32) / FONTE_TSPL[f][0]);
+      if (nome.length <= cabe(2)) texto(cmds, col, Y.nome, 2, nome);
+      else texto(cmds, col, Y.nome + 4, 1, nome.length <= cabe(1) ? nome : nome.slice(0, cabe(1) + 1).replace(/\s+\S*$/, ''));
+      if (et.cor) texto(cmds, col, Y.cor, 3, limpar(et.cor, 20));
+      if (ean.valido(codigo)) {
+        // EAN-13: 95 módulos de 2 pontos (0,25 mm) = 23,75 mm, com zona livre de 11 e 7 módulos nas pontas
+        const xb = col + Math.round((wCol - 95 * 2) / 2);
+        // BARCODE x,y,"EAN13",altura,texto legível (0 = não; os números vão logo abaixo, centralizados),rotação,estreita,larga,"12 dígitos"
+        cmds.push(`BARCODE ${xb},${Y.barras},"EAN13",${Y.altBarras},0,0,2,2,"${codigo.slice(0, 12)}"`);
+        texto(cmds, col, Y.codigo, 2, codigo);
+      } else if (codigo) {
+        // código que não é EAN-13: Code 128, barra estreita de 2 pontos (1 se não couber)
         const estreita = modulosCode128(codigo) * 2 <= wCol - 32 ? 2 : 1;
-        const wBar = modulosCode128(codigo) * estreita;
-        const xb = col + Math.max(8, Math.round((wCol - wBar) / 2));
-        // BARCODE x,y,"tipo",altura,texto legível (0 = não),rotação,estreita,larga,"conteúdo"
+        const xb = col + Math.max(8, Math.round((wCol - modulosCode128(codigo) * estreita) / 2));
         cmds.push(`BARCODE ${xb},${Y.barras},"128",${Y.altBarras},0,0,${estreita},${estreita},"${codigo}"`);
-        texto(cmds, col, Y.codigo, 3, codigo);
+        texto(cmds, col, Y.codigo, 2, codigo);
       }
-      if (et.sku) texto(cmds, col, Y.sku, 2, limpar(et.sku, 24));
+      if (et.sku) texto(cmds, col, Y.sku, 1, limpar(et.sku, 32));
     });
     cmds.push('PRINT 1,1');
   }
   return Buffer.from(cmds.join('\r\n') + '\r\n', 'latin1');
 }
 
-module.exports = { montar, separarEnvios, separarPaginas, paraPng, paraTspl, paraTsplCompacto, paraTsplSku, lerFiscal, etiquetaRegua, PREAMBULO };
+module.exports = { LAYOUT_SKU, montar, separarEnvios, separarPaginas, paraPng, paraTspl, paraTsplCompacto, paraTsplSku, lerFiscal, etiquetaRegua, PREAMBULO };

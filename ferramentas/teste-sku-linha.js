@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Teste de UMA linha do rolo de etiquetas de produto (3 colunas de 34 x 23 mm).
+// Teste de UMA linha do rolo de etiquetas de produto (3 colunas de 35 x 25 mm).
 // Cada etiqueta sai com uma moldura exatamente nas bordas que o programa calcula, o número da coluna
 // e uma régua em mm. Pela foto dá para ver se a moldura cai dentro de cada etiqueta física ou se
 // "anda" para o lado (espaço entre colunas ou margem esquerda errados) ou para cima/baixo (sensor).
@@ -12,8 +12,8 @@ const path = require('path');
 const net = require('net');
 
 const arg = (n, pad) => { const i = process.argv.indexOf(`--${n}`); return i > 0 ? Number(process.argv[i + 1]) : pad; };
-const larguraMm = arg('largura', 34), alturaMm = arg('altura', 23);
-const espacoMm = arg('espaco', 2.5), margemMm = arg('margem', 0), colunas = 3;
+const larguraMm = arg('largura', 35), alturaMm = arg('altura', 25);
+const espacoMm = arg('espaco', 2.2), margemMm = arg('margem', 1), colunas = 3;
 const PM = 8;
 const wCol = Math.round(larguraMm * PM), hEt = Math.round(alturaMm * PM);
 const passo = Math.round((larguraMm + espacoMm) * PM), x0 = Math.round(margemMm * PM);

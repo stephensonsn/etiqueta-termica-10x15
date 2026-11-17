@@ -8,445 +8,412 @@
   :root {
     --bg: #F8FAFC; --card: #FFFFFF; --text: #0F172A; --muted: #64748B; --border: #E2E8F0;
     --primary: #2563EB; --primary-hover: #1D4ED8; --primary-light: #EFF6FF;
-    --success: #16A34A; --success-bg: #DCFCE7; --warn: #EA580C; --warn-bg: #FFF7ED;
-    --danger: #DC2626; --danger-bg: #FEF2F2;
+    --ok: #166534; --ok-bg: #DCFCE7; --warn: #9A3412; --warn-bg: #FFEDD5; --erro: #B91C1C; --erro-bg: #FEE2E2;
     --radius: 12px; --shadow: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
-    --shadow-lg: 0 10px 15px -3px rgba(0,0,0,.08), 0 4px 6px -4px rgba(0,0,0,.04);
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: var(--bg); color: var(--text); font: 15px/1.5 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100vh; }
+  body { background: var(--bg); color: var(--text); font: 15px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, sans-serif; min-height: 100vh; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  button { font-family: inherit; }
 
-  /* Header */
-  header { background: var(--card); border-bottom: 1px solid var(--border); padding: 16px 24px; display: flex; align-items: center; gap: 16px; position: sticky; top: 0; z-index: 100; box-shadow: var(--shadow); }
-  header .logo { width: 40px; height: 40px; background: linear-gradient(135deg, var(--primary), #7C3AED); border-radius: 10px; display: grid; place-items: center; color: #fff; font-size: 20px; flex-shrink: 0; }
+  header { background: var(--card); border-bottom: 1px solid var(--border); padding: 14px 24px; display: flex; align-items: center; gap: 16px; position: sticky; top: 0; z-index: 100; }
   header h1 { font-size: 18px; font-weight: 700; flex: 1; }
-  header .nav-link { color: var(--muted); text-decoration: none; font-weight: 500; font-size: 14px; padding: 8px 12px; border-radius: 8px; transition: all .15s; }
-  header .nav-link:hover { background: var(--primary-light); color: var(--primary); }
+  header a { color: var(--muted); text-decoration: none; font-weight: 600; font-size: 14px; padding: 8px 12px; border-radius: 8px; }
+  header a:hover { background: var(--primary-light); color: var(--primary); }
 
-  /* Layout */
-  main { max-width: 1200px; margin: 0 auto; padding: 24px; display: grid; gap: 24px; }
+  main { max-width: 1240px; margin: 0 auto; padding: 24px; display: grid; gap: 24px; padding-bottom: 120px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 24px; box-shadow: var(--shadow); min-width: 0; }
+  .card-title { font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .card-sub { font-size: 13px; color: var(--muted); margin-top: 2px; }
 
-  /* Cards */
-  .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; box-shadow: var(--shadow); }
-  .card-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
-  .card-icon { width: 36px; height: 36px; border-radius: 8px; display: grid; place-items: center; font-size: 18px; flex-shrink: 0; }
-  .card-title { font-size: 16px; font-weight: 700; }
-  .card-subtitle { font-size: 13px; color: var(--muted); margin-top: 2px; }
+  /* indicadores: grade única 4 x 1, 2 x 2, 1 x 4 */
+  .indicadores { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+  .ind { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 20px; box-shadow: var(--shadow); }
+  .ind .v { font-size: 26px; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .ind .r { font-size: 13px; color: var(--muted); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-  /* Stats Grid */
-  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
-  .stat-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; display: flex; align-items: center; gap: 16px; box-shadow: var(--shadow); transition: transform .15s, box-shadow .15s; }
-  .stat-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
-  .stat-icon { width: 48px; height: 48px; border-radius: 12px; display: grid; place-items: center; font-size: 24px; flex-shrink: 0; }
-  .stat-value { font-size: 28px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
-  .stat-label { font-size: 13px; color: var(--muted); margin-top: 4px; }
+  .selo { display: inline-flex; align-items: center; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .selo.ok { background: var(--ok-bg); color: var(--ok); } .selo.alerta { background: var(--warn-bg); color: var(--warn); } .selo.erro { background: var(--erro-bg); color: var(--erro); } .selo.neutro { background: var(--bg); color: var(--muted); border: 1px solid var(--border); }
 
-  /* Product Grid */
-  .product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
-  .product-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; transition: all .2s; cursor: pointer; position: relative; overflow: hidden; }
-  .product-card:hover { border-color: var(--primary); box-shadow: var(--shadow-lg); transform: translateY(-2px); }
-  .product-card.selected { border-color: var(--primary); background: var(--primary-light); }
-  .product-card.selected::before { content: ''; position: absolute; top: 12px; right: 12px; width: 24px; height: 24px; background: var(--primary); color: #fff; border-radius: 50%; display: grid; place-items: center; font-size: 14px; font-weight: 700; }
-  .color-dot { width: 32px; height: 32px; border-radius: 50%; margin-bottom: 12px; border: 2px solid var(--border); }
-  .product-name { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
-  .product-sku { font-size: 12px; color: var(--muted); font-family: ui-monospace, monospace; margin-bottom: 8px; }
-  .product-barcode { font-size: 13px; font-weight: 600; color: var(--text); background: var(--bg); padding: 4px 8px; border-radius: 6px; display: inline-block; font-family: ui-monospace, monospace; }
-  .product-qty { margin-top: 12px; display: flex; align-items: center; gap: 8px; }
-  .qty-input { width: 60px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; font-weight: 600; text-align: center; font-family: inherit; }
-  .qty-input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37,99,235,.15); }
-  .qty-label { font-size: 13px; color: var(--muted); }
+  .btn { border: 1px solid transparent; padding: 10px 18px; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; white-space: nowrap; }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .btn-primary { background: var(--primary); color: #fff; }
+  .btn-primary:hover:not(:disabled) { background: var(--primary-hover); }
+  .btn-sec { background: var(--card); color: var(--text); border-color: var(--border); }
+  .btn-sec:hover:not(:disabled) { border-color: var(--muted); }
+  .btn-link { background: none; border: 0; color: var(--primary); font-weight: 600; cursor: pointer; padding: 4px 6px; font-size: 13px; }
 
-  /* Config Section */
-  .config-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
-  .field label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--text); }
-  .field input, .field select { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; font-family: inherit; transition: border-color .15s, box-shadow .15s; }
-  .field input:focus, .field select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37,99,235,.15); }
+  input, select { font: inherit; }
+  .field label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+  .field input, .field select { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; background: #fff; }
+  .field input:focus, .busca:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37,99,235,.15); }
   .field small { display: block; font-size: 12px; color: var(--muted); margin-top: 4px; }
 
-  /* Action Bar */
-  .action-bar { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 24px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; box-shadow: var(--shadow); position: sticky; bottom: 24px; z-index: 50; }
-  .action-bar .summary { flex: 1; font-size: 14px; color: var(--muted); }
-  .action-bar .summary strong { color: var(--text); font-weight: 700; }
-  .btn { border: none; padding: 12px 24px; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; transition: all .15s; display: inline-flex; align-items: center; gap: 8px; font-family: inherit; }
-  .btn:disabled { opacity: .5; cursor: not-allowed; }
-  .btn-primary { background: var(--primary); color: #fff; box-shadow: 0 2px 8px rgba(37,99,235,.3); }
-  .btn-primary:hover:not(:disabled) { background: var(--primary-hover); box-shadow: 0 4px 12px rgba(37,99,235,.4); transform: translateY(-1px); }
-  .btn-secondary { background: var(--card); color: var(--text); border: 1px solid var(--border); }
-  .btn-secondary:hover:not(:disabled) { background: var(--bg); border-color: var(--muted); }
+  /* etiquetas: lista + prévia */
+  .etiquetas { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 24px; align-items: start; }
+  .ferramentas { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 16px 0 8px; }
+  .busca { flex: 1 1 220px; min-width: 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; min-height: 44px; }
+  .lista { display: grid; gap: 0; }
+  .item { display: grid; grid-template-columns: minmax(0, 1fr) 190px 70px 132px; gap: 12px; align-items: center; padding: 12px 4px; border-bottom: 1px solid var(--border); }
+  .item.cab { font-size: 12px; font-weight: 600; color: var(--muted); padding-top: 4px; padding-bottom: 8px; }
+  .item.ativo { background: var(--primary-light); }
+  .item .nome { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .item .det { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .item .cod { font-size: 13px; white-space: nowrap; }
+  .item .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .qtd { display: inline-grid; grid-template-columns: 40px 52px 40px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: #fff; justify-self: end; }
+  .qtd button { border: 0; background: var(--bg); font-size: 18px; font-weight: 700; cursor: pointer; min-height: 40px; color: var(--text); }
+  .qtd button:disabled { color: #CBD5E1; cursor: not-allowed; }
+  .qtd input { border: 0; border-left: 1px solid var(--border); border-right: 1px solid var(--border); text-align: center; font-weight: 700; font-size: 15px; width: 100%; -moz-appearance: textfield; }
+  .qtd input::-webkit-outer-spin-button, .qtd input::-webkit-inner-spin-button { -webkit-appearance: none; }
+  .vazio { padding: 32px 16px; text-align: center; color: var(--muted); }
+  .vazio strong { display: block; color: var(--text); margin-bottom: 4px; }
 
-  /* Status Badge */
-  .badge { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; }
-  .badge-success { background: var(--success-bg); color: var(--success); }
-  .badge-warn { background: var(--warn-bg); color: var(--warn); }
-  .badge-danger { background: var(--danger-bg); color: var(--danger); }
+  .previa { position: sticky; top: 84px; display: grid; gap: 16px; }
+  .rolo { background: #CBD5E1; border-radius: 8px; padding: 10px 8px; }
+  .rolo svg { display: block; width: 100%; height: auto; }
+  .aviso { font-size: 13px; color: var(--muted); }
+  .medidas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
+  details > summary { cursor: pointer; font-weight: 600; font-size: 14px; }
 
-  /* Toast */
-  .toast { position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%); background: var(--text); color: #fff; padding: 12px 24px; border-radius: 10px; font-weight: 600; font-size: 14px; box-shadow: var(--shadow-lg); z-index: 200; opacity: 0; transition: opacity .3s; pointer-events: none; }
-  .toast.show { opacity: 1; }
-
-  /* Preview Modal */
-  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 300; display: none; place-items: center; backdrop-filter: blur(4px); }
-  .modal-overlay.open { display: grid; }
-  .modal { background: var(--card); border-radius: 16px; padding: 32px; max-width: 500px; width: 90%; box-shadow: var(--shadow-lg); }
-  .modal h3 { font-size: 18px; margin-bottom: 16px; }
-  .preview-label { background: #fff; border: 2px dashed var(--border); border-radius: 8px; padding: 20px; margin: 16px 0; text-align: center; }
-  .preview-label .barcode { font-family: 'Libre Barcode 128', monospace; font-size: 48px; letter-spacing: 2px; margin: 8px 0; }
-  .preview-label .code { font-family: ui-monospace, monospace; font-size: 14px; font-weight: 700; }
-  .preview-label .name { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
-
-  @media (max-width: 768px) {
-    main { padding: 16px; }
-    .stats { grid-template-columns: repeat(2, 1fr); }
-    .product-grid { grid-template-columns: 1fr; }
-    .action-bar { flex-direction: column; align-items: stretch; text-align: center; }
-    .action-bar .summary { text-align: center; }
-  }
-
-  /* ---------- loja virtual ---------- */
-  .loja-grade { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+  /* loja */
+  .loja-grade { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 12px; }
   .senha { position: relative; }
-  .senha input { width: 100%; padding-right: 64px; }
+  .senha input { padding-right: 76px; }
   .senha button { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); border: 0; background: none; color: var(--primary); font-weight: 600; cursor: pointer; padding: 6px; }
   .linha-acoes { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; }
-  .selo { display: inline-flex; padding: 3px 10px; border-radius: 999px; font-size: 13px; font-weight: 600; white-space: nowrap; }
-  .selo.ok { background: #DCFCE7; color: #166534; } .selo.alerta { background: #FFEDD5; color: #9A3412; } .selo.erro { background: #FEE2E2; color: #B91C1C; }
-  .bipe { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 12px; align-items: end; }
-  .bipe input#bipe-codigo { font-size: 22px; padding: 14px; font-family: ui-monospace, monospace; }
+  .bipe { display: grid; grid-template-columns: minmax(0, 1fr) 110px auto; gap: 12px; align-items: end; margin-top: 16px; }
+  .bipe #bipe-codigo { font-size: 20px; padding: 12px; font-family: ui-monospace, monospace; }
   .modos { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
-  .modos button { border: 0; background: var(--card); color: var(--muted); padding: 12px 14px; font-weight: 600; cursor: pointer; min-height: 48px; }
+  .modos button { border: 0; background: var(--card); color: var(--muted); padding: 10px 14px; font-weight: 600; cursor: pointer; min-height: 44px; }
   .modos button[aria-pressed="true"] { background: var(--primary); color: #fff; }
-  #bipe-resultado { margin-top: 12px; padding: 14px; border-radius: 10px; background: var(--bg); min-height: 24px; font-weight: 600; }
-  #bipe-resultado.ok { background: #DCFCE7; color: #166534; } #bipe-resultado.erro { background: #FEE2E2; color: #B91C1C; }
-  table.loja { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 14px; }
-  table.loja th { text-align: left; color: var(--muted); font-weight: 600; padding: 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
-  table.loja td { padding: 8px; border-bottom: 1px solid var(--border); vertical-align: middle; }
-  table.loja td.num { font-family: ui-monospace, monospace; text-align: right; }
-  table.loja input { width: 130px; padding: 6px 8px; font-family: ui-monospace, monospace; }
-  .tabela-rolagem { overflow-x: auto; }
-  @media (max-width: 820px) { .loja-grade, .bipe { grid-template-columns: minmax(0, 1fr); } }
+  #bipe-resultado { margin-top: 12px; padding: 12px 14px; border-radius: 10px; background: var(--bg); font-weight: 600; font-size: 14px; }
+  #bipe-resultado.ok { background: var(--ok-bg); color: var(--ok); } #bipe-resultado.erro { background: var(--erro-bg); color: var(--erro); }
+  table.mov { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13px; }
+  table.mov th { text-align: left; color: var(--muted); font-weight: 600; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+  table.mov td { padding: 6px 8px; border-bottom: 1px solid var(--border); }
+  .rolagem { overflow-x: auto; }
+
+  .barra { position: fixed; left: 0; right: 0; bottom: 0; background: var(--card); border-top: 1px solid var(--border); box-shadow: 0 -4px 12px rgba(0,0,0,.05); z-index: 90; }
+  .barra-in { max-width: 1240px; margin: 0 auto; padding: 14px 24px; display: flex; align-items: center; gap: 12px; }
+  .barra .resumo { flex: 1; font-size: 14px; color: var(--muted); min-width: 0; }
+  .barra .resumo strong { color: var(--text); }
+
+  .toast { position: fixed; bottom: 96px; left: 50%; transform: translateX(-50%); background: var(--text); color: #fff; padding: 12px 20px; border-radius: 10px; font-weight: 600; font-size: 14px; z-index: 200; opacity: 0; transition: opacity .25s; pointer-events: none; max-width: calc(100% - 32px); }
+  .toast.show { opacity: 1; }
+
+  @media (max-width: 1080px) {
+    .etiquetas { grid-template-columns: minmax(0, 1fr); }
+    .previa { position: static; }
+    .indicadores { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  @media (max-width: 700px) {
+    main { padding: 16px; }
+    header { padding: 12px 16px; }
+    .loja-grade, .bipe, .medidas { grid-template-columns: minmax(0, 1fr); }
+    .item { grid-template-columns: minmax(0, 1fr) 132px; }
+    .item .cod-col { grid-column: 1 / -1; order: 3; }
+    .item .est-col, .item.cab { display: none; }
+    .barra-in { flex-wrap: wrap; padding: 12px 16px; }
+    .barra .resumo { flex-basis: 100%; }
+    .barra .btn { flex: 1; }
+  }
+  @media (max-width: 700px) {
+    header { gap: 10px; }
+    header h1 { font-size: 16px; white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+    header .selo { font-size: 11px; padding: 2px 8px; }
+    header a { padding: 6px 4px; }
+    .ind { padding: 12px 14px; } .ind .v { font-size: 22px; }
+    .ferramentas { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .ferramentas .busca { grid-column: 1 / -1; }
+    .ferramentas .btn { white-space: normal; font-size: 13px; padding: 8px; line-height: 1.2; }
+  }
 </style>
-<link href="https://fonts.googleapis.com/css2?family=Libre+Barcode+128&display=swap" rel="stylesheet">
 </head>
 <body>
 
 <header>
   <h1>Etiquetas de produto</h1>
-  <a href="/painel" class="nav-link">← Voltar ao Painel</a>
+  <span class="selo neutro" id="impressora">Impressora…</span>
+  <a href="/painel">Painel</a>
 </header>
 
 <main>
-  <!-- Loja virtual: estoque e código de barras ligados ao site -->
-  <div class="card" id="loja">
-    <div class="card-header">
+  <section class="indicadores" aria-label="Resumo">
+    <div class="ind"><div class="v" id="ind-ean">0 de 0</div><div class="r" id="ind-ean-r">produtos com EAN-13</div></div>
+    <div class="ind"><div class="v" id="ind-total">0</div><div class="r" id="ind-total-r">etiquetas para imprimir</div></div>
+    <div class="ind"><div class="v" id="ind-linhas">0</div><div class="r" id="ind-linhas-r">linhas · 3 por linha</div></div>
+    <div class="ind"><div class="v" id="ind-loja">—</div><div class="r" id="ind-loja-r">loja virtual</div></div>
+  </section>
+
+  <section class="card" aria-labelledby="t-etiquetas">
+    <div class="etiquetas">
       <div>
-        <div class="card-title">Loja virtual <span class="selo alerta" id="loja-selo">Não ligada</span></div>
-        <div class="card-subtitle" id="loja-sub">O estoque fica no site; o leitor de código de barras soma e tira direto dele</div>
+        <div class="card-title" id="t-etiquetas">Escolha o que imprimir</div>
+        <div class="card-sub">Defina quantas etiquetas de cada produto. Só imprime quem tem EAN-13.</div>
+        <div class="ferramentas">
+          <input class="busca" id="busca" type="search" placeholder="Buscar por nome, cor, SKU ou código" aria-label="Buscar produto">
+          <button class="btn btn-sec" id="gerar-faltam">Gerar EAN-13 que faltam</button>
+          <button class="btn btn-sec" id="pelo-estoque">Quantidade = estoque</button>
+          <button class="btn btn-sec" id="zerar">Zerar</button>
+        </div>
+        <div class="lista" id="lista" aria-live="polite"></div>
       </div>
+
+      <aside class="previa" aria-label="Prévia">
+        <div>
+          <div class="card-title">Prévia da primeira linha</div>
+          <div class="card-sub">Tamanho e posições iguais aos do papel</div>
+        </div>
+        <div class="rolo"><svg id="svg-previa" role="img" aria-label="Prévia da linha de etiquetas"></svg></div>
+        <div class="aviso" id="aviso-ean">EAN-13 interno começa com 200: serve para bipar na sua loja. Mercado Livre e Shopee exigem EAN registrado na GS1 Brasil.</div>
+        <details id="det-medidas">
+          <summary>Medidas do rolo e impressão</summary>
+          <div class="medidas">
+            <div class="field"><label for="cfg-largura">Largura (mm)</label><input id="cfg-largura" type="number" min="20" max="100" step="0.5"></div>
+            <div class="field"><label for="cfg-altura">Altura (mm)</label><input id="cfg-altura" type="number" min="15" max="80" step="0.5"></div>
+            <div class="field"><label for="cfg-espaco">Espaço entre colunas (mm)</label><input id="cfg-espaco" type="number" min="0" max="10" step="0.1"></div>
+            <div class="field"><label for="cfg-margem">Margem esquerda (mm)</label><input id="cfg-margem" type="number" min="0" max="10" step="0.1"></div>
+            <div class="field"><label for="cfg-colunas">Colunas</label><select id="cfg-colunas"><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></div>
+            <div class="field"><label for="cfg-gap">Espaço entre linhas (mm)</label><input id="cfg-gap" type="number" min="0" max="10" step="0.5"></div>
+            <div class="field"><label for="cfg-densidade">Escuro (0 a 15)</label><input id="cfg-densidade" type="number" min="0" max="15" step="1"></div>
+            <div class="field"><label for="cfg-velocidade">Velocidade (2 a 8)</label><input id="cfg-velocidade" type="number" min="2" max="8" step="1"></div>
+          </div>
+          <div class="linha-acoes"><button class="btn-link" id="medidas-padrao">Voltar ao padrão (35 x 25 mm, 3 colunas)</button></div>
+        </details>
+      </aside>
     </div>
-    <details id="loja-ligar">
-      <summary style="cursor:pointer;font-weight:600">Ligar a loja</summary>
-      <p class="card-subtitle" style="margin:10px 0">No painel do WordPress: WooCommerce, Configurações, Avançado, API REST, Adicionar chave, permissão Leitura/Gravação. Copie a chave do consumidor e o segredo do consumidor para cá. Eles ficam só neste computador.</p>
+  </section>
+
+  <section class="card" id="loja" aria-labelledby="t-loja">
+    <div class="card-title" id="t-loja">Loja virtual e leitor <span class="selo alerta" id="loja-selo">Não ligada</span></div>
+    <div class="card-sub" id="loja-sub">O estoque fica no site; o leitor de código de barras soma e tira direto dele</div>
+    <details id="loja-ligar" style="margin-top:12px">
+      <summary>Ligar a loja</summary>
+      <p class="card-sub" style="margin:10px 0">No painel do WordPress: WooCommerce, Configurações, Avançado, API REST, Adicionar chave, permissão Leitura/Gravação. Copie a chave e o segredo do consumidor para cá. Eles ficam só neste computador.</p>
       <div class="loja-grade">
         <div class="field"><label for="loja-url">Endereço da loja</label><input id="loja-url" type="url" placeholder="https://sualoja.com.br"></div>
         <div class="field"><label for="loja-chave">Chave do consumidor</label><div class="senha"><input id="loja-chave" type="password" autocomplete="off" placeholder="ck_..."><button type="button" data-olho="loja-chave">Mostrar</button></div></div>
         <div class="field"><label for="loja-segredo">Segredo do consumidor</label><div class="senha"><input id="loja-segredo" type="password" autocomplete="off" placeholder="cs_..."><button type="button" data-olho="loja-segredo">Mostrar</button></div></div>
       </div>
-      <div class="linha-acoes"><button class="btn btn-primary" id="loja-salvar">Salvar e sincronizar</button><button class="btn btn-secondary" id="loja-esquecer">Esquecer a chave</button></div>
+      <div class="linha-acoes"><button class="btn btn-primary" id="loja-salvar">Salvar e sincronizar</button><button class="btn btn-sec" id="loja-esquecer">Esquecer a chave</button></div>
     </details>
 
-    <div style="margin-top:16px">
-      <div class="bipe">
-        <div class="field" style="margin:0"><label for="bipe-codigo">Leitor de código de barras</label><input id="bipe-codigo" autocomplete="off" placeholder="Bipe o produto ou digite o código e tecle Enter"></div>
-        <div class="field" style="margin:0"><label for="bipe-qtd">Quantidade</label><input id="bipe-qtd" type="number" value="1" min="1" max="9999" style="width:100px"></div>
-        <div class="modos" role="group" aria-label="O que o bipe faz">
-          <button type="button" data-modo="entrada" aria-pressed="false">Entrada</button>
-          <button type="button" data-modo="saida" aria-pressed="false">Saída</button>
-          <button type="button" data-modo="consulta" aria-pressed="true">Consultar</button>
-        </div>
-      </div>
-      <div id="bipe-resultado" role="status" aria-live="polite">Escolha Entrada (chegou mercadoria), Saída (vendeu ou separou) ou Consultar, e bipe.</div>
-    </div>
-
-    <div class="linha-acoes"><button class="btn btn-secondary" id="loja-sincronizar">Sincronizar com o site</button><button class="btn btn-secondary" id="loja-usar">Usar os produtos da loja nas etiquetas</button><span class="card-subtitle" id="loja-atualizado"></span></div>
-    <div class="tabela-rolagem"><table class="loja"><thead><tr><th>Produto</th><th>Cor</th><th>SKU</th><th>Código de barras</th><th style="text-align:right">Estoque no site</th></tr></thead><tbody id="loja-produtos"></tbody></table></div>
-    <details style="margin-top:12px"><summary style="cursor:pointer;font-weight:600">Últimos movimentos</summary><div class="tabela-rolagem"><table class="loja"><thead><tr><th>Hora</th><th>Produto</th><th style="text-align:right">De</th><th style="text-align:right">Para</th><th>Situação</th></tr></thead><tbody id="loja-movimentos"></tbody></table></div></details>
-  </div>
-
-  <!-- Stats -->
-  <div class="stats">
-    <div class="stat-card">
-      <div><div class="stat-value" id="stat-total">96</div><div class="stat-label">Etiquetas no total</div></div>
-    </div>
-    <div class="stat-card">
-      <div><div class="stat-value" id="stat-cores">6</div><div class="stat-label">Cores cadastradas</div></div>
-    </div>
-    <div class="stat-card">
-      <div><div class="stat-value" id="stat-colunas">3</div><div class="stat-label">Etiquetas por linha</div></div>
-    </div>
-    <div class="stat-card">
-      <div><div class="stat-value" id="stat-ble">—</div><div class="stat-label">Impressora</div></div>
-    </div>
-  </div>
-
-  <!-- Configuração de Impressão -->
-  <div class="card">
-    <div class="card-header">
-      <div>
-        <div class="card-title">Configuração da Impressão</div>
-        <div class="card-subtitle">Ajuste o layout e a qualidade antes de imprimir</div>
+    <div class="bipe">
+      <div class="field"><label for="bipe-codigo">Leitor de código de barras</label><input id="bipe-codigo" autocomplete="off" placeholder="Bipe ou digite e tecle Enter"></div>
+      <div class="field"><label for="bipe-qtd">Quantidade</label><input id="bipe-qtd" type="number" value="1" min="1" max="9999"></div>
+      <div class="modos" role="group" aria-label="O que o bipe faz">
+        <button type="button" data-modo="entrada" aria-pressed="false">Entrada</button>
+        <button type="button" data-modo="saida" aria-pressed="false">Saída</button>
+        <button type="button" data-modo="consulta" aria-pressed="true">Consultar</button>
       </div>
     </div>
-    <div class="config-grid">
-      <div class="field">
-        <label for="cfg-largura">Largura da etiqueta (mm)</label>
-        <input id="cfg-largura" type="number" value="34" min="20" max="100" step="1">
-        <small>Cada etiqueta individual</small>
-      </div>
-      <div class="field">
-        <label for="cfg-altura">Altura da etiqueta (mm)</label>
-        <input id="cfg-altura" type="number" value="23" min="15" max="80" step="1">
-        <small>Altura física do papel</small>
-      </div>
-      <div class="field">
-        <label for="cfg-colunas">Colunas por linha</label>
-        <select id="cfg-colunas">
-          <option value="1">1 coluna</option>
-          <option value="2">2 colunas</option>
-          <option value="3" selected>3 colunas</option>
-        </select>
-        <small>Quantas etiquetas lado a lado</small>
-      </div>
-      <div class="field">
-        <label for="cfg-espaco">Espaço entre colunas (mm)</label>
-        <input id="cfg-espaco" type="number" value="2.5" min="0" max="10" step="0.5">
-        <small>Entre uma etiqueta e a do lado, no rolo</small>
-      </div>
-      <div class="field">
-        <label for="cfg-margem">Margem esquerda (mm)</label>
-        <input id="cfg-margem" type="number" value="0" min="0" max="10" step="0.5">
-        <small>Da borda do rolo até a 1ª coluna</small>
-      </div>
-      <div class="field">
-        <label for="cfg-gap">Espaço entre linhas (mm)</label>
-        <input id="cfg-gap" type="number" value="2" min="0" max="10" step="0.5">
-        <small>Espaço entre linhas</small>
-      </div>
-      <div class="field">
-        <label for="cfg-densidade">Densidade (escuro)</label>
-        <input id="cfg-densidade" type="number" value="8" min="0" max="15" step="1">
-        <small>0 = claro · 15 = escuro</small>
-      </div>
-      <div class="field">
-        <label for="cfg-velocidade">Velocidade</label>
-        <input id="cfg-velocidade" type="number" value="4" min="2" max="8" step="1">
-        <small>2 = lento/nítido · 8 = rápido</small>
-      </div>
-    </div>
-  </div>
-
-  <!-- Cadastro de Produtos -->
-  <div class="card">
-    <div class="card-header">
-      <div>
-        <div class="card-title">Produtos Cadastrados</div>
-        <div class="card-subtitle">Selecione as cores e ajuste a quantidade de etiquetas para cada uma</div>
-      </div>
-    </div>
-    <div class="product-grid" id="product-grid"></div>
-  </div>
-
-  <!-- Barra de Ação -->
-  <div class="action-bar">
-    <div class="summary" id="action-summary">
-      <strong>0</strong> etiquetas selecionadas · <strong>0</strong> cores
-    </div>
-    <button class="btn btn-secondary" id="btn-preview">Prévia</button>
-    <button class="btn btn-secondary" id="btn-test" style="border-color:var(--primary);color:var(--primary);">Teste (2 linhas)</button>
-    <button class="btn btn-primary" id="btn-print" disabled>Imprimir Etiquetas</button>
-  </div>
+    <div id="bipe-resultado" role="status" aria-live="polite">Escolha Entrada (chegou mercadoria), Saída (vendeu ou separou) ou Consultar, e bipe.</div>
+    <div class="linha-acoes"><button class="btn btn-sec" id="loja-sincronizar">Sincronizar com o site</button><span class="card-sub" id="loja-atualizado"></span></div>
+    <details style="margin-top:12px"><summary>Últimos movimentos</summary><div class="rolagem"><table class="mov"><thead><tr><th>Hora</th><th>Produto</th><th style="text-align:right">De</th><th style="text-align:right">Para</th><th>Situação</th></tr></thead><tbody id="loja-movimentos"></tbody></table></div></details>
+  </section>
 </main>
 
-<!-- Toast -->
-<div class="toast" id="toast"></div>
-
-<!-- Modal de Prévia -->
-<div class="modal-overlay" id="modal-preview">
-  <div class="modal">
-    <h3>Prévia da Etiqueta</h3>
-    <p style="color:var(--muted);font-size:14px;margin-bottom:12px;">Representação visual do que será impresso na etiqueta térmica.</p>
-    <div class="preview-label" id="preview-content">
-      <div class="name" id="preview-nome" style="font-size:12px;letter-spacing:0.5px;margin-bottom:4px;font-weight:600;">SQUISHY LISO 8CM</div>
-      <div class="name" id="preview-cor" style="font-weight:700;color:var(--text);margin:2px 0;font-size:18px;letter-spacing:1px;">VERDE</div>
-      <div class="barcode" id="preview-barcode" style="font-family:'Libre Barcode EAN13 Text',monospace;font-size:48px;margin:8px 0;line-height:1;">||||||| |||||||</div>
-      <div class="code" id="preview-codigo" style="font-size:16px;font-weight:700;color:var(--text);letter-spacing:2px;margin-top:4px;">810001</div>
-      <div class="code" id="preview-sku" style="font-size:10px;color:var(--muted);letter-spacing:0.5px;margin-top:6px;">TT-MSQ-VD</div>
-    </div>
-    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
-      <button class="btn btn-secondary" onclick="document.getElementById('modal-preview').classList.remove('open')">Fechar</button>
-    </div>
+<div class="barra">
+  <div class="barra-in">
+    <div class="resumo" id="resumo">Nenhuma etiqueta escolhida</div>
+    <button class="btn btn-sec" id="btn-teste" disabled>Imprimir 1 linha de teste</button>
+    <button class="btn btn-primary" id="btn-imprimir" disabled>Imprimir</button>
   </div>
 </div>
+<div class="toast" id="toast" role="status"></div>
 
 <script>
-const CORES = [
-  { sku: 'TT-MSQ-VD', barcode: '810001', nome: 'Squishy Liso 8cm', cor: 'Verde', hex: '#22C55E', qty: 16 },
-  { sku: 'TT-MSQ-RS', barcode: '810002', nome: 'Squishy Liso 8cm', cor: 'Rosa', hex: '#EC4899', qty: 16 },
-  { sku: 'TT-MSQ-LI', barcode: '810003', nome: 'Squishy Liso 8cm', cor: 'Lilás', hex: '#A855F7', qty: 16 },
-  { sku: 'TT-MSQ-AZ', barcode: '810004', nome: 'Squishy Liso 8cm', cor: 'Azul', hex: '#3B82F6', qty: 16 },
-  { sku: 'TT-MSQ-BR', barcode: '810005', nome: 'Squishy Liso 8cm', cor: 'Branco', hex: '#E2E8F0', qty: 16 },
-  { sku: 'TT-MSQ-AM', barcode: '810006', nome: 'Squishy Liso 8cm', cor: 'Amarelo', hex: '#EAB308', qty: 16 },
-];
-
 const $ = (id) => document.getElementById(id);
-let produtos = JSON.parse(localStorage.getItem('sku-produtos') || 'null') || CORES.map(c => ({...c}));
+const ler = (k, pad) => { try { return JSON.parse(localStorage.getItem(k)) ?? pad; } catch (_) { return pad; } };
+const guardar = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) { /* sem armazenamento */ } };
+function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), 3500); }
 
-function salvar() { localStorage.setItem('sku-produtos', JSON.stringify(produtos)); }
-
-function renderGrid() {
-  const grid = $('product-grid');
-  grid.replaceChildren(...produtos.map((p, i) => {
-    const card = document.createElement('div');
-    card.className = 'product-card' + (p.qty > 0 ? ' selected' : '');
-    card.innerHTML = `
-      <div class="color-dot" style="background:${p.hex};${p.cor === 'Branco' ? 'border-color:#CBD5E1;' : ''}"></div>
-      <div class="product-name">${p.cor}</div>
-      <div class="product-sku">${p.sku}</div>
-      <div class="product-barcode">${p.barcode}</div>
-      <div class="product-qty">
-        <input class="qty-input" type="number" min="0" max="999" value="${p.qty}" data-idx="${i}">
-        <span class="qty-label">etiquetas</span>
-      </div>`;
-    card.querySelector('.qty-input').oninput = (e) => {
-      p.qty = Math.max(0, parseInt(e.target.value) || 0);
-      salvar();
-      card.classList.toggle('selected', p.qty > 0);
-      atualizarResumo();
-    };
-    return card;
-  }));
+// ---------- EAN-13 (o mesmo cálculo de src/ean13.js) ----------
+function digitoEan(d12) { let s = 0; for (let i = 0; i < 12; i++) s += Number(d12[i]) * (i % 2 ? 3 : 1); return String((10 - (s % 10)) % 10); }
+const eanValido = (c) => /^\d{13}$/.test(String(c || '')) && digitoEan(String(c)) === String(c)[12];
+const eanInterno = (c) => eanValido(c) && String(c).startsWith('200');
+const TL = ['0001101','0011001','0010011','0111101','0100011','0110001','0101111','0111011','0110111','0001011'];
+const TG = TL.map((p) => [...p].map((b) => b === '1' ? '0' : '1').reverse().join(''));
+const TR = TL.map((p) => [...p].map((b) => b === '1' ? '0' : '1').join(''));
+const PAR = ['LLLLLL','LLGLGG','LLGGLG','LLGGGL','LGLLGG','LGGLLG','LGGGLL','LGLGLG','LGLGGL','LGGLGL'];
+function modulosEan(c) {
+  let m = '101'; const p = PAR[Number(c[0])];
+  for (let i = 1; i <= 6; i++) m += (p[i - 1] === 'L' ? TL : TG)[Number(c[i])];
+  m += '01010'; for (let i = 7; i <= 12; i++) m += TR[Number(c[i])];
+  return m + '101';
+}
+function situacaoEan(c) {
+  if (!c) return { txt: 'Sem código', cls: 'erro' };
+  if (eanInterno(c)) return { txt: 'EAN-13 interno', cls: 'ok' };
+  if (eanValido(c)) return { txt: 'EAN-13', cls: 'ok' };
+  return { txt: 'Não é EAN-13', cls: 'alerta' };
 }
 
-function atualizarResumo() {
-  const ativos = produtos.filter(p => p.qty > 0);
-  const total = ativos.reduce((s, p) => s + p.qty, 0);
-  $('action-summary').innerHTML = `<strong>${total}</strong> etiqueta${total !== 1 ? 's' : ''} · <strong>${ativos.length}</strong> cor${ativos.length !== 1 ? 'es' : ''}`;
-  $('btn-print').disabled = total === 0;
-  $('stat-total').textContent = total;
-  $('stat-cores').textContent = ativos.length;
+// ---------- medidas do rolo ----------
+const PADRAO = { larguraMm: 35, alturaMm: 25, espacoColunasMm: 2.2, margemEsqMm: 1, colunas: 3, gapMm: 2, densidade: 8, velocidade: 4 };
+const CAMPOS = { larguraMm: 'cfg-largura', alturaMm: 'cfg-altura', espacoColunasMm: 'cfg-espaco', margemEsqMm: 'cfg-margem', colunas: 'cfg-colunas', gapMm: 'cfg-gap', densidade: 'cfg-densidade', velocidade: 'cfg-velocidade' };
+let medidas = { ...PADRAO, ...ler('sku-medidas', {}) };
+function mostrarMedidas() { for (const [k, id] of Object.entries(CAMPOS)) $(id).value = medidas[k]; }
+for (const [k, id] of Object.entries(CAMPOS)) $(id).addEventListener('change', () => {
+  const v = Number($(id).value);
+  if (Number.isFinite(v) && v >= Number($(id).min) && v <= Number($(id).max)) medidas[k] = v; else $(id).value = medidas[k];
+  guardar('sku-medidas', medidas); atualizar();
+});
+$('medidas-padrao').onclick = () => { medidas = { ...PADRAO }; guardar('sku-medidas', medidas); mostrarMedidas(); atualizar(); };
+
+// ---------- produtos e quantidades ----------
+let loja = null, qtd = ler('sku-qtd', {}), filtro = '', assinatura = '';
+const produtos = () => (loja ? loja.produtos : []);
+const imprimiveis = () => produtos().filter((p) => eanValido(p.barcode) && (qtd[p.chave] || 0) > 0);
+function etiquetasEmOrdem() {
+  const out = [];
+  for (const p of imprimiveis()) for (let i = 0; i < qtd[p.chave]; i++) out.push({ nome: p.nome, cor: p.cor, sku: p.sku, barcode: p.barcode });
+  return out;
+}
+function definirQtd(chave, n) { n = Math.max(0, Math.min(999, Math.floor(Number(n) || 0))); if (n) qtd[chave] = n; else delete qtd[chave]; guardar('sku-qtd', qtd); }
+
+function desenharLista() {
+  const lista = $('lista');
+  if (!loja || !produtos().length) {
+    lista.innerHTML = '<div class="vazio"><strong>Nenhum produto ainda</strong>Ligue a loja abaixo e clique em Sincronizar com o site para trazer os produtos.</div>';
+    return;
+  }
+  const f = filtro.trim().toLowerCase();
+  const vis = produtos().filter((p) => !f || [p.nome, p.cor, p.sku, p.barcode].some((x) => String(x || '').toLowerCase().includes(f)));
+  const cab = document.createElement('div'); cab.className = 'item cab';
+  cab.innerHTML = '<div>Produto</div><div class="cod-col">Código de barras</div><div class="num est-col">Estoque</div><div class="num">Etiquetas</div>';
+  const linhas = vis.map((p) => {
+    const ok = eanValido(p.barcode), n = qtd[p.chave] || 0, sit = situacaoEan(p.barcode);
+    const el = document.createElement('div'); el.className = 'item' + (ok && n ? ' ativo' : '');
+    const c1 = document.createElement('div');
+    const nome = document.createElement('div'); nome.className = 'nome'; nome.textContent = p.nome; nome.title = p.nome;
+    const det = document.createElement('div'); det.className = 'det'; det.textContent = [p.cor, p.sku].filter(Boolean).join(' · ');
+    c1.append(nome, det);
+    const c2 = document.createElement('div'); c2.className = 'cod-col';
+    const cod = document.createElement('div'); cod.className = 'cod mono'; cod.textContent = p.barcode || '—';
+    const s = document.createElement('span'); s.className = 'selo ' + sit.cls; s.textContent = sit.txt + (p.soAqui && p.barcode ? ' · só neste computador' : '');
+    c2.append(cod, s);
+    if (!ok) { const g = document.createElement('button'); g.className = 'btn-link'; g.textContent = p.barcode ? 'Trocar por EAN-13' : 'Gerar EAN-13'; g.onclick = () => gerar([p.chave]); c2.append(g); }
+    const c3 = document.createElement('div'); c3.className = 'num est-col'; c3.textContent = p.estoque == null ? '—' : String(p.estoque);
+    const c4 = document.createElement('div'); c4.className = 'qtd';
+    const menos = document.createElement('button'); menos.textContent = '−'; menos.setAttribute('aria-label', 'Menos uma etiqueta de ' + p.nome);
+    const inp = document.createElement('input'); inp.type = 'number'; inp.min = 0; inp.max = 999; inp.value = n; inp.setAttribute('aria-label', 'Etiquetas de ' + p.nome);
+    const mais = document.createElement('button'); mais.textContent = '+'; mais.setAttribute('aria-label', 'Mais uma etiqueta de ' + p.nome);
+    [menos, inp, mais].forEach((x) => { x.disabled = !ok; });
+    if (!ok) c4.title = 'Gere o EAN-13 para poder imprimir';
+    menos.onclick = () => { definirQtd(p.chave, (qtd[p.chave] || 0) - 1); atualizar(); };
+    mais.onclick = () => { definirQtd(p.chave, (qtd[p.chave] || 0) + 1); atualizar(); };
+    inp.onchange = () => { definirQtd(p.chave, inp.value); atualizar(); };
+    c4.append(menos, inp, mais);
+    el.append(c1, c2, c3, c4);
+    return el;
+  });
+  lista.replaceChildren(cab, ...(linhas.length ? linhas : [Object.assign(document.createElement('div'), { className: 'vazio', textContent: 'Nenhum produto com "' + filtro + '".' })]));
 }
 
-function getConfig() {
-  return {
-    larguraMm: Number($('cfg-largura').value) || 34,
-    alturaMm: Number($('cfg-altura').value) || 23,
-    colunas: Number($('cfg-colunas').value) || 3,
-    gapMm: Number($('cfg-gap').value) || 2,
-    espacoColunasMm: Number($('cfg-espaco').value) || 0,
-    margemEsqMm: Number($('cfg-margem').value) || 0,
-    densidade: Number($('cfg-densidade').value) || 8,
-    velocidade: Number($('cfg-velocidade').value) || 6,
+// ---------- prévia: mesmas medidas e posições da impressora (LAYOUT_SKU em src/etiqueta.js) ----------
+const LAYOUT = { nome: 30, cor: 52, barras: 80, altBarras: 58, codigo: 142, sku: 166 };
+const FONTE = { 1: [8, 12], 2: [12, 20], 3: [16, 24] };
+const limpar = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/["\\]/g, '').toUpperCase();
+function desenharPrevia() {
+  const m = medidas, PM = 8;
+  const wCol = Math.round(m.larguraMm * PM), hEt = Math.round(m.alturaMm * PM);
+  const passo = Math.round((m.larguraMm + m.espacoColunasMm) * PM), x0 = Math.round(m.margemEsqMm * PM);
+  const larg = Math.round((m.margemEsqMm * 2 + m.colunas * m.larguraMm + (m.colunas - 1) * m.espacoColunasMm) * PM);
+  const esc = hEt / 200, Y = {}; for (const [k, v] of Object.entries(LAYOUT)) Y[k] = Math.round(v * esc);
+  const ets = etiquetasEmOrdem().slice(0, m.colunas);
+  const svg = $('svg-previa'); svg.setAttribute('viewBox', `0 0 ${larg} ${hEt}`);
+  const partes = [];
+  const txt = (col, y, f, t) => {
+    const [cw, ch] = FONTE[f]; const max = Math.floor((wCol - 32) / cw); const s = t.slice(0, max);
+    const x = col + Math.max(16, Math.round((wCol - s.length * cw) / 2));
+    partes.push(`<text x="${x}" y="${y + ch * 0.85}" font-size="${ch * 1.05}" textLength="${s.length * cw}" lengthAdjust="spacingAndGlyphs" font-family="Menlo, monospace" font-weight="${f === 3 ? 700 : 600}" fill="#000">${s.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</text>`);
   };
-}
-
-$('cfg-colunas').onchange = () => { $('stat-colunas').textContent = $('cfg-colunas').value; };
-
-// Prévia
-$('btn-preview').onclick = () => {
-  const ativo = produtos.find(p => p.qty > 0);
-  if (!ativo) return showToast('Selecione pelo menos uma cor');
-  $('preview-nome').textContent = (ativo.nome || 'Squishy Liso 8cm').toUpperCase();
-  $('preview-cor').textContent = ativo.cor.toUpperCase();
-  $('preview-codigo').textContent = ativo.barcode;
-  $('preview-sku').textContent = ativo.sku;
-  $('modal-preview').classList.add('open');
-};
-
-// Teste: imprime só 2 linhas (6 etiquetas) da primeira cor ativa
-$('btn-test').onclick = async () => {
-  const btn = $('btn-test');
-  const ativo = produtos.find(p => p.qty > 0);
-  if (!ativo) return showToast('Selecione pelo menos uma cor');
-  btn.disabled = true;
-  btn.textContent = '⏳ Testando…';
-  try {
-    const etiquetas = [];
-    for (let i = 0; i < 6; i++) {
-      etiquetas.push({ barcode: ativo.barcode, cor: ativo.cor, sku: ativo.sku, nome: ativo.nome || 'Squishy Liso 8cm' });
-    }
-    const r = await fetch('/api/sku/imprimir', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ etiquetas, opts: getConfig() })
-    });
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(j.erro || 'Falha ao enviar');
-    showToast(`6 etiquetas de teste enviadas (${ativo.cor})`);
-  } catch (e) {
-    showToast('' + e.message);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Teste (2 linhas)';
+  for (let c = 0; c < m.colunas; c++) {
+    const col = x0 + c * passo;
+    partes.push(`<rect x="${col}" y="0" width="${wCol}" height="${hEt}" rx="16" fill="#fff"/>`);
+    const e = ets[c]; if (!e) continue;
+    const nome = limpar(e.nome);
+    const cabe = (f) => Math.floor((wCol - 32) / FONTE[f][0]);
+    if (nome.length <= cabe(2)) txt(col, Y.nome, 2, nome);
+    else txt(col, Y.nome + 4, 1, nome.length <= cabe(1) ? nome : nome.slice(0, cabe(1) + 1).replace(/\s+\S*$/, ''));
+    if (e.cor) txt(col, Y.cor, 3, limpar(e.cor));
+    const mods = modulosEan(e.barcode), xb = col + Math.round((wCol - 95 * 2) / 2);
+    let d = ''; for (let i = 0; i < 95; i++) if (mods[i] === '1') d += `M${xb + i * 2} ${Y.barras}h2v${Y.altBarras}h-2z`;
+    partes.push(`<path d="${d}" fill="#000"/>`);
+    txt(col, Y.codigo, 2, e.barcode);
+    if (e.sku) txt(col, Y.sku, 1, limpar(e.sku));
   }
-};
+  if (!ets.length) partes.push(`<text x="${larg / 2}" y="${hEt / 2 + 8}" text-anchor="middle" font-size="22" fill="#64748B" font-family="-apple-system, sans-serif">Escolha a quantidade de um produto para ver aqui</text>`);
+  svg.innerHTML = partes.join('');
+}
 
-// Imprimir
-$('btn-print').onclick = async () => {
-  const btn = $('btn-print');
-  btn.disabled = true;
-  btn.textContent = '⏳ Enviando…';
+// ---------- resumo e indicadores ----------
+function atualizar() {
+  assinatura = JSON.stringify(produtos()); // a consulta periódica só redesenha se o site mudar algo
+  const ps = produtos(), comEan = ps.filter((p) => eanValido(p.barcode)).length, faltam = ps.length - comEan;
+  const ets = etiquetasEmOrdem(), linhas = Math.ceil(ets.length / medidas.colunas), nProd = imprimiveis().length;
+  $('ind-ean').textContent = `${comEan} de ${ps.length}`;
+  $('ind-ean-r').textContent = faltam ? `com EAN-13 · faltam ${faltam}` : 'produtos com EAN-13';
+  $('ind-total').textContent = ets.length;
+  $('ind-total-r').textContent = nProd ? `etiquetas · ${nProd} produto${nProd > 1 ? 's' : ''}` : 'etiquetas para imprimir';
+  $('ind-linhas').textContent = linhas;
+  $('ind-linhas-r').textContent = `linhas · ${medidas.colunas} por linha`;
+  $('gerar-faltam').textContent = faltam ? `Gerar EAN-13 que faltam (${faltam})` : 'Todos têm EAN-13';
+  $('gerar-faltam').disabled = !faltam;
+  const temEstoque = ps.some((p) => eanValido(p.barcode) && p.estoque > 0);
+  $('pelo-estoque').disabled = !temEstoque;
+  $('pelo-estoque').title = temEstoque ? 'Uma etiqueta para cada peça em estoque no site' : 'Precisa da chave da loja para ler o estoque';
+  $('zerar').disabled = !Object.keys(qtd).length;
+  const sobra = linhas * medidas.colunas - ets.length;
+  $('resumo').innerHTML = ets.length
+    ? `<strong>${ets.length}</strong> etiqueta${ets.length > 1 ? 's' : ''} em <strong>${linhas}</strong> linha${linhas > 1 ? 's' : ''}${sobra ? ` · ${sobra} em branco na última` : ''}`
+    : 'Nenhuma etiqueta escolhida';
+  $('btn-imprimir').disabled = !ets.length;
+  $('btn-imprimir').textContent = ets.length ? `Imprimir ${ets.length}` : 'Imprimir';
+  $('btn-teste').disabled = !ets.length;
+  $('aviso-ean').hidden = !ps.some((p) => eanInterno(p.barcode)) && faltam === 0;
+  desenharLista(); desenharPrevia();
+}
+
+$('busca').addEventListener('input', (e) => { filtro = e.target.value; desenharLista(); });
+$('zerar').onclick = () => { qtd = {}; guardar('sku-qtd', qtd); atualizar(); };
+$('pelo-estoque').onclick = () => {
+  let n = 0;
+  for (const p of produtos()) if (eanValido(p.barcode) && p.estoque > 0) { definirQtd(p.chave, p.estoque); n++; }
+  toast(`${n} produto${n !== 1 ? 's' : ''} com a quantidade do estoque`); atualizar();
+};
+async function gerar(chaves) {
   try {
-    const etiquetas = [];
-    for (const p of produtos) {
-      for (let i = 0; i < p.qty; i++) {
-        etiquetas.push({ barcode: p.barcode, cor: p.cor, sku: p.sku, nome: p.nome || 'Squishy Liso 8cm' });
-      }
-    }
-    if (!etiquetas.length) throw new Error('Nenhuma etiqueta selecionada');
-    const r = await fetch('/api/sku/imprimir', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ etiquetas, opts: getConfig() })
-    });
+    const r = await apiLoja('/api/loja/gerar-ean', chaves ? { chaves } : {});
+    loja = r; desenharLoja(); atualizar();
+    toast(r.gerados.length ? `${r.gerados.length} EAN-13 gerado${r.gerados.length > 1 ? 's' : ''}${r.temChave ? ' e gravado' + (r.gerados.length > 1 ? 's' : '') + ' no site' : ' · vão para o site quando a chave for ligada'}` : 'Nada para gerar');
+  } catch (e) { toast(e.message); }
+}
+$('gerar-faltam').onclick = () => gerar();
+
+async function imprimir(etiquetas, rotulo, btn) {
+  const antes = btn.textContent; btn.disabled = true; btn.textContent = 'Enviando…';
+  try {
+    const r = await fetch('/api/sku/imprimir', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ etiquetas, opts: medidas }) });
     const j = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(j.erro || 'Falha ao enviar');
-    showToast(`${etiquetas.length} etiqueta${etiquetas.length > 1 ? 's' : ''} enviada${etiquetas.length > 1 ? 's' : ''}!`);
-  } catch (e) {
-    showToast('' + e.message);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Imprimir Etiquetas';
-    atualizarResumo();
-  }
-};
-
-function showToast(msg) {
-  const t = $('toast');
-  t.textContent = msg;
-  t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 3000);
+    if (!r.ok) throw new Error(j.erro || 'a impressora não recebeu');
+    toast(rotulo);
+  } catch (e) { toast(e.message); }
+  finally { btn.textContent = antes; atualizar(); }
 }
+$('btn-imprimir').onclick = () => { const e = etiquetasEmOrdem(); imprimir(e, `${e.length} etiqueta${e.length > 1 ? 's' : ''} enviada${e.length > 1 ? 's' : ''} para a impressora`, $('btn-imprimir')); };
+$('btn-teste').onclick = () => { const e = etiquetasEmOrdem().slice(0, medidas.colunas); imprimir(e, 'Linha de teste enviada', $('btn-teste')); };
 
-// Verificar BLE
-async function checkBle() {
-  try {
-    const r = await fetch('/api/estado');
-    const d = await r.json();
-    const vivo = d.bleVivo === true;
-    $('stat-ble').textContent = vivo ? 'Online' : 'Offline';
-    $('stat-ble').parentElement.parentElement.querySelector('.stat-icon').style.background = vivo ? '#DCFCE7' : '#FEF2F2';
-    $('stat-ble').parentElement.parentElement.querySelector('.stat-icon').style.color = vivo ? '#16A34A' : '#DC2626';
-  } catch (_) { $('stat-ble').textContent = '?'; }
+async function verImpressora() {
+  const s = $('impressora');
+  try { const d = await (await fetch('/api/estado')).json(); s.textContent = d.fila && d.fila.texto ? d.fila.texto : 'Impressora'; s.className = 'selo ' + (d.fila && d.fila.ok ? 'ok' : 'alerta'); }
+  catch (_) { s.textContent = 'Ponte fora do ar'; s.className = 'selo erro'; }
 }
-
-// Init
-renderGrid();
-atualizarResumo();
-checkBle();
-setInterval(checkBle, 10000);
 
 // ---------- loja virtual ----------
-let loja = null, modoBipe = 'consulta';
-const brl = (v) => v === '' || v == null ? '' : Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+let modoBipe = 'consulta';
 async function apiLoja(rota, corpo) {
   const r = await fetch(rota, corpo === undefined ? {} : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo) });
   const j = await r.json().catch(() => ({}));
@@ -458,53 +425,38 @@ function desenharLoja() {
   const selo = $('loja-selo');
   selo.textContent = loja.temChave ? 'Ligada' : loja.url ? 'Só leitura (sem chave)' : 'Não ligada';
   selo.className = 'selo ' + (loja.temChave ? 'ok' : 'alerta');
+  $('ind-loja').textContent = loja.temChave ? 'Ligada' : loja.url ? 'Só leitura' : 'Não ligada';
+  $('ind-loja-r').textContent = loja.url ? loja.url.replace(/^https:\/\//, '') : 'loja virtual';
   $('loja-sub').textContent = loja.url ? loja.url.replace(/^https:\/\//, '') + (loja.pendentes ? ` · ${loja.pendentes} movimento(s) esperando o site voltar` : '') : 'O estoque fica no site; o leitor de código de barras soma e tira direto dele';
   if (!$('loja-url').value) $('loja-url').value = loja.url || '';
   $('loja-ligar').open = !loja.temChave;
   $('loja-atualizado').textContent = loja.atualizado ? 'Sincronizado às ' + new Date(loja.atualizado).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) + ' · ' + loja.produtos.length + ' produto(s)' : '';
-  $('loja-produtos').replaceChildren(...loja.produtos.map((p) => {
-    const tr = document.createElement('tr');
-    const cod = document.createElement('input');
-    cod.value = p.barcode || ''; cod.placeholder = 'definir'; cod.setAttribute('aria-label', 'Código de barras de ' + p.nome);
-    cod.onchange = async () => {
-      try { await apiLoja('/api/loja/codigo', { chave: p.chave, barcode: cod.value }); showToast('Código gravado no site'); carregarLoja(); }
-      catch (e) { showToast(e.message); cod.value = p.barcode || ''; }
-    };
-    const tdCod = document.createElement('td'); tdCod.append(cod);
-    const est = p.estoque == null ? 'não controlado' : String(p.estoque);
-    tr.innerHTML = '<td></td><td></td><td class="num" style="text-align:left"></td>';
-    tr.children[0].textContent = p.nome; tr.children[1].textContent = p.cor || '—'; tr.children[2].textContent = p.sku;
-    const tdEst = document.createElement('td'); tdEst.className = 'num'; tdEst.textContent = est;
-    tr.append(tdCod, tdEst);
-    return tr;
-  }));
   $('loja-movimentos').replaceChildren(...loja.movimentos.map((m) => {
     const tr = document.createElement('tr');
     [new Date(m.hora).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }), m.nome + (m.cor ? ' ' + m.cor : ''), m.de ?? '', m.para ?? '', m.situacao].forEach((t, i) => {
-      const td = document.createElement('td'); td.textContent = t; if (i === 2 || i === 3) td.className = 'num'; tr.append(td);
+      const td = document.createElement('td'); td.textContent = t; if (i === 2 || i === 3) td.style.textAlign = 'right'; tr.append(td);
     });
     return tr;
   }));
 }
-async function carregarLoja() { try { loja = await apiLoja('/api/loja'); desenharLoja(); } catch (_) { /* ponte fora do ar */ } }
+async function carregarLoja() {
+  try {
+    loja = await apiLoja('/api/loja'); desenharLoja();
+    const a = JSON.stringify(loja.produtos); // só redesenha a lista se algo mudou (não atrapalha quem está digitando)
+    if (a !== assinatura) { assinatura = a; atualizar(); }
+  } catch (_) { /* ponte fora do ar */ }
+}
 document.querySelectorAll('[data-olho]').forEach((b) => { b.onclick = () => { const i = $(b.dataset.olho); i.type = i.type === 'password' ? 'text' : 'password'; b.textContent = i.type === 'password' ? 'Mostrar' : 'Esconder'; }; });
 $('loja-salvar').onclick = async () => {
   try {
     await apiLoja('/api/loja/config', { url: $('loja-url').value, chave: $('loja-chave').value, segredo: $('loja-segredo').value });
     $('loja-chave').value = ''; $('loja-segredo').value = '';
     const r = await apiLoja('/api/loja/sincronizar', {});
-    showToast(r.importados + ' produto(s) trazidos do site'); loja = r; desenharLoja();
-  } catch (e) { showToast(e.message); carregarLoja(); }
+    toast(r.importados + ' produto(s) trazidos do site'); loja = r; desenharLoja(); atualizar();
+  } catch (e) { toast(e.message); carregarLoja(); }
 };
-$('loja-esquecer').onclick = async () => { await apiLoja('/api/loja/config', { url: $('loja-url').value, chave: null }); showToast('Chave apagada deste computador'); carregarLoja(); };
-$('loja-sincronizar').onclick = async () => { try { const r = await apiLoja('/api/loja/sincronizar', {}); loja = r; desenharLoja(); showToast(r.importados + ' produto(s) atualizados'); } catch (e) { showToast(e.message); } };
-$('loja-usar').onclick = () => {
-  if (!loja || !loja.produtos.length) return showToast('Sincronize a loja primeiro');
-  const sem = loja.produtos.filter((p) => !p.barcode).length;
-  produtos = loja.produtos.filter((p) => p.barcode).map((p) => ({ sku: p.sku, barcode: p.barcode, nome: p.nome, cor: p.cor || '', hex: '#94A3B8', qty: 0 }));
-  salvar(); renderGrid(); atualizarResumo();
-  showToast(produtos.length + ' produto(s) prontos para etiqueta' + (sem ? ` · ${sem} sem código de barras` : ''));
-};
+$('loja-esquecer').onclick = async () => { await apiLoja('/api/loja/config', { url: $('loja-url').value, chave: null }); toast('Chave apagada deste computador'); carregarLoja(); };
+$('loja-sincronizar').onclick = async () => { try { const r = await apiLoja('/api/loja/sincronizar', {}); loja = r; desenharLoja(); atualizar(); toast(r.importados + ' produto(s) atualizados'); } catch (e) { toast(e.message); } };
 document.querySelectorAll('[data-modo]').forEach((b) => { b.onclick = () => { modoBipe = b.dataset.modo; document.querySelectorAll('[data-modo]').forEach((x) => x.setAttribute('aria-pressed', x === b)); $('bipe-codigo').focus(); }; });
 $('bipe-codigo').addEventListener('keydown', async (e) => {
   if (e.key !== 'Enter') return;
@@ -515,8 +467,7 @@ $('bipe-codigo').addEventListener('keydown', async (e) => {
   try {
     const r = await apiLoja('/api/loja/bipe', { codigo, modo: modoBipe, qtd: Number($('bipe-qtd').value) || 1 });
     if (!r.achou) { res.className = 'erro'; res.textContent = 'Código ' + codigo + ' não está cadastrado em nenhum produto da loja.'; return; }
-    const p = r.produto, nome = p.nome + (p.cor ? ' ' + p.cor : '');
-    const m = r.movimento;
+    const p = r.produto, nome = p.nome + (p.cor ? ' ' + p.cor : ''), m = r.movimento;
     res.className = 'ok';
     res.textContent = !m ? nome + ' · estoque no site: ' + (p.estoque ?? 'não controlado')
       : m.situacao === 'gravado' ? nome + ' · De ' + m.de + ' para ' + m.para
@@ -525,7 +476,9 @@ $('bipe-codigo').addEventListener('keydown', async (e) => {
   } catch (err) { res.className = 'erro'; res.textContent = err.message; }
   e.target.focus();
 });
-carregarLoja(); setInterval(carregarLoja, 15000);
+
+mostrarMedidas(); atualizar(); verImpressora(); carregarLoja();
+setInterval(verImpressora, 10000); setInterval(carregarLoja, 15000);
 </script>
 </body>
 </html>

@@ -56,5 +56,18 @@ const medir = (im) => {
   fs.mkdirSync(path.join(__dirname, '..', 'docs'), { recursive: true });
   fs.writeFileSync(path.join(__dirname, '..', 'docs', 'exemplo-shopee.png'), e.paraPng(sh.img));
   fs.writeFileSync(path.join(__dirname, '..', 'docs', 'exemplo-mercado-livre.png'), e.paraPng(junta.img));
+  // EAN-13: verificador, numeração interna sem repetir e etiqueta de produto com EAN13 na impressora
+  const ean = require('../src/ean13.js');
+  assert.strictEqual(ean.digito('789100031550'), '7');           // 7891000315507 (EAN real conhecido)
+  assert.ok(ean.valido('7891000315507'));
+  assert.ok(!ean.valido('7891000315508'));
+  assert.strictEqual(ean.problema('810001'), 'não é EAN-13 (6 dígitos)');
+  assert.strictEqual(ean.proximoInterno([]), '2000000000015');
+  assert.strictEqual(ean.proximoInterno(['2000000000015', '7891000315507']), '2000000000022');
+  assert.strictEqual(ean.modulos('7891000315507').length, 95);
+  const sku = e.paraTsplSku([{ nome: 'Squishy ursinho game bar que brilha', cor: 'Rosa', barcode: '2000000000015', sku: 'TT-1' }]).toString('latin1');
+  assert.ok(/BARCODE \d+,80,"EAN13",58,0,0,2,2,"200000000001"/.test(sku), 'EAN13 com 12 dígitos e módulo de 2 pontos');
+  assert.ok(sku.includes('"SQUISHY URSINHO GAME BAR QUE"'), 'nome longo cortado no fim de palavra');
+  assert.ok(sku.includes('SIZE 108 mm,25 mm'));
   console.log('ok: todos os testes passaram');
 })().catch((err) => { console.error('FALHOU:', err.message); process.exit(1); });

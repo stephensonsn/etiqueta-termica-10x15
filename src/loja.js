@@ -12,6 +12,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const ean = require('./ean13');
 
 let cfg, log, RAIZ;
 const ARQ = () => path.join(RAIZ, 'logs', 'loja.json'); // dados da loja (sem dados de clientes)
@@ -84,9 +85,18 @@ async function sincronizar() {
     const { dados: ps } = await chamar('GET', '/wp-json/wc/store/v1/products?per_page=100', null, { publico: true });
     for (const p of ps) lista.push({ chave: String(p.id), id: p.id, varId: 0, nome: p.name, cor: '', sku: p.sku || '', barcode: '', estoque: null, preco: '' });
   }
-  // mantém códigos de barras que só existem aqui (dados antes de existir a chave)
+  // mantém códigos de barras que só existem aqui (gerados antes de existir a chave) e, se já houver
+  // chave, grava esses códigos no site
   const antigos = new Map(dados.produtos.map((p) => [p.chave, p]));
-  for (const p of lista) if (!p.barcode && antigos.get(p.chave)?.barcode) p.barcode = antigos.get(p.chave).barcode;
+  for (const p of lista) {
+    const a = antigos.get(p.chave);
+    if (p.barcode || !a?.barcode) continue;
+    p.barcode = a.barcode; p.soAqui = true;
+    if (temChave()) {
+      try { await chamar('PUT', caminhoDe(p), { global_unique_id: p.barcode }); p.soAqui = false; }
+      catch (e) { log(`loja: código ${p.barcode} de ${p.nome} não foi para o site (${e.message})`); }
+    }
+  }
   dados.produtos = lista;
   dados.atualizado = new Date().toISOString();
   dados.erro = '';
@@ -169,12 +179,35 @@ async function definirCodigo({ chave, barcode }) {
   if (!p) throw new Error('produto não encontrado; sincronize a loja');
   const codigo = String(barcode || '').trim();
   if (!/^[0-9A-Za-z-]{4,20}$/.test(codigo)) throw new Error('código de barras inválido (4 a 20 letras ou números)');
+  if (/^\d{13}$/.test(codigo) && ean.problema(codigo)) throw new Error(`EAN-13 com ${ean.problema(codigo)}`);
   const outro = dados.produtos.find((x) => x.chave !== chave && normal(x.barcode) === normal(codigo));
   if (outro) throw new Error(`esse código já é do produto ${outro.nome}${outro.cor ? ' ' + outro.cor : ''}`);
+  p.soAqui = !temChave();
   if (temChave()) await chamar('PUT', caminhoDe(p), { global_unique_id: codigo });
   p.barcode = codigo;
   gravar();
   return p;
+}
+
+// Gera EAN-13 interno (200 + sequência + verificador) para os produtos sem EAN-13 válido.
+// Idempotente: quem já tem EAN-13 válido não muda; rodar de novo só pega quem ainda falta.
+async function gerarEan13({ chaves } = {}) {
+  const alvo = dados.produtos.filter((p) => (!chaves || chaves.includes(p.chave)) && !ean.valido(p.barcode));
+  const gerados = [];
+  for (const p of alvo) {
+    const codigo = ean.proximoInterno(dados.produtos.map((x) => x.barcode));
+    const antes = p.barcode;
+    p.barcode = codigo; p.soAqui = true;
+    gravar(); // grava a cada um: se cair no meio, o próximo não repete número
+    if (temChave()) {
+      try { await chamar('PUT', caminhoDe(p), { global_unique_id: codigo }); p.soAqui = false; }
+      catch (e) { log(`loja: EAN ${codigo} de ${p.nome} ficou só neste computador (${e.message})`); }
+    }
+    gerados.push({ chave: p.chave, nome: p.nome, cor: p.cor, de: antes || '', para: codigo });
+  }
+  gravar();
+  if (gerados.length) log(`loja: ${gerados.length} EAN-13 interno(s) gerado(s)${temChave() ? '' : ' (ficam neste computador até ligar a chave da loja)'}`);
+  return { gerados, ...estadoLoja() };
 }
 
 function salvarConfig({ url, chave, segredo }) {
@@ -195,4 +228,4 @@ function estadoLoja() {
   };
 }
 
-module.exports = { iniciar, sincronizar, bipar, definirCodigo, salvarConfig, estadoLoja, reenviarPendentes };
+module.exports = { iniciar, sincronizar, bipar, definirCodigo, gerarEan13, salvarConfig, estadoLoja, reenviarPendentes };

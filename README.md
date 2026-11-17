@@ -106,11 +106,14 @@ Em <http://127.0.0.1:9100/painel>, acessível só do próprio computador.
 
 ## Etiquetas de produto (código de barras)
 
-Em <http://127.0.0.1:9100/estoque> dá para cadastrar produtos e imprimir etiquetas de código de barras em rolos de várias colunas (por exemplo 3 colunas de 34 x 23 mm), direto na mesma impressora.
+Em <http://127.0.0.1:9100/estoque> você escolhe quantas etiquetas de cada produto quer e imprime em rolos de várias colunas (padrão: 3 colunas de 35 x 25 mm, medidas conferidas por foto no OIA-8370-B), direto na mesma impressora.
 
-- Cada etiqueta leva o nome do produto, a cor, o código de barras (Code 128), o número uma vez só embaixo das barras e o SKU, tudo centralizado na própria coluna.
-- **Espaço entre colunas** e **margem esquerda** são ajustáveis: em rolos de várias colunas cada etiqueta começa em largura + espaço, senão a última coluna sai cortada.
-- Ao trocar de rolo (de 100 x 150 para 34 x 23, por exemplo), a ponte recalibra o sensor de papel sozinha antes de imprimir. Sem isso a impressão "sobe" a cada linha e a impressora pode travar.
+- **EAN-13:** cada etiqueta leva o nome do produto, a cor, as barras EAN-13 (módulo de 0,25 mm), os 13 números embaixo e o SKU, centralizados na própria coluna. Nome longo vai em letra menor, cortado no fim de uma palavra.
+- **EAN-13 interno:** "Gerar EAN-13 que faltam" cria códigos `200` + sequência + dígito verificador para quem ainda não tem e grava no site. Servem para bipar na sua loja; Mercado Livre e Shopee exigem EAN registrado na GS1 Brasil. Rodar de novo não repete número nem troca código existente.
+- **Quantidade:** botões − e + por produto, "Quantidade = estoque" (precisa da chave da loja) e "Zerar". Só imprime quem tem EAN-13 válido.
+- **Prévia:** a primeira linha aparece com as mesmas medidas e posições do papel. "Imprimir 1 linha de teste" gasta só uma linha.
+- **Medidas do rolo:** largura, altura, espaço entre colunas e margem esquerda ficam em "Medidas do rolo e impressão". Para medir um rolo novo: `node ferramentas/teste-sku-linha.js --largura 35 --altura 25 --espaco 2.2 --margem 1` imprime uma linha com moldura e régua em mm em cada etiqueta.
+- Ao trocar de rolo (de 100 x 150 para 35 x 25, por exemplo), a ponte recalibra o sensor de papel sozinha antes de imprimir.
 
 ## Loja virtual (WooCommerce): estoque e leitor de código de barras
 
@@ -118,8 +121,8 @@ A tela de estoque (<http://127.0.0.1:9100/estoque>) liga na loja WordPress + Woo
 
 - **Produtos do site:** traz os produtos e as variações (cores), com SKU, código de barras e estoque.
 - **Leitor de código de barras:** o leitor USB ou Bluetooth funciona como teclado. Escolha **Entrada** (chegou mercadoria), **Saída** (vendeu ou separou) ou **Consultar** e bipe. A ponte lê o estoque atual no site, soma ou tira e grava de volta; vendas feitas no site no meio do caminho não se perdem.
-- **Código de barras no site:** o código digitado na tabela vai para o campo "GTIN, UPC, EAN ou ISBN" do produto no WooCommerce.
-- **Etiquetas:** "Usar os produtos da loja nas etiquetas" leva os produtos com código de barras para a impressão de etiquetas de produto.
+- **Código de barras no site:** o EAN-13 vai para o campo "GTIN, UPC, EAN ou ISBN" do produto no WooCommerce. Sem a chave, fica neste computador e sobe para o site na próxima sincronização com chave.
+- **Etiquetas:** os produtos do site aparecem direto na lista de etiquetas.
 - **Site fora do ar:** o movimento fica guardado e é reenviado sozinho a cada minuto, uma vez só.
 
 Para ligar: no WordPress, *WooCommerce → Configurações → Avançado → API REST → Adicionar chave*, permissão **Leitura/Gravação**. Cole a chave e o segredo na tela de estoque. Eles ficam só no `config.json` deste computador, que não vai para o git. Sem a chave, a tela só lê o catálogo público (sem quantidade em estoque).
