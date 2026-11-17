@@ -39,7 +39,7 @@
   .abas[hidden] { display: none; }
   .guia { border-color: #FDBA74; background: #FFF7ED; }
   .guia[hidden] { display: none; }
-  .trilha { list-style: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 0 0 14px; padding: 0; }
+  .trilha { list-style: none; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin: 0 0 14px; padding: 0; }
   .trilha li { padding: 8px 12px; border-radius: 8px; background: #FFEDD5; color: var(--suave); font-weight: 600; text-align: center; white-space: nowrap; }
   .trilha li[aria-current="step"] { background: var(--primaria); color: var(--sobre-primaria); }
   .trilha li.feita { background: var(--verde-fundo); color: var(--verde); }
@@ -50,6 +50,14 @@
   .escolhas span { color: var(--suave); font-size: 13px; }
   .passos-lista { margin: 0; padding-left: 20px; }
   .passos-lista li { margin-bottom: 4px; }
+  .checagens { list-style: none; margin: 0 0 8px; padding: 0; border: 1px solid #FED7AA; border-radius: 8px; background: var(--cartao); }
+  .checagens:empty { display: none; }
+  .checagens li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px 12px; border-top: 1px solid var(--linha); }
+  .checagens li:first-child { border-top: 0; }
+  .checagens .nome { font-weight: 600; }
+  .checagens .detalhe { color: var(--suave); font-size: 13px; }
+  .checagens .lado { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+  a.acao { display: inline-flex; align-items: center; text-decoration: none; }
   .rodape-guia { border-top: 1px solid #FED7AA; padding-top: 14px; }
   .rodape-guia #gu-pular { margin-left: auto; }
   .ajuda { color: var(--suave); font-size: 13px; margin: 8px 0 0; }
@@ -108,7 +116,8 @@
   @media (max-width: 820px) {
     main { grid-template-columns: minmax(0, 1fr); padding: 12px 12px 24px; } header { padding: 12px; }
     .grade4, .escolhas { grid-template-columns: minmax(0, 1fr); }
-    .trilha li { font-size: 13px; padding: 8px 4px; overflow: hidden; text-overflow: ellipsis; }
+    .trilha li { font-size: 12px; padding: 8px 2px; overflow: hidden; text-overflow: ellipsis; }
+    .checagens li { grid-template-columns: minmax(0, 1fr); } .checagens .lado { justify-content: flex-start; }
     header .selo { white-space: normal; }
     ul.lista li { grid-template-columns: 22px 40px minmax(0, 1fr) auto; }
     ul.lista li .acao { grid-column: 3 / -1; justify-self: start; }
@@ -130,36 +139,58 @@
   <section class="larga guia" id="guia" hidden>
     <h2 id="guia-titulo">Configuração da impressora</h2>
     <ol class="trilha" aria-label="Etapas">
-      <li id="tr-1">1. Conexão</li><li id="tr-2">2. Impressora</li><li id="tr-3">3. Teste</li>
+      <li id="tr-1">1. Conexão</li><li id="tr-2">2. Liberações</li><li id="tr-3">3. Impressora</li><li id="tr-4">4. Teste</li><li id="tr-5">5. Mercado Livre</li>
     </ol>
     <div id="et-1">
       <p class="pergunta">Como a impressora está ligada a este computador?</p>
       <div class="escolhas" role="radiogroup" aria-label="Tipo de conexão">
-        <button type="button" role="radio" data-met="usb"><strong>Cabo USB</strong><span>O mais simples. A impressora fica ligada no computador.</span></button>
-        <button type="button" role="radio" data-met="ble"><strong>Bluetooth</strong><span>Sem fio. O computador liga nela sozinho.</span></button>
+        <button type="button" role="radio" data-met="usb"><strong>Cabo USB</strong><span>O mais simples e o mais rápido. A impressora fica ligada no computador.</span></button>
+        <button type="button" role="radio" data-met="ble"><strong>Bluetooth</strong><span>Sem fio. O computador liga nela sozinho, sem parear.</span></button>
         <button type="button" role="radio" data-met="rede"><strong>Rede</strong><span>Só para impressoras com Wi-Fi ou cabo de rede.</span></button>
       </div>
     </div>
     <div id="et-2" hidden>
-      <p class="pergunta" id="et-2-titulo"></p>
-      <ol class="passos-lista" id="et-2-passos"></ol>
-      <div class="botoes" id="et-2-acao"></div>
-      <p class="ajuda" id="et-2-estado" role="status" aria-live="polite"></p>
-      <p class="ajuda" id="et-2-driver" hidden><strong id="et-2-driver-estado"></strong> <span id="et-2-driver-texto"></span> <a href="https://www.oasismarket.com.br/uploadfile/202607/1403a8aabf95f261e142ac195a20649b.zip" id="et-2-driver-link" rel="noopener">Baixar o driver da OIA-8370</a> · <a href="https://www.oasismarket.com.br/index.php?c=category&id=12" target="_blank" rel="noopener">outros modelos, no site oficial</a></p>
+      <p class="pergunta">Libere o que o macOS pede. O assistente só avança com tudo marcado como pronto.</p>
+      <ul class="checagens" id="et-2-lista"></ul>
     </div>
     <div id="et-3" hidden>
-      <p class="pergunta">Imprima uma etiqueta de teste para conferir.</p>
+      <p class="pergunta" id="et-3-titulo"></p>
+      <ol class="passos-lista" id="et-3-passos"></ol>
+      <div class="botoes" id="et-3-acao"></div>
+      <p class="ajuda" id="et-3-estado" role="status" aria-live="polite"></p>
+      <ul class="checagens" id="et-3-extra"></ul>
+    </div>
+    <div id="et-4" hidden>
+      <p class="pergunta">Imprima uma etiqueta de teste e diga como ela saiu.</p>
       <ol class="passos-lista">
         <li>Clique em Imprimir teste. Sai uma etiqueta com moldura e uma linha a cada 10 mm.</li>
         <li>A moldura deve aparecer inteira, sem cortar nas bordas.</li>
-        <li>Se saiu certo, clique em Concluir. Se não saiu, volte e confira a conexão.</li>
       </ol>
-      <div class="botoes"><button class="acao" type="button" id="gu-teste">Imprimir teste</button></div>
-      <p class="ajuda" id="et-3-estado" role="status" aria-live="polite"></p>
+      <div class="botoes"><button class="acao primaria" type="button" id="gu-teste">Imprimir teste</button></div>
+      <div class="botoes" id="et-4-resposta" hidden>
+        <button class="acao" type="button" id="gu-saiu">Saiu inteira</button>
+        <button class="acao" type="button" id="gu-nao-saiu">Não saiu ou saiu cortada</button>
+      </div>
+      <p class="ajuda" id="et-4-estado" role="status" aria-live="polite"></p>
+    </div>
+    <div id="et-5" hidden>
+      <p class="pergunta">Ligue a impressão direta no Mercado Livre.</p>
+      <ol class="passos-lista">
+        <li>Em Preferências de venda, na parte de etiquetas, escolha Impressora térmica e formato ZPL.</li>
+        <li>Ligue Imprimir pelo navegador.</li>
+        <li>Abra a tela de Vendas. Quando o site encontrar a impressora, esta etapa fica pronta sozinha.</li>
+      </ol>
+      <div class="botoes">
+        <a class="acao" href="https://www.mercadolivre.com.br/preferencias-de-venda" target="_blank" rel="noopener">Abrir Preferências de venda</a>
+        <a class="acao" href="https://vendedores.mercadolivre.com.br/vendas/omni/lista" target="_blank" rel="noopener">Abrir Vendas</a>
+      </div>
+      <ul class="checagens" id="et-5-lista"></ul>
+      <label class="opcao"><input type="checkbox" id="gu-sem-ml"> <span>Não vendo no Mercado Livre (só Shopee ou outros programas)</span></label>
     </div>
     <div class="botoes rodape-guia">
       <button class="acao" type="button" id="gu-voltar">Voltar</button>
       <button class="acao primaria" type="button" id="gu-avancar">Continuar</button>
+      <span class="ajuda" id="gu-falta" style="margin:0"></span>
       <button class="acao" type="button" id="gu-pular">Fazer depois</button>
     </div>
   </section>
@@ -255,6 +286,7 @@
 const $ = (id) => document.getElementById(id);
 let dados = null, foco = null, aba = 'fila', camposSujos = false, ocupado = false;
 const marcadas = new Set();
+
 const ROTULO = { enviando: ['Enviando…', 'cinza'], aguardando: ['Para imprimir', 'laranja'], impresso: ['Enviada', 'verde'], erro: ['Parada na fila', 'vermelho'], descartado: ['Tirada da lista', 'cinza'] };
 const naFila = (p) => p.estado === 'aguardando' || p.estado === 'erro' || p.estado === 'enviando';
 
@@ -437,76 +469,120 @@ setInterval(async () => {
 }, 1000);
 
 // ---------- assistente de configuração (primeira vez ou quando pedido) ----------
-let guiaAberto = null, etapa = 1, metodo = null;
+// Cada etapa só deixa avançar quando o que ela pede está pronto, conferido de verdade pela ponte.
+let guiaAberto = null, etapa = 1, metodo = null, testeOk = false, testeEnviado = false;
+const ETAPAS = 5;
 const PASSOS = {
-  usb: { titulo: 'Ligue a impressora no cabo USB', passos: ['Ligue a impressora na tomada e no USB do computador.', 'Espere ela aparecer abaixo (leva alguns segundos).', 'Clique em Usar esta impressora. Se o driver do fabricante já estiver instalado, o assistente reconhece e usa; se não estiver, funciona sem ele.'] },
-  ble: { titulo: 'Conecte a impressora por Bluetooth', passos: ['Ligue a impressora e deixe o Bluetooth do computador ligado.', 'Clique em Escolher impressora e selecione a sua na lista do navegador (precisa ser o Google Chrome).', 'Não é preciso parear nos Ajustes do Sistema nem digitar código.'] },
+  usb: { titulo: 'Ligue a impressora no cabo USB', passos: ['Ligue a impressora na tomada e no USB do computador.', 'Espere ela aparecer abaixo (leva alguns segundos).', 'Clique em Usar esta impressora. Com o driver do fabricante instalado, o assistente usa a fila dele; sem driver, funciona do mesmo jeito.'] },
+  ble: { titulo: 'Ligue a impressora por Bluetooth', passos: ['Ligue a impressora e deixe-a perto do computador.', 'Confira o nome Bluetooth dela (sai na etiqueta de autoteste; na OIA-8370-B é OIA-8370-B) e clique em Usar.', 'Não é preciso parear nos Ajustes do Sistema nem digitar código: o computador liga nela sozinho.'] },
   rede: { titulo: 'Informe o endereço da impressora na rede', passos: ['Ligue a impressora na mesma rede deste computador.', 'Descubra o endereço IP dela (aparece na etiqueta de autoteste ou no roteador).', 'Digite o endereço e clique em Usar este endereço.'] },
 };
+const abrirAjustes = (qual) => api('/api/abrir-ajustes', { qual }).catch((e) => aviso(e.message, 'erro'));
+// linha de checagem: nome, detalhe, selo pronto/pendente e botão de ação quando pendente
+function checagem(nome, detalhe, ok, acao) {
+  const lado = el('div', { className: 'lado' }, el('span', { className: 'selo ' + (ok ? 'verde' : 'laranja'), textContent: ok ? 'Pronto' : 'Pendente' }));
+  if (!ok && acao) lado.prepend(Object.assign(el('button', { className: 'acao mini', type: 'button', textContent: acao[0] }), { onclick: acao[1] }));
+  return el('li', {}, el('div', {}, el('div', { className: 'nome', textContent: nome }), el('div', { className: 'detalhe', textContent: detalhe })), lado);
+}
+function itensLiberacao() {
+  const itens = [];
+  if (metodo === 'ble') {
+    const bt = dados.bt;
+    itens.push({
+      ok: bt === 5, nome: 'Bluetooth do Mac',
+      detalhe: bt === 5 ? 'Ligado e liberado para a impressora' : bt === 3 ? 'O macOS bloqueou: libere "conector-bluetooth" em Privacidade e Segurança, Bluetooth' : bt === 4 ? 'Desligado: ligue o Bluetooth do Mac' : 'Esperando o conector Bluetooth responder…',
+      acao: bt === 3 ? ['Abrir a liberação', () => abrirAjustes('bluetooth')] : bt === 4 ? ['Abrir Bluetooth', () => abrirAjustes('bluetoothLigar')] : null,
+    });
+  }
+  itens.push({
+    ok: !!dados.vigia.ativo, nome: 'Pasta Downloads',
+    detalhe: dados.vigia.ativo ? 'Liberada: o arquivo de etiqueta da Shopee imprime sozinho' : 'O macOS bloqueou: libere o acesso à pasta Downloads em Privacidade e Segurança, Arquivos e Pastas',
+    acao: ['Abrir a liberação', () => abrirAjustes('arquivos')],
+  });
+  return itens;
+}
 function etapaPronta() {
-  if (!dados) return false;
-  const t = dados.config.conexao.tipo;
-  if (etapa === 1) return !!metodo;
-  if (etapa === 2) return t === metodo && dados.fila.ok;
-  return true;
+  if (!dados) return [false, ''];
+  const { config, fila } = dados;
+  if (etapa === 1) return [!!metodo, 'Escolha como a impressora está ligada'];
+  if (etapa === 2) { const f = itensLiberacao().filter((i) => !i.ok); return [!f.length, f.length ? 'Falta liberar: ' + f.map((i) => i.nome).join(', ') : '']; }
+  if (etapa === 3) return [config.conexao.tipo === metodo && fila.ok, 'A impressora ainda não está conectada'];
+  if (etapa === 4) return [testeOk, testeEnviado ? 'Diga como a etiqueta de teste saiu' : 'Imprima a etiqueta de teste'];
+  return [$('gu-sem-ml').checked || Date.now() - (dados.siteVisto || 0) < 15 * 60000, 'Esperando o Mercado Livre encontrar a impressora'];
 }
 function desenharGuia() {
   const { config, fila, conexoes } = dados;
   if (guiaAberto === null) guiaAberto = !config.configurado;
   $('guia').hidden = !guiaAberto;
   if (!guiaAberto) return;
-  if (!metodo) metodo = config.configurado ? config.conexao.tipo === 'bluetooth' ? 'ble' : config.conexao.tipo : null;
-  [1, 2, 3].forEach((n) => {
+  if (!metodo && config.configurado) metodo = config.conexao.tipo === 'bluetooth' ? 'ble' : config.conexao.tipo;
+  for (let n = 1; n <= ETAPAS; n++) {
     $('et-' + n).hidden = etapa !== n;
     const li = $('tr-' + n);
     li.className = n < etapa ? 'feita' : '';
     if (n === etapa) li.setAttribute('aria-current', 'step'); else li.removeAttribute('aria-current');
-  });
+  }
   document.querySelectorAll('[data-met]').forEach((b) => b.setAttribute('aria-checked', b.dataset.met === metodo));
-  if (etapa === 2 && metodo) {
+  if (etapa === 2) $('et-2-lista').replaceChildren(...itensLiberacao().map((i) => checagem(i.nome, i.detalhe, i.ok, i.acao)));
+  if (etapa === 3 && metodo) {
     const P = PASSOS[metodo];
-    $('et-2-titulo').textContent = P.titulo;
-    if ($('et-2-passos').dataset.met !== metodo) {
-      $('et-2-passos').dataset.met = metodo;
-      $('et-2-passos').replaceChildren(...P.passos.map((t) => el('li', { textContent: t })));
-      const acao = $('et-2-acao');
-      if (metodo === 'usb') acao.replaceChildren(Object.assign(el('button', { className: 'acao primaria', type: 'button', textContent: 'Usar esta impressora' }), { onclick: () => { const u = dados.conexoes.usb.find((x) => x.ligada); if (u) fazer('Ligando no cabo', () => api('/api/config', { conexao: u.semFila ? { tipo: 'usb', uri: u.uri } : { tipo: 'usb', fila: u.fila } })); } }));
-      if (metodo === 'ble') acao.replaceChildren(Object.assign(el('button', { className: 'acao primaria', type: 'button', textContent: 'Escolher impressora' }), { onclick: bleProcurar }));
-      if (metodo === 'rede') { const campo = el('input', { className: 'num', placeholder: '192.168.0.50', style: 'padding:8px 10px;border:1px solid var(--borda);border-radius:8px;min-height:40px' }); campo.setAttribute('aria-label', 'Endereço IP da impressora'); acao.replaceChildren(campo, Object.assign(el('button', { className: 'acao primaria', type: 'button', textContent: 'Usar este endereço' }), { onclick: () => fazer('Gravando o endereço', () => api('/api/config', { conexao: { tipo: 'rede', host: campo.value.trim(), portaRede: 9100 } })) })); }
+    $('et-3-titulo').textContent = P.titulo;
+    if ($('et-3-passos').dataset.met !== metodo) {
+      $('et-3-passos').dataset.met = metodo;
+      $('et-3-passos').replaceChildren(...P.passos.map((t) => el('li', { textContent: t })));
+      const acao = $('et-3-acao');
+      const campo = (ph, val, rot) => { const c = el('input', { className: 'num', placeholder: ph, value: val || '', style: 'padding:8px 10px;border:1px solid var(--borda);border-radius:8px;min-height:40px' }); c.setAttribute('aria-label', rot); return c; };
+      if (metodo === 'usb') acao.replaceChildren(Object.assign(el('button', { className: 'acao primaria', type: 'button', textContent: 'Usar esta impressora' }), { onclick: () => { const u = dados.conexoes.usb.find((x) => x.ligada); if (!u) return aviso('Nenhuma impressora no cabo ainda', 'erro'); fazer('Ligando no cabo', () => api('/api/config', { conexao: u.semFila ? { tipo: 'usb', uri: u.uri } : { tipo: 'usb', fila: u.fila } })); } }));
+      if (metodo === 'ble') { const c = campo('OIA-8370-B', config.conexao.bleNome || 'OIA-8370-B', 'Nome Bluetooth da impressora'); acao.replaceChildren(c, Object.assign(el('button', { className: 'acao primaria', type: 'button', textContent: 'Usar' }), { onclick: () => fazer('Procurando a impressora', () => api('/api/config', { conexao: { tipo: 'ble', bleNome: c.value.trim() } })) })); }
+      if (metodo === 'rede') { const c = campo('192.168.0.50', config.conexao.host, 'Endereço IP da impressora'); acao.replaceChildren(c, Object.assign(el('button', { className: 'acao primaria', type: 'button', textContent: 'Usar este endereço' }), { onclick: () => fazer('Gravando o endereço', () => api('/api/config', { conexao: { tipo: 'rede', host: c.value.trim(), portaRede: 9100 } })) })); }
     }
     const usb = conexoes.usb.find((x) => x.ligada);
-    const instalado = conexoes.usb.find((x) => !x.semFila);
     const certo = config.conexao.tipo === metodo && fila.ok;
-    const textoUsb = usb && !usb.semFila ? 'Driver já instalado: ' + usb.nome + '. Clique em Usar esta impressora para ligar a impressão direta.'
-      : usb ? 'Impressora no cabo: ' + usb.nome + '. Não tem driver instalado, e não precisa: clique em Usar esta impressora.'
-        : instalado ? 'Driver já instalado (' + instalado.nome + '), mas a impressora está desligada ou sem cabo.'
-          : 'Nenhuma impressora encontrada no cabo ainda. Procurando…';
-    $('et-2-driver').hidden = metodo !== 'usb';
-    $('et-2-driver-estado').textContent = dados.driver.instalado ? 'Driver do fabricante: instalado.' : 'Driver do fabricante: não instalado.';
-    $('et-2-driver-texto').textContent = dados.driver.instalado ? 'Nada a fazer.' : 'As etiquetas do Mercado Livre e da Shopee imprimem sem ele. Ele só é preciso para imprimir de outros programas.';
-    $('et-2-driver-link').hidden = dados.driver.instalado;
-    $('et-2-estado').textContent = certo ? 'Conectada: ' + fila.texto + '. Pode continuar.'
-      : metodo === 'usb' ? textoUsb
-        : metodo === 'ble' ? (navigator.bluetooth ? (config.conexao.tipo === 'ble' ? fila.texto : 'Aguardando você escolher a impressora.') : 'Este navegador não tem Bluetooth: abra este painel no Google Chrome.')
+    $('et-3-estado').textContent = certo ? 'Conectada: ' + fila.texto + '.'
+      : metodo === 'usb' ? (usb ? 'Impressora no cabo: ' + usb.nome + '. Clique em Usar esta impressora.' : 'Nenhuma impressora no cabo ainda. Procurando…')
+        : metodo === 'ble' ? (config.conexao.tipo === 'ble' ? fila.texto + '. Ligue a impressora e deixe-a perto do computador.' : 'Confira o nome e clique em Usar.')
           : 'Aguardando o endereço.';
+    // opcional: driver de sistema, para imprimir de outros programas (pede a senha do Mac)
+    $('et-3-extra').replaceChildren(
+      checagem('Imprimir de outros programas (opcional)', dados.driverProprio ? 'Instalado: a impressora "Etiqueta Termica 10x15" aparece no Imprimir do Mac' : 'Instala a impressora no Imprimir do Mac. O macOS pede a sua senha de administrador.', dados.driverProprio,
+        ['Instalar', () => fazer('Instalando o driver (o Mac vai pedir a senha)', () => api('/api/instalar-driver', {}))]),
+      checagem('Driver do fabricante (opcional)', dados.driver.instalado ? 'Instalado' : 'Não precisa para o Mercado Livre e a Shopee', dados.driver.instalado,
+        ['Baixar no site oficial', () => window.open('https://www.oasismarket.com.br/index.php?c=category&id=12', '_blank', 'noopener')]));
   }
+  if (etapa === 4) $('et-4-resposta').hidden = !testeEnviado;
+  if (etapa === 5) {
+    const visto = Date.now() - (dados.siteVisto || 0) < 15 * 60000;
+    $('et-5-lista').replaceChildren(checagem('Mercado Livre', visto ? 'O site encontrou a impressora' : 'Aguardando você abrir a tela de Vendas com Imprimir pelo navegador ligado…', visto));
+  }
+  const [pronta, falta] = etapaPronta();
   $('gu-voltar').hidden = etapa === 1;
-  $('gu-avancar').textContent = etapa === 3 ? 'Concluir' : 'Continuar';
-  $('gu-avancar').disabled = !etapaPronta();
+  $('gu-avancar').textContent = etapa === ETAPAS ? 'Concluir' : 'Continuar';
+  $('gu-avancar').disabled = !pronta;
+  $('gu-falta').textContent = pronta ? '' : falta;
 }
 document.querySelectorAll('[data-met]').forEach((b) => { b.onclick = () => { metodo = b.dataset.met; desenharGuia(); }; });
 $('gu-voltar').onclick = () => { etapa = Math.max(1, etapa - 1); desenharGuia(); };
 $('gu-avancar').onclick = async () => {
-  if (etapa < 3) { etapa++; desenharGuia(); return; }
+  if (!etapaPronta()[0]) return;
+  if (etapa < ETAPAS) { etapa++; desenharGuia(); return; }
   await api('/api/config', { configurado: true }); guiaAberto = false; etapa = 1; atualizar();
 };
 $('gu-pular').onclick = async () => { await api('/api/config', { configurado: true }); guiaAberto = false; etapa = 1; atualizar(); };
+$('gu-sem-ml').onchange = () => desenharGuia();
 $('gu-teste').onclick = async () => {
-  $('et-3-estado').textContent = 'Enviando a etiqueta de teste…';
-  try { await api('/api/teste', { tipo: 'regua' }); $('et-3-estado').textContent = 'Teste enviado. Confira a etiqueta que saiu.'; }
-  catch (e) { $('et-3-estado').textContent = 'Não saiu: ' + e.message; }
+  $('et-4-estado').textContent = 'Enviando a etiqueta de teste…'; testeOk = false;
+  try { await api('/api/teste', { tipo: 'regua' }); testeEnviado = true; $('et-4-estado').textContent = 'Teste enviado. Confira a etiqueta e responda abaixo.'; }
+  catch (e) { $('et-4-estado').textContent = 'Não saiu: ' + e.message; }
+  desenharGuia();
 };
-$('refazer').onclick = () => { guiaAberto = true; etapa = 1; metodo = null; desenharGuia(); $('guia').scrollIntoView({ behavior: 'smooth', block: 'start' }); };
+$('gu-saiu').onclick = () => { testeOk = true; $('et-4-estado').textContent = 'Ótimo. Pode continuar.'; desenharGuia(); };
+$('gu-nao-saiu').onclick = async () => {
+  testeOk = false;
+  $('et-4-estado').textContent = 'Confira se o papel está encaixado entre as guias e a tampa bem fechada. Recalibrando o sensor de papel; depois imprima o teste de novo.';
+  await api('/api/teste', { tipo: 'detectar' }).catch(() => {});
+  desenharGuia();
+};
+$('refazer').onclick = () => { guiaAberto = true; etapa = 1; metodo = null; testeOk = false; testeEnviado = false; desenharGuia(); $('guia').scrollIntoView({ behavior: 'smooth', block: 'start' }); };
 
 // ---------- ações ----------
 async function atualizar() {

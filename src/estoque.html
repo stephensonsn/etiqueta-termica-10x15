@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Etiquetas de produto</title>
+<style>
+  :root {
+    --bg: #F8FAFC; --card: #FFFFFF; --text: #0F172A; --muted: #64748B; --border: #E2E8F0;
+    --primary: #2563EB; --primary-hover: #1D4ED8; --primary-light: #EFF6FF;
+    --success: #16A34A; --success-bg: #DCFCE7; --warn: #EA580C; --warn-bg: #FFF7ED;
+    --danger: #DC2626; --danger-bg: #FEF2F2;
+    --radius: 12px; --shadow: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+    --shadow-lg: 0 10px 15px -3px rgba(0,0,0,.08), 0 4px 6px -4px rgba(0,0,0,.04);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font: 15px/1.5 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100vh; }
+
+  /* Header */
+  header { background: var(--card); border-bottom: 1px solid var(--border); padding: 16px 24px; display: flex; align-items: center; gap: 16px; position: sticky; top: 0; z-index: 100; box-shadow: var(--shadow); }
+  header .logo { width: 40px; height: 40px; background: linear-gradient(135deg, var(--primary), #7C3AED); border-radius: 10px; display: grid; place-items: center; color: #fff; font-size: 20px; flex-shrink: 0; }
+  header h1 { font-size: 18px; font-weight: 700; flex: 1; }
+  header .nav-link { color: var(--muted); text-decoration: none; font-weight: 500; font-size: 14px; padding: 8px 12px; border-radius: 8px; transition: all .15s; }
+  header .nav-link:hover { background: var(--primary-light); color: var(--primary); }
+
+  /* Layout */
+  main { max-width: 1200px; margin: 0 auto; padding: 24px; display: grid; gap: 24px; }
+
+  /* Cards */
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; box-shadow: var(--shadow); }
+  .card-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+  .card-icon { width: 36px; height: 36px; border-radius: 8px; display: grid; place-items: center; font-size: 18px; flex-shrink: 0; }
+  .card-title { font-size: 16px; font-weight: 700; }
+  .card-subtitle { font-size: 13px; color: var(--muted); margin-top: 2px; }
+
+  /* Stats Grid */
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+  .stat-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; display: flex; align-items: center; gap: 16px; box-shadow: var(--shadow); transition: transform .15s, box-shadow .15s; }
+  .stat-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+  .stat-icon { width: 48px; height: 48px; border-radius: 12px; display: grid; place-items: center; font-size: 24px; flex-shrink: 0; }
+  .stat-value { font-size: 28px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+  .stat-label { font-size: 13px; color: var(--muted); margin-top: 4px; }
+
+  /* Product Grid */
+  .product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+  .product-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; transition: all .2s; cursor: pointer; position: relative; overflow: hidden; }
+  .product-card:hover { border-color: var(--primary); box-shadow: var(--shadow-lg); transform: translateY(-2px); }
+  .product-card.selected { border-color: var(--primary); background: var(--primary-light); }
+  .product-card.selected::before { content: ''; position: absolute; top: 12px; right: 12px; width: 24px; height: 24px; background: var(--primary); color: #fff; border-radius: 50%; display: grid; place-items: center; font-size: 14px; font-weight: 700; }
+  .color-dot { width: 32px; height: 32px; border-radius: 50%; margin-bottom: 12px; border: 2px solid var(--border); }
+  .product-name { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+  .product-sku { font-size: 12px; color: var(--muted); font-family: ui-monospace, monospace; margin-bottom: 8px; }
+  .product-barcode { font-size: 13px; font-weight: 600; color: var(--text); background: var(--bg); padding: 4px 8px; border-radius: 6px; display: inline-block; font-family: ui-monospace, monospace; }
+  .product-qty { margin-top: 12px; display: flex; align-items: center; gap: 8px; }
+  .qty-input { width: 60px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; font-weight: 600; text-align: center; font-family: inherit; }
+  .qty-input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37,99,235,.15); }
+  .qty-label { font-size: 13px; color: var(--muted); }
+
+  /* Config Section */
+  .config-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+  .field label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--text); }
+  .field input, .field select { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; font-family: inherit; transition: border-color .15s, box-shadow .15s; }
+  .field input:focus, .field select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37,99,235,.15); }
+  .field small { display: block; font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+  /* Action Bar */
+  .action-bar { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 24px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; box-shadow: var(--shadow); position: sticky; bottom: 24px; z-index: 50; }
+  .action-bar .summary { flex: 1; font-size: 14px; color: var(--muted); }
+  .action-bar .summary strong { color: var(--text); font-weight: 700; }
+  .btn { border: none; padding: 12px 24px; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; transition: all .15s; display: inline-flex; align-items: center; gap: 8px; font-family: inherit; }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .btn-primary { background: var(--primary); color: #fff; box-shadow: 0 2px 8px rgba(37,99,235,.3); }
+  .btn-primary:hover:not(:disabled) { background: var(--primary-hover); box-shadow: 0 4px 12px rgba(37,99,235,.4); transform: translateY(-1px); }
+  .btn-secondary { background: var(--card); color: var(--text); border: 1px solid var(--border); }
+  .btn-secondary:hover:not(:disabled) { background: var(--bg); border-color: var(--muted); }
+
+  /* Status Badge */
+  .badge { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .badge-success { background: var(--success-bg); color: var(--success); }
+  .badge-warn { background: var(--warn-bg); color: var(--warn); }
+  .badge-danger { background: var(--danger-bg); color: var(--danger); }
+
+  /* Toast */
+  .toast { position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%); background: var(--text); color: #fff; padding: 12px 24px; border-radius: 10px; font-weight: 600; font-size: 14px; box-shadow: var(--shadow-lg); z-index: 200; opacity: 0; transition: opacity .3s; pointer-events: none; }
+  .toast.show { opacity: 1; }
+
+  /* Preview Modal */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 300; display: none; place-items: center; backdrop-filter: blur(4px); }
+  .modal-overlay.open { display: grid; }
+  .modal { background: var(--card); border-radius: 16px; padding: 32px; max-width: 500px; width: 90%; box-shadow: var(--shadow-lg); }
+  .modal h3 { font-size: 18px; margin-bottom: 16px; }
+  .preview-label { background: #fff; border: 2px dashed var(--border); border-radius: 8px; padding: 20px; margin: 16px 0; text-align: center; }
+  .preview-label .barcode { font-family: 'Libre Barcode 128', monospace; font-size: 48px; letter-spacing: 2px; margin: 8px 0; }
+  .preview-label .code { font-family: ui-monospace, monospace; font-size: 14px; font-weight: 700; }
+  .preview-label .name { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+
+  @media (max-width: 768px) {
+    main { padding: 16px; }
+    .stats { grid-template-columns: repeat(2, 1fr); }
+    .product-grid { grid-template-columns: 1fr; }
+    .action-bar { flex-direction: column; align-items: stretch; text-align: center; }
+    .action-bar .summary { text-align: center; }
+  }
+</style>
+<link href="https://fonts.googleapis.com/css2?family=Libre+Barcode+128&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<header>
+  <h1>Etiquetas de produto</h1>
+  <a href="/painel" class="nav-link">← Voltar ao Painel</a>
+</header>
+
+<main>
+  <!-- Stats -->
+  <div class="stats">
+    <div class="stat-card">
+      <div><div class="stat-value" id="stat-total">96</div><div class="stat-label">Etiquetas no total</div></div>
+    </div>
+    <div class="stat-card">
+      <div><div class="stat-value" id="stat-cores">6</div><div class="stat-label">Cores cadastradas</div></div>
+    </div>
+    <div class="stat-card">
+      <div><div class="stat-value" id="stat-colunas">3</div><div class="stat-label">Etiquetas por linha</div></div>
+    </div>
+    <div class="stat-card">
+      <div><div class="stat-value" id="stat-ble">—</div><div class="stat-label">Impressora</div></div>
+    </div>
+  </div>
+
+  <!-- Configuração de Impressão -->
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title">Configuração da Impressão</div>
+        <div class="card-subtitle">Ajuste o layout e a qualidade antes de imprimir</div>
+      </div>
+    </div>
+    <div class="config-grid">
+      <div class="field">
+        <label for="cfg-largura">Largura da etiqueta (mm)</label>
+        <input id="cfg-largura" type="number" value="34" min="20" max="100" step="1">
+        <small>Cada etiqueta individual</small>
+      </div>
+      <div class="field">
+        <label for="cfg-altura">Altura da etiqueta (mm)</label>
+        <input id="cfg-altura" type="number" value="23" min="15" max="80" step="1">
+        <small>Altura física do papel</small>
+      </div>
+      <div class="field">
+        <label for="cfg-colunas">Colunas por linha</label>
+        <select id="cfg-colunas">
+          <option value="1">1 coluna</option>
+          <option value="2">2 colunas</option>
+          <option value="3" selected>3 colunas</option>
+        </select>
+        <small>Quantas etiquetas lado a lado</small>
+      </div>
+      <div class="field">
+        <label for="cfg-espaco">Espaço entre colunas (mm)</label>
+        <input id="cfg-espaco" type="number" value="2.5" min="0" max="10" step="0.5">
+        <small>Entre uma etiqueta e a do lado, no rolo</small>
+      </div>
+      <div class="field">
+        <label for="cfg-margem">Margem esquerda (mm)</label>
+        <input id="cfg-margem" type="number" value="0" min="0" max="10" step="0.5">
+        <small>Da borda do rolo até a 1ª coluna</small>
+      </div>
+      <div class="field">
+        <label for="cfg-gap">Espaço entre linhas (mm)</label>
+        <input id="cfg-gap" type="number" value="2" min="0" max="10" step="0.5">
+        <small>Espaço entre linhas</small>
+      </div>
+      <div class="field">
+        <label for="cfg-densidade">Densidade (escuro)</label>
+        <input id="cfg-densidade" type="number" value="8" min="0" max="15" step="1">
+        <small>0 = claro · 15 = escuro</small>
+      </div>
+      <div class="field">
+        <label for="cfg-velocidade">Velocidade</label>
+        <input id="cfg-velocidade" type="number" value="4" min="2" max="8" step="1">
+        <small>2 = lento/nítido · 8 = rápido</small>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cadastro de Produtos -->
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title">Produtos Cadastrados</div>
+        <div class="card-subtitle">Selecione as cores e ajuste a quantidade de etiquetas para cada uma</div>
+      </div>
+    </div>
+    <div class="product-grid" id="product-grid"></div>
+  </div>
+
+  <!-- Barra de Ação -->
+  <div class="action-bar">
+    <div class="summary" id="action-summary">
+      <strong>0</strong> etiquetas selecionadas · <strong>0</strong> cores
+    </div>
+    <button class="btn btn-secondary" id="btn-preview">Prévia</button>
+    <button class="btn btn-secondary" id="btn-test" style="border-color:var(--primary);color:var(--primary);">Teste (2 linhas)</button>
+    <button class="btn btn-primary" id="btn-print" disabled>Imprimir Etiquetas</button>
+  </div>
+</main>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- Modal de Prévia -->
+<div class="modal-overlay" id="modal-preview">
+  <div class="modal">
+    <h3>Prévia da Etiqueta</h3>
+    <p style="color:var(--muted);font-size:14px;margin-bottom:12px;">Representação visual do que será impresso na etiqueta térmica.</p>
+    <div class="preview-label" id="preview-content">
+      <div class="name" id="preview-nome" style="font-size:12px;letter-spacing:0.5px;margin-bottom:4px;font-weight:600;">SQUISHY LISO 8CM</div>
+      <div class="name" id="preview-cor" style="font-weight:700;color:var(--text);margin:2px 0;font-size:18px;letter-spacing:1px;">VERDE</div>
+      <div class="barcode" id="preview-barcode" style="font-family:'Libre Barcode EAN13 Text',monospace;font-size:48px;margin:8px 0;line-height:1;">||||||| |||||||</div>
+      <div class="code" id="preview-codigo" style="font-size:16px;font-weight:700;color:var(--text);letter-spacing:2px;margin-top:4px;">810001</div>
+      <div class="code" id="preview-sku" style="font-size:10px;color:var(--muted);letter-spacing:0.5px;margin-top:6px;">TT-MSQ-VD</div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
+      <button class="btn btn-secondary" onclick="document.getElementById('modal-preview').classList.remove('open')">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const CORES = [
+  { sku: 'TT-MSQ-VD', barcode: '810001', nome: 'Squishy Liso 8cm', cor: 'Verde', hex: '#22C55E', qty: 16 },
+  { sku: 'TT-MSQ-RS', barcode: '810002', nome: 'Squishy Liso 8cm', cor: 'Rosa', hex: '#EC4899', qty: 16 },
+  { sku: 'TT-MSQ-LI', barcode: '810003', nome: 'Squishy Liso 8cm', cor: 'Lilás', hex: '#A855F7', qty: 16 },
+  { sku: 'TT-MSQ-AZ', barcode: '810004', nome: 'Squishy Liso 8cm', cor: 'Azul', hex: '#3B82F6', qty: 16 },
+  { sku: 'TT-MSQ-BR', barcode: '810005', nome: 'Squishy Liso 8cm', cor: 'Branco', hex: '#E2E8F0', qty: 16 },
+  { sku: 'TT-MSQ-AM', barcode: '810006', nome: 'Squishy Liso 8cm', cor: 'Amarelo', hex: '#EAB308', qty: 16 },
+];
+
+const $ = (id) => document.getElementById(id);
+let produtos = JSON.parse(localStorage.getItem('sku-produtos') || 'null') || CORES.map(c => ({...c}));
+
+function salvar() { localStorage.setItem('sku-produtos', JSON.stringify(produtos)); }
+
+function renderGrid() {
+  const grid = $('product-grid');
+  grid.replaceChildren(...produtos.map((p, i) => {
+    const card = document.createElement('div');
+    card.className = 'product-card' + (p.qty > 0 ? ' selected' : '');
+    card.innerHTML = `
+      <div class="color-dot" style="background:${p.hex};${p.cor === 'Branco' ? 'border-color:#CBD5E1;' : ''}"></div>
+      <div class="product-name">${p.cor}</div>
+      <div class="product-sku">${p.sku}</div>
+      <div class="product-barcode">${p.barcode}</div>
+      <div class="product-qty">
+        <input class="qty-input" type="number" min="0" max="999" value="${p.qty}" data-idx="${i}">
+        <span class="qty-label">etiquetas</span>
+      </div>`;
+    card.querySelector('.qty-input').oninput = (e) => {
+      p.qty = Math.max(0, parseInt(e.target.value) || 0);
+      salvar();
+      card.classList.toggle('selected', p.qty > 0);
+      atualizarResumo();
+    };
+    return card;
+  }));
+}
+
+function atualizarResumo() {
+  const ativos = produtos.filter(p => p.qty > 0);
+  const total = ativos.reduce((s, p) => s + p.qty, 0);
+  $('action-summary').innerHTML = `<strong>${total}</strong> etiqueta${total !== 1 ? 's' : ''} · <strong>${ativos.length}</strong> cor${ativos.length !== 1 ? 'es' : ''}`;
+  $('btn-print').disabled = total === 0;
+  $('stat-total').textContent = total;
+  $('stat-cores').textContent = ativos.length;
+}
+
+function getConfig() {
+  return {
+    larguraMm: Number($('cfg-largura').value) || 34,
+    alturaMm: Number($('cfg-altura').value) || 23,
+    colunas: Number($('cfg-colunas').value) || 3,
+    gapMm: Number($('cfg-gap').value) || 2,
+    espacoColunasMm: Number($('cfg-espaco').value) || 0,
+    margemEsqMm: Number($('cfg-margem').value) || 0,
+    densidade: Number($('cfg-densidade').value) || 8,
+    velocidade: Number($('cfg-velocidade').value) || 6,
+  };
+}
+
+$('cfg-colunas').onchange = () => { $('stat-colunas').textContent = $('cfg-colunas').value; };
+
+// Prévia
+$('btn-preview').onclick = () => {
+  const ativo = produtos.find(p => p.qty > 0);
+  if (!ativo) return showToast('Selecione pelo menos uma cor');
+  $('preview-nome').textContent = (ativo.nome || 'Squishy Liso 8cm').toUpperCase();
+  $('preview-cor').textContent = ativo.cor.toUpperCase();
+  $('preview-codigo').textContent = ativo.barcode;
+  $('preview-sku').textContent = ativo.sku;
+  $('modal-preview').classList.add('open');
+};
+
+// Teste: imprime só 2 linhas (6 etiquetas) da primeira cor ativa
+$('btn-test').onclick = async () => {
+  const btn = $('btn-test');
+  const ativo = produtos.find(p => p.qty > 0);
+  if (!ativo) return showToast('Selecione pelo menos uma cor');
+  btn.disabled = true;
+  btn.textContent = '⏳ Testando…';
+  try {
+    const etiquetas = [];
+    for (let i = 0; i < 6; i++) {
+      etiquetas.push({ barcode: ativo.barcode, cor: ativo.cor, sku: ativo.sku, nome: ativo.nome || 'Squishy Liso 8cm' });
+    }
+    const r = await fetch('/api/sku/imprimir', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ etiquetas, opts: getConfig() })
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.erro || 'Falha ao enviar');
+    showToast(`6 etiquetas de teste enviadas (${ativo.cor})`);
+  } catch (e) {
+    showToast('' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Teste (2 linhas)';
+  }
+};
+
+// Imprimir
+$('btn-print').onclick = async () => {
+  const btn = $('btn-print');
+  btn.disabled = true;
+  btn.textContent = '⏳ Enviando…';
+  try {
+    const etiquetas = [];
+    for (const p of produtos) {
+      for (let i = 0; i < p.qty; i++) {
+        etiquetas.push({ barcode: p.barcode, cor: p.cor, sku: p.sku, nome: p.nome || 'Squishy Liso 8cm' });
+      }
+    }
+    if (!etiquetas.length) throw new Error('Nenhuma etiqueta selecionada');
+    const r = await fetch('/api/sku/imprimir', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ etiquetas, opts: getConfig() })
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.erro || 'Falha ao enviar');
+    showToast(`${etiquetas.length} etiqueta${etiquetas.length > 1 ? 's' : ''} enviada${etiquetas.length > 1 ? 's' : ''}!`);
+  } catch (e) {
+    showToast('' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Imprimir Etiquetas';
+    atualizarResumo();
+  }
+};
+
+function showToast(msg) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// Verificar BLE
+async function checkBle() {
+  try {
+    const r = await fetch('/api/estado');
+    const d = await r.json();
+    const vivo = d.bleVivo === true;
+    $('stat-ble').textContent = vivo ? 'Online' : 'Offline';
+    $('stat-ble').parentElement.parentElement.querySelector('.stat-icon').style.background = vivo ? '#DCFCE7' : '#FEF2F2';
+    $('stat-ble').parentElement.parentElement.querySelector('.stat-icon').style.color = vivo ? '#16A34A' : '#DC2626';
+  } catch (_) { $('stat-ble').textContent = '?'; }
+}
+
+// Init
+renderGrid();
+atualizarResumo();
+checkBle();
+setInterval(checkBle, 10000);
+</script>
+</body>
+</html>

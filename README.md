@@ -75,7 +75,7 @@ Passo a passo:
    ```bash
    ./instalar.sh
    ```
-4. Na primeira vez o instalador abre o painel (<http://127.0.0.1:9100/painel>) com o **assistente de configuração**: você escolhe a conexão (cabo, Bluetooth ou rede), seleciona a impressora e imprime uma etiqueta de teste.
+4. Na primeira vez o instalador abre o painel (<http://127.0.0.1:9100/painel>) com o **assistente de configuração**, em 5 etapas que só avançam quando a anterior está pronta de verdade: conexão (cabo, Bluetooth ou rede); liberações do macOS (Bluetooth e pasta Downloads, com botão que abre a tela certa dos Ajustes); impressora conectada; etiqueta de teste confirmada; e o Mercado Livre encontrando a impressora. Na etapa da impressora também dá para instalar o driver de sistema: o próprio macOS pede a senha de administrador.
 5. **Cabo USB:** ligue a impressora e clique em *Usar esta impressora*. Se o driver do fabricante já estiver instalado, o assistente reconhece e usa a fila dele. Se não estiver, a ponte cria a própria fila e funciona sem driver. O driver do fabricante só é necessário para imprimir de outros programas; ele não vem neste projeto e deve ser baixado no [site oficial](https://www.oasismarket.com.br/index.php?c=category&id=12).
 6. **Só para Bluetooth:** abra o painel no Google Chrome, clique em *Escolher impressora* na linha Bluetooth e selecione a sua. É uma vez só; daí em diante o computador liga nela sozinho.
 
@@ -103,6 +103,18 @@ Em <http://127.0.0.1:9100/painel>, acessível só do próprio computador.
 | **Impressora** | Cabo USB, Bluetooth ou rede. |
 | **Ajustes de impressão** | Deslocamento, escuro, velocidade, formato junto ou separado, régua de teste. |
 | **Registro técnico** | Últimos eventos, autoteste, recalibrar o sensor de papel, reiniciar a impressora. |
+
+## Etiquetas de produto (código de barras)
+
+Em <http://127.0.0.1:9100/estoque> dá para cadastrar produtos e imprimir etiquetas de código de barras em rolos de várias colunas (por exemplo 3 colunas de 34 x 23 mm), direto na mesma impressora.
+
+- Cada etiqueta leva o nome do produto, a cor, o código de barras (Code 128), o número uma vez só embaixo das barras e o SKU, tudo centralizado na própria coluna.
+- **Espaço entre colunas** e **margem esquerda** são ajustáveis: em rolos de várias colunas cada etiqueta começa em largura + espaço, senão a última coluna sai cortada.
+- Ao trocar de rolo (de 100 x 150 para 34 x 23, por exemplo), a ponte recalibra o sensor de papel sozinha antes de imprimir. Sem isso a impressão "sobe" a cada linha e a impressora pode travar.
+
+## Calibração
+
+`node ferramentas/grade-calibracao.js` imprime uma grade com régua em milímetros nas quatro bordas e linhas a cada 10 mm. Pela foto dela dá para medir quanto está sendo cortado de cada lado e se a impressão sai torta. O script espera a impressora conectar (até 15 minutos) antes de enviar.
 
 ## Conexões
 

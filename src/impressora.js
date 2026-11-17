@@ -243,12 +243,30 @@ function conexoesDisponiveis() {
 
 // Manda a etiqueta pela melhor conexão disponível, com nova tentativa e espera crescente.
 // "gerar(tipo)" devolve os bytes no formato certo para cada conexão.
+// Troca de rolo (ex.: de etiqueta de envio 100x150 para etiqueta de produto 34x23): o sensor de
+// papel continua ajustado para o rolo anterior, a impressora perde a separação entre etiquetas,
+// a impressão vai "subindo" a cada linha e às vezes ela trava parecendo conectada. Quando o
+// tamanho do trabalho muda, a ponte manda o comando de calibração (GAPDETECT) antes de imprimir.
+function comCalibracao(bytes) {
+  const ini = bytes.toString('latin1', 0, Math.min(bytes.length, 4096));
+  const m = ini.match(/SIZE ([\d.]+) mm,\s*([\d.]+) mm/);
+  if (!m) return bytes;
+  const papel = `${m[1]}x${m[2]}`;
+  if (cfg.ultimoPapel === papel) return bytes;
+  const gap = ini.match(/GAP [^\r\n]*\r\n/);
+  const pos = gap ? gap.index + gap[0].length : ini.indexOf('\r\n', m.index) + 2;
+  log(`rolo mudou (${cfg.ultimoPapel || 'desconhecido'} -> ${papel} mm): recalibrando o sensor de papel antes de imprimir`);
+  cfg.ultimoPapel = papel;
+  try { fs.writeFileSync(ARQ_CFG, JSON.stringify(cfg, null, 2)); } catch (_) { /* fica na memória */ }
+  return Buffer.concat([bytes.subarray(0, pos), Buffer.from('GAPDETECT\r\n', 'latin1'), bytes.subarray(pos)]);
+}
+
 async function enviar(gerar, rotulo) {
   let ultimo = new Error(situacaoPreferida().texto || 'impressora não conectada');
   for (let t = 1; t <= cfg.tentativas; t++) {
     const opcoes = conexoesDisponiveis();
     for (const cx of opcoes) {
-      const bytes = gerar(cx.tipo);
+      const bytes = comCalibracao(gerar(cx.tipo));
       const tempo = Math.min(10000 + Math.ceil(bytes.length / 1024) * 50, 60000); // base + por KB, com teto
       const arq = path.join(RAIZ, 'recebidos', `${rotulo}.tspl`);
       try {
@@ -573,8 +591,13 @@ function driverDoFabricante() {
   } catch (_) { return { instalado: false, modelos: 0 }; }
 }
 
+// Uma impressora com o NOSSO driver de sistema já está instalada neste Mac?
+function driverProprio() {
+  try { return fs.existsSync('/Library/Printers/EtiquetaTermica/rastertotspl'); } catch (_) { return false; }
+}
+
 function estado() {
-  return { config: cfg, limites: LIMITES, bleVivo: bleVivo(), driver: driverDoFabricante(), vigia, fila: situacaoFila(), conexoes: listarConexoes(), pedidos, log: ultimasLinhas.slice(-25).reverse() };
+  return { config: cfg, limites: LIMITES, bleVivo: bleVivo(), bt: Date.now() - bleInfo.quando < 8000 ? bleInfo.bt : undefined, driver: driverDoFabricante(), driverProprio: driverProprio(), vigia, fila: situacaoFila(), conexoes: listarConexoes(), pedidos, log: ultimasLinhas.slice(-25).reverse() };
 }
 
 module.exports = { enviarBruto, bleInformar, lerZplDeArquivo, iniciarVigia, bleProximo, bleFeito, receberZpl, imprimirPedido, descartarPedido, diagnostico, salvarConfig, estado, log, cfg, RAIZ };

@@ -8,6 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const net = require('net');
+let siteVisto = 0; // última vez que o site do Mercado Livre procurou a impressora
 const { enviarBruto, bleInformar, lerZplDeArquivo, iniciarVigia, bleProximo, bleFeito, receberZpl, imprimirPedido, descartarPedido, diagnostico, salvarConfig, estado, log, cfg, RAIZ } = require('./impressora');
 
 const DISPOSITIVO = {
@@ -63,7 +64,7 @@ const servidor = http.createServer(async (req, res) => {
   try {
 
     // ---------- painel local (só o próprio computador) ----------
-    if (rota === '/' || rota === '/painel' || rota.startsWith('/api/')) {
+    if (rota === '/' || rota === '/painel' || rota === '/estoque' || rota.startsWith('/api/')) {
       const host = (req.headers.host || '').toLowerCase();
       const proprio = [`127.0.0.1:${cfg.porta}`, `localhost:${cfg.porta}`];
       if (!proprio.includes(host) || (origem && !proprio.map((x) => `http://${x}`).includes(origem))) {
@@ -74,7 +75,11 @@ const servidor = http.createServer(async (req, res) => {
         res.writeHead(200, { 'Content-Type': 'text/html;charset=UTF-8', 'Cache-Control': 'no-store' });
         return res.end(fs.readFileSync(path.join(__dirname, 'painel.html')));
       }
-      if (req.method === 'GET' && rota === '/api/estado') return json(estado());
+      if (req.method === 'GET' && rota === '/estoque') {
+        res.writeHead(200, { 'Content-Type': 'text/html;charset=UTF-8', 'Cache-Control': 'no-store' });
+        return res.end(fs.readFileSync(path.join(__dirname, 'estoque.html')));
+      }
+      if (req.method === 'GET' && rota === '/api/estado') return json({ ...estado(), siteVisto });
       if (req.method === 'GET' && rota === '/api/ble/proximo') return json(bleProximo() || {});
       const mPrevia = rota.match(/^\/api\/previa\/([0-9]+-[0-9]+)\.png$/);
       if (req.method === 'GET' && mPrevia) {
@@ -100,9 +105,40 @@ const servidor = http.createServer(async (req, res) => {
         const txt = await corpo(req);
         try {
           if (rota === '/api/config') return json(salvarConfig(JSON.parse(txt || '{}')));
-          if (rota === '/api/ble/estado') { const b = JSON.parse(txt || '{}'); bleInformar({ conectada: b.conectada === true, nome: String(b.nome || '').slice(0, 60), jaRespondeu: b.jaRespondeu === true, respondeAgora: b.respondeAgora === true, estado: Number.isInteger(b.estado) ? b.estado : undefined }); return json({}); }
+          if (rota === '/api/ble/estado') { const b = JSON.parse(txt || '{}'); bleInformar({ bt: Number.isInteger(b.bt) ? b.bt : undefined, conectada: b.conectada === true, nome: String(b.nome || '').slice(0, 60), jaRespondeu: b.jaRespondeu === true, respondeAgora: b.respondeAgora === true, estado: Number.isInteger(b.estado) ? b.estado : undefined }); return json({}); }
           if (rota === '/api/ble/feito') { const b = JSON.parse(txt || '{}'); bleFeito(Number(b.id), b.ok === true, String(b.erro || '').slice(0, 200)); return json({}); }
           if (rota === '/api/teste') return json(await diagnostico(JSON.parse(txt || '{}').tipo));
+          if (rota === '/api/abrir-ajustes') {
+            // abre a tela certa dos Ajustes do Sistema para a pessoa liberar a permissão
+            const telas = {
+              bluetooth: 'x-apple.systempreferences:com.apple.preference.security?Privacy_Bluetooth',
+              arquivos: 'x-apple.systempreferences:com.apple.preference.security?Privacy_FilesAndFolders',
+              impressoras: 'x-apple.systempreferences:com.apple.Print-Scan-Settings.extension',
+              bluetoothLigar: 'x-apple.systempreferences:com.apple.BluetoothSettings',
+            };
+            const alvo = telas[JSON.parse(txt || '{}').qual];
+            if (!alvo) return json({ erro: 'tela desconhecida' }, 400);
+            require('child_process').execFile('/usr/bin/open', [alvo], () => {});
+            return json({ ok: true });
+          }
+          if (rota === '/api/instalar-driver') {
+            // driver de sistema: o próprio macOS pede a senha de administrador, na janela padrão dele
+            const script = path.join(RAIZ, 'driver-mac', 'instalar-driver.sh');
+            if (!fs.existsSync(script)) return json({ erro: 'o driver de sistema não veio nesta instalação' }, 400);
+            const cmd = `do shell script quoted form of "${script.replace(/"/g, '')}" with administrator privileges`;
+            const r = await new Promise((ok) => require('child_process').execFile('/usr/bin/osascript', ['-e', cmd], { timeout: 180000 }, (e, so, se) => ok({ e, se })));
+            if (r.e) return json({ erro: /cancel/i.test(String(r.se)) ? 'instalação cancelada' : `não instalou: ${String(r.se || r.e.message).trim().slice(0, 160)}` }, 400);
+            return json({ ok: true });
+          }
+          if (rota === '/api/sku/imprimir') {
+            const { etiquetas, opts } = JSON.parse(txt || '{}');
+            if (!Array.isArray(etiquetas) || !etiquetas.length) return json({ erro: 'lista de etiquetas vazia' }, 400);
+            const { paraTsplSku } = require('./etiqueta');
+            const tspl = paraTsplSku(etiquetas, opts || {});
+            await enviarBruto(tspl);
+            log(`SKU: impressas ${etiquetas.length} etiqueta(s) via /api/sku/imprimir`);
+            return json({ ok: true, quantidade: etiquetas.length });
+          }
           const mAcao = rota.match(/^\/api\/pedido\/([0-9]+-[0-9]+)\/(imprimir|descartar)$/);
           if (mAcao) return json(mAcao[2] === 'imprimir' ? await imprimirPedido(mAcao[1]) : descartarPedido(mAcao[1]));
         } catch (e) {
@@ -117,6 +153,7 @@ const servidor = http.createServer(async (req, res) => {
     // páginas de outros sites não podem usar a impressora
     if (origem && !ORIGENS.test(origem)) { res.writeHead(403, h); return res.end('origem nao permitida'); }
 
+    if (origem && ORIGENS.test(origem)) siteVisto = Date.now(); // o site do marketplace já enxerga a ponte
     if (req.method === 'GET' && rota === '/default') { res.writeHead(200, h); return res.end(JSON.stringify(DISPOSITIVO)); }
     if (req.method === 'GET' && rota === '/available') { res.writeHead(200, h); return res.end(JSON.stringify({ printer: [DISPOSITIVO] })); }
     if (req.method === 'GET' && rota === '/config') { res.writeHead(200, h); return res.end(JSON.stringify({ application: { version: '1.3.2.489', build_number: 489, api_level: 5, platform: 'macos', supportedConversions: {} } })); }

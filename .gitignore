@@ -8,3 +8,4 @@ conector-bluetooth/conector-bluetooth
 build/
 dist/
 driver-mac/rastertotspl
+ferramentas/*.tspl

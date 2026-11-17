@@ -58,6 +58,11 @@ fi
 codesign --force --sign - "$BT/conector-bluetooth" >>"$REG" 2>&1
 touch "$BT/conector-bluetooth" # mais novo que o fonte: o instalador não tenta recompilar
 
+passo "driver de sistema (filtro TSPL) universal"
+clang -O2 -Wno-deprecated-declarations -arch arm64 -arch x86_64 "$PALCO/app/driver-mac/rastertotspl.c" -o "$PALCO/app/driver-mac/rastertotspl" -lcups >>"$REG" 2>&1 \
+  || clang -O2 -Wno-deprecated-declarations "$PALCO/app/driver-mac/rastertotspl.c" -o "$PALCO/app/driver-mac/rastertotspl" -lcups >>"$REG" 2>&1
+codesign --force --sign - "$PALCO/app/driver-mac/rastertotspl" >>"$REG" 2>&1 || true
+
 cp "$RAIZ/empacotar/Instalar.command" "$RAIZ/empacotar/Desinstalar.command" "$RAIZ/empacotar/LEIA-ME.txt" "$PALCO/"
 chmod +x "$PALCO/Instalar.command" "$PALCO/Desinstalar.command" "$PALCO/app/instalar.sh"
 

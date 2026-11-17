@@ -38,6 +38,8 @@ final class Conector: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
     var jaRespondeu = false
     var contador = 0
     var tentativas = 0
+    var avisouDesligado = false
+    var conectandoDesde: Date?          // pedido de conexão em andamento
     var canalInfo: CBCharacteristic?   // canal de leitura usado como sinal de vida
     var pulsoPedido: Date?
     var retomar = false                // reenviar o trabalho atual depois de reconectar
@@ -63,13 +65,47 @@ final class Conector: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
     var nomeAlvo: String { Conector.lerConfig(caminhoConfig).nome }
 
     // ---------- conexão ----------
+    // UUID da impressora salvo para reconexão instantânea (sem escanear)
+    var uuidSalvo: UUID? {
+        get { UserDefaults.standard.string(forKey: "blePrinterUUID").flatMap(UUID.init) }
+        set { UserDefaults.standard.set(newValue?.uuidString, forKey: "blePrinterUUID") }
+    }
+
     func centralManagerDidUpdateState(_ c: CBCentralManager) {
         switch c.state {
-        case .poweredOn: procurar()
-        case .unauthorized: registrar("ERRO sem permissão de Bluetooth: libere em Ajustes do Sistema, Privacidade e Segurança, Bluetooth")
-        case .poweredOff: registrar("Bluetooth do computador está desligado")
+        case .poweredOn:
+            registrar("Bluetooth do computador ligado")
+            reconectarOuProcurar()
+        case .unauthorized:
+            registrar("ERRO sem permissão de Bluetooth: libere em Ajustes do Sistema, Privacidade e Segurança, Bluetooth")
+            informar()
+        case .poweredOff, .resetting:
+            // o Mac desligou o Bluetooth (ou dormiu): esquece a ligação antiga. Sem isso, ao religar,
+            // a busca era ignorada porque ainda havia uma "impressora" presa no meio da conexão
+            if !avisouDesligado { registrar("Bluetooth do computador desligado; reconecta sozinho quando voltar") }
+            avisouDesligado = true
+            retomar = idTrabalho != nil
+            esquecerLigacao()
         default: break
         }
+    }
+
+    // Tenta reconectar pelo UUID salvo primeiro (instantâneo); se falhar, cai no scan normal
+    func reconectarOuProcurar() {
+        guard central.state == .poweredOn, impressora == nil else { return }
+        if nomeAlvo.isEmpty { registrar("sem impressora escolhida (conexao.bleNome vazio); aguardando"); return }
+        if let uuid = uuidSalvo {
+            let conhecidos = central.retrievePeripherals(withIdentifiers: [uuid])
+            if let p = conhecidos.first {
+                registrar("reconectando por UUID salvo (\(uuid.uuidString.prefix(8))…)")
+                impressora = p
+                p.delegate = self
+                conectandoDesde = Date()
+                central.connect(p, options: [CBConnectPeripheralOptionNotifyOnDisconnectionKey: true])
+                return
+            }
+        }
+        procurar()
     }
 
     func procurar() {
@@ -86,10 +122,15 @@ final class Conector: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
         impressora = p
         p.delegate = self
         registrar("achei \(nome); conectando")
+        conectandoDesde = Date()
         c.connect(p, options: nil)
     }
 
     func centralManager(_ c: CBCentralManager, didConnect p: CBPeripheral) {
+        conectandoDesde = nil; avisouDesligado = false
+        // Salva o UUID para reconexão instantânea futura (sem precisar escanear)
+        uuidSalvo = p.identifier
+        registrar("UUID salvo para reconexão: \(p.identifier.uuidString.prefix(8))…")
         canal = nil
         p.discoverServices(nil)
     }
@@ -186,14 +227,37 @@ final class Conector: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
         var r = URLRequest(url: url)
         r.httpMethod = "POST"
         let respondeAgora = jaRespondeu && Date().timeIntervalSince(estadoQuando) < 15
-        var corpo: [String: Any] = ["conectada": canal != nil, "nome": impressora?.name ?? nomeAlvo, "jaRespondeu": jaRespondeu, "respondeAgora": respondeAgora]
+        // bt: 3 = sem permissão, 4 = desligado, 5 = ligado (CBManagerState)
+        var corpo: [String: Any] = ["conectada": canal != nil, "nome": impressora?.name ?? nomeAlvo, "jaRespondeu": jaRespondeu, "respondeAgora": respondeAgora, "bt": central.state.rawValue]
         if let e = estado, respondeAgora { corpo["estado"] = e }
         r.httpBody = try? JSONSerialization.data(withJSONObject: corpo)
         URLSession.shared.dataTask(with: r).resume()
     }
 
     // ---------- trabalhos ----------
+    // Esquece a impressora atual sem perder o trabalho em andamento (ele é reenviado ao reconectar).
+    func esquecerLigacao() {
+        bomba?.invalidate(); bomba = nil
+        if let p = impressora, central.state == .poweredOn { central.cancelPeripheralConnection(p) }
+        impressora = nil; canal = nil; canalInfo = nil; pulsoPedido = nil; conectandoDesde = nil
+        if !retomar { ocupado = false; idTrabalho = nil }
+        informar()
+    }
+
     func tique() {
+        // "parece conectado mas está travado": o pedido de conexão ficou sem resposta (impressora
+        // desligada, fora de alcance ou presa em outro aparelho). Desiste em 12 s e procura de novo.
+        if let desde = conectandoDesde, Date().timeIntervalSince(desde) > 12 {
+            registrar("a impressora não completou a conexão em 12 s; procurando de novo")
+            retomar = idTrabalho != nil
+            esquecerLigacao()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in self?.reconectarOuProcurar() }
+            return
+        }
+        // sem impressora e sem busca em andamento (ex.: depois de dormir): volta a procurar a cada 15 s
+        if impressora == nil, central.state == .poweredOn, contador % 15 == 0 {
+            if !central.isScanning { reconectarOuProcurar() }
+        }
         // envio parado há mais de 4 s: a ligação morreu. Reconecta e manda de novo, sem falhar o trabalho
         if idTrabalho != nil, Date().timeIntervalSince(ultimoAvanco) > 4, let p = impressora {
             registrar("envio parado; reiniciando a conexão para mandar de novo")
@@ -202,16 +266,16 @@ final class Conector: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
             return
         }
         contador += 1
-        // sinal de vida a cada 10 s: depois de horas parada a ligação pode estar morta sem avisar,
-        // e a primeira etiqueta ficava esperando. Uma leitura sem resposta em 3 s força a reconexão.
+        // Keepalive a cada 5 s (antes era 10 s): evita timeout de inatividade do macOS/CoreBluetooth.
+        // Se a impressora não responder em 4 s, força reconexão imediata.
         if idTrabalho == nil, canal != nil, let p = impressora {
-            if let pedido = pulsoPedido, Date().timeIntervalSince(pedido) > 3 {
-                registrar("a impressora não respondeu ao sinal de vida; reconectando")
+            if let pedido = pulsoPedido, Date().timeIntervalSince(pedido) > 4 {
+                registrar("keepalive sem resposta há \(Int(Date().timeIntervalSince(pedido)))s; reconectando")
                 pulsoPedido = nil
                 central.cancelPeripheralConnection(p)
                 return
             }
-            if contador % 10 == 0, pulsoPedido == nil, let ch = canalInfo { pulsoPedido = Date(); p.readValue(for: ch) }
+            if contador % 5 == 0, pulsoPedido == nil, let ch = canalInfo { pulsoPedido = Date(); p.readValue(for: ch) }
         }
         if contador % 3 == 0 { informar() }
         guard canal != nil, !ocupado else { return }

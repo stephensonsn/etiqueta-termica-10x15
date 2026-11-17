@@ -494,4 +494,87 @@ function separarEnvios(zpl) {
   return envios;
 }
 
-module.exports = { montar, separarEnvios, separarPaginas, paraPng, paraTspl, paraTsplCompacto, lerFiscal, etiquetaRegua, PREAMBULO };
+// Etiquetas de produto (SKU) em rolo de várias colunas, com comandos nativos da impressora.
+//
+// Medido na foto da impressão de 17/11 (rolo 34 x 23 mm, 3 colunas):
+//  - cada coluna saía ~2,5 mm mais à esquerda que a anterior: o código somava só a largura da
+//    etiqueta (34 mm) e esquecia o espaço entre as colunas do rolo. A 3ª coluna perdia o começo
+//    do texto ("ERDE", "OSA", "10001"). Agora cada coluna começa em largura + espaço entre colunas.
+//  - o número aparecia duas vezes, um deles por cima das barras: os parâmetros do BARCODE estavam
+//    fora de ordem (o "2" que devia ser a largura da barra virou "texto legível centralizado").
+//  - "810001" não é um EAN-13 válido (precisa de 13 dígitos); o código de barras certo para
+//    números curtos é o Code 128.
+//  - texto alinhado à esquerda ficava torto entre as colunas: agora cada linha é centralizada pela
+//    largura real da fonte da impressora.
+// Fontes internas TSPL (largura x altura do caractere, em pontos): "1" 8x12, "2" 12x20, "3" 16x24.
+const FONTE_TSPL = { 1: [8, 12], 2: [12, 20], 3: [16, 24] };
+
+// Largura do Code 128 em módulos: início (11) + símbolos (11 cada) + verificador (11) + fim (13).
+// Só dígitos em quantidade par usa o subconjunto C (2 dígitos por símbolo).
+function modulosCode128(txt) {
+  const simbolos = /^\d+$/.test(txt) && txt.length % 2 === 0 ? txt.length / 2 : txt.length;
+  return 11 + simbolos * 11 + 11 + 13;
+}
+
+function paraTsplSku(etiquetas, opts = {}) {
+  const {
+    larguraMm = 34, alturaMm = 23, colunas = 3,
+    espacoColunasMm = 2.5,   // espaço entre uma etiqueta e a do lado, no rolo
+    margemEsqMm = 0,         // da borda do rolo até a 1ª coluna
+    gapMm = 2, densidade = 8, velocidade = 4,
+  } = opts;
+  if (!Array.isArray(etiquetas) || !etiquetas.length) throw new Error('lista de etiquetas vazia');
+  const PM = 8; // pontos por mm (203 dpi)
+  const wCol = Math.round(larguraMm * PM);
+  const passo = Math.round((larguraMm + espacoColunasMm) * PM);
+  const x0 = Math.round(margemEsqMm * PM);
+  const hEt = Math.round(alturaMm * PM);
+  const larguraTotalMm = Math.min(108, Math.ceil(margemEsqMm + colunas * larguraMm + (colunas - 1) * espacoColunasMm));
+  const limpar = (t, max) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/["\\]/g, '').toUpperCase().slice(0, max);
+
+  // texto centralizado; reduz a ampliação até caber, e corta se ainda assim não couber
+  const texto = (cmds, col, y, fonte, txt, mult = 1) => {
+    const [cw] = FONTE_TSPL[fonte];
+    const util = wCol - 2 * 16; // 2 mm de folga de cada lado
+    while (mult > 1 && txt.length * cw * mult > util) mult--;
+    const max = Math.floor(util / (cw * mult));
+    const t = txt.slice(0, max);
+    const x = col + Math.max(16, Math.round((wCol - t.length * cw * mult) / 2));
+    cmds.push(`TEXT ${x},${y},"${fonte}",0,${mult},${mult},"${t}"`);
+  };
+
+  // layout vertical para 23 mm (184 pontos), com 2 mm livres em cima e embaixo
+  const esc = hEt / 184; // acompanha alturas diferentes de 23 mm
+  const Y = { nome: 16, cor: 38, barras: 66, altBarras: 46, codigo: 118, sku: 146 };
+  for (const k of Object.keys(Y)) Y[k] = Math.round(Y[k] * esc);
+
+  const cmds = [
+    '\r\n'.repeat(1024) + `SIZE ${larguraTotalMm} mm,${alturaMm} mm`,
+    `GAP ${gapMm} mm,0 mm`,
+    'REFERENCE 0,0', 'DIRECTION 0', 'OFFSET 0 mm',
+    `DENSITY ${densidade}`, `SPEED ${velocidade}`,
+  ];
+  for (let i = 0; i < etiquetas.length; i += colunas) {
+    cmds.push('CLS');
+    etiquetas.slice(i, i + colunas).forEach((et, c) => {
+      const col = x0 + c * passo;
+      const codigo = String(et.barcode || '').replace(/[^\x20-\x7e]/g, '').replace(/"/g, '');
+      texto(cmds, col, Y.nome, 2, limpar(et.nome || 'PRODUTO', 30));
+      texto(cmds, col, Y.cor, 3, limpar(et.cor, 20));
+      if (codigo) {
+        // barra estreita de 2 pontos; se não couber, 1 ponto
+        const estreita = modulosCode128(codigo) * 2 <= wCol - 32 ? 2 : 1;
+        const wBar = modulosCode128(codigo) * estreita;
+        const xb = col + Math.max(8, Math.round((wCol - wBar) / 2));
+        // BARCODE x,y,"tipo",altura,texto legível (0 = não),rotação,estreita,larga,"conteúdo"
+        cmds.push(`BARCODE ${xb},${Y.barras},"128",${Y.altBarras},0,0,${estreita},${estreita},"${codigo}"`);
+        texto(cmds, col, Y.codigo, 3, codigo);
+      }
+      if (et.sku) texto(cmds, col, Y.sku, 2, limpar(et.sku, 24));
+    });
+    cmds.push('PRINT 1,1');
+  }
+  return Buffer.from(cmds.join('\r\n') + '\r\n', 'latin1');
+}
+
+module.exports = { montar, separarEnvios, separarPaginas, paraPng, paraTspl, paraTsplCompacto, paraTsplSku, lerFiscal, etiquetaRegua, PREAMBULO };
