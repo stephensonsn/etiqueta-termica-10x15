@@ -90,6 +90,15 @@ Passo a passo:
 1. Na Central do Vendedor, em *Envio em massa → Gerar documentos*, escolha **Etiqueta de envio → Térmica ZPL**.
 2. Clique em **Gerar documentos selecionados**. O .zip é baixado e a ponte imprime sozinha.
 
+## TikTok Shop
+
+No TikTok Shop (Seller Center Brasil) cada venda sai em **uma etiqueta só**, no mesmo padrão do Mercado Livre: a etiqueta da iMile em cima e, no rodapé, a faixa *DANFE SIMPLIFICADO – ETIQUETA* (1 – Saída, NF, série, código de barras e chave em grupos de 4).
+
+- **Configuração no TikTok:** Logística → Envio → Opções de formato de documento: etiqueta A6, *Imprimir em 1 página*, formato **ZPL**. Na impressão, marque *Etiqueta de envio* e *NF-e*.
+- **Como junta:** a etiqueta da iMile já traz a chave da NF-e em código de barras; a ponte lê a chave da imagem (leitor Code 128 próprio, `src/code128.js`) e monta a faixa. O arquivo `<data>_NF-e.txt` do mesmo lote não imprime separado (se a etiqueta não chegar em 10 minutos, ele imprime sozinho).
+- **Impressão direta (sem clicar em baixar):** o TikTok não fala com impressora local; ele gera os arquivos e espera o clique em *Baixar todos os arquivos*. A extensão em `extensao-chrome/` faz esse clique sozinha quando a janela *Imprimir resultado* aparece, e a ponte imprime. Para instalar no Chrome: abra `chrome://extensions`, ligue o *Modo do desenvolvedor*, clique em *Carregar sem compactação* e escolha a pasta `extensao-chrome`. Na primeira vez o Chrome pode perguntar se o site pode baixar vários arquivos: responda *Permitir*.
+- A extensão só roda em `seller-br.tiktok.com`, não envia nada para fora do computador e não mexe em pedido.
+
 ## O painel
 
 Em <http://127.0.0.1:9100/painel>, acessível só do próprio computador.

@@ -1,0 +1,13 @@
+{
+  "manifest_version": 3,
+  "name": "Etiqueta Térmica 10x15 - impressão direta",
+  "version": "1.0.0",
+  "description": "No TikTok Shop, baixa sozinho os arquivos de etiqueta quando você clica em imprimir, para a ponte local imprimir na térmica.",
+  "content_scripts": [
+    {
+      "matches": ["https://seller-br.tiktok.com/*"],
+      "js": ["tiktok.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
