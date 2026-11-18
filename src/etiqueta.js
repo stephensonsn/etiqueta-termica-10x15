@@ -29,7 +29,9 @@ function separarPaginas(zpl) {
   return paginas;
 }
 // Página que é só uma imagem pronta (modelo da Shopee): não tem texto para remontar.
-const ehImagemPronta = (pagina) => /~DG/.test(pagina) && /\^XG/.test(pagina) && !/\^FD/.test(pagina);
+// Shopee: "~DG" + "^XG". TikTok Shop: uma página só com "^GFA" (imagem 808 x ~1127), sem texto.
+const ehImagemPronta = (pagina) => ((/~DG/.test(pagina) && /\^XG/.test(pagina)) || /\^GF[AB],/.test(pagina)) && !/\^FD/.test(pagina);
+const ehTikTok = (pagina) => /\^GF[AB],/.test(pagina) && !/~DG/.test(pagina);
 
 // Decodifica texto de um ^FD com ^FH (ex.: _C3_A7 -> ç)
 function decodificarFH(txt) {
@@ -557,8 +559,10 @@ async function montarConjunta(pagEnvio, fiscal) {
 // Encaixa uma etiqueta que já vem como imagem (816 x 1218 na Shopee) na área de 800 x 1198,
 // sem redimensionar (para não estragar os códigos de barras): centraliza e corta só as sobras das bordas.
 async function encaixarImagem(pagina) {
-  const larg = Number((pagina.match(/~DG[^,]*,\d+,(\d+),/) || [])[1] || 102) * 8;
-  const total = Number((pagina.match(/~DG[^,]*,(\d+),\d+,/) || [])[1] || 0);
+  // tamanho da imagem: "~DG<nome>,<total>,<bytes por linha>," (Shopee) ou "^GFA,<comp>,<total>,<bytes por linha>," (TikTok)
+  const gf = pagina.match(/\^GF[AB],\d+,(\d+),(\d+),/);
+  const larg = gf ? Number(gf[2]) * 8 : Number((pagina.match(/~DG[^,]*,\d+,(\d+),/) || [])[1] || 102) * 8;
+  const total = gf ? Number(gf[1]) : Number((pagina.match(/~DG[^,]*,(\d+),\d+,/) || [])[1] || 0);
   const alt = total && larg ? Math.ceil(total / (larg / 8)) : ENVIO_A;
   const img = await renderizar(pagina, larg, alt);
   const lim = limites(img);
@@ -587,7 +591,12 @@ async function montar(zpl, modo = 'junto') {
   if (ehImagemPronta(paginas[0])) {
     // Shopee: a etiqueta já vem como imagem completa, com a DACE resumida no rodapé
     const saidaImg = [];
-    for (const p of paginas) saidaImg.push({ id: 'Shopee ' + require('crypto').createHash('sha1').update(p).digest('hex').slice(0, 6), tipo: 'envio + DACE (Shopee)', img: await encaixarImagem(p) });
+    for (const p of paginas) {
+      const h = require('crypto').createHash('sha1').update(p).digest('hex').slice(0, 6);
+      saidaImg.push(ehTikTok(p)
+        ? { id: 'TikTok ' + h, tipo: 'TikTok Shop', img: await encaixarImagem(p) }
+        : { id: 'Shopee ' + h, tipo: 'envio + DACE (Shopee)', img: await encaixarImagem(p) });
+    }
     return saidaImg;
   }
   const id = (paginas[0].match(/"id":"(\d+)"/) || [])[1] || '';

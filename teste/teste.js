@@ -72,5 +72,12 @@ const medir = (im) => {
   // página só de controle que o Mercado Livre manda depois de cada etiqueta não vira etiqueta
   assert.strictEqual(e.separarPaginas('^XA^MCY^XZ').length, 0);
   assert.strictEqual(e.separarPaginas('^XA^FO10,10^A0N,30,30^FDOi^FS^XZ\n^XA^MCY^XZ').length, 1);
+  // TikTok Shop: cada página é uma imagem ^GFA sem texto; vira uma etiqueta própria, sem corte
+  const linhaTk = 'F'.repeat(202); // 101 bytes por linha, tudo preto
+  const pgTk = `^XA,^FS\n^FO0,0\n^GFA,${101 * 40},${101 * 40},101,${(linhaTk + '\n').repeat(40)}^FS,^XZ`;
+  const tk = await e.montar(pgTk);
+  assert.strictEqual(tk.length, 1);
+  assert.strictEqual(tk[0].tipo, 'TikTok Shop');
+  assert.strictEqual(e.separarEnvios(pgTk + '\n' + pgTk).length, 2);
   console.log('ok: todos os testes passaram');
 })().catch((err) => { console.error('FALHOU:', err.message); process.exit(1); });

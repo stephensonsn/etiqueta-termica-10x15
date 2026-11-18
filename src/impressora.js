@@ -497,7 +497,9 @@ const ARQ_VISTOS = path.join(RAIZ, 'logs', 'arquivos-vistos.json');
 let vistos = {};
 try { vistos = JSON.parse(fs.readFileSync(ARQ_VISTOS, 'utf8')); } catch (_) { /* primeira vez */ }
 const vigia = { ativo: false, texto: 'Desligado' };
-const NOME_ETIQUETA = /etiqueta|shipping|label|envio|zpl/i;
+// .zip só com nome de etiqueta; .txt/.zpl qualquer nome (o TikTok baixa "<data>_Packing slip.txt" e
+// "<data>_Shipping label.txt"), desde que o conteúdo seja ZPL (lerZplDeArquivo confere o ^XA)
+const NOME_ETIQUETA = /etiqueta|shipping|label|envio|zpl|packing|slip|tiktok/i;
 let varrendo = false;
 async function varrerDownloads(inicial) {
   if (varrendo || !cfg.vigiarDownloads) { if (!cfg.vigiarDownloads) { vigia.ativo = false; vigia.texto = 'Desligado'; } return; }
@@ -505,10 +507,10 @@ async function varrerDownloads(inicial) {
   try {
     const agora = Date.now();
     for (const nome of fs.readdirSync(PASTA)) {
-      if (!/\.(zip|txt|zpl)$/i.test(nome) || !NOME_ETIQUETA.test(nome)) continue;
+      if (!/\.(zip|txt|zpl)$/i.test(nome) || (/\.zip$/i.test(nome) && !NOME_ETIQUETA.test(nome))) continue;
       const caminho = path.join(PASTA, nome);
       let st; try { st = fs.statSync(caminho); } catch (_) { continue; }
-      if (!st.isFile() || st.size === 0 || st.size > 64 * 1024 * 1024) continue;
+      if (!st.isFile() || st.size === 0 || st.size > 64 * 1024 * 1024 || (!/\.zip$/i.test(nome) && st.size > 8 * 1024 * 1024)) continue;
       const chave = `${nome}|${st.size}|${Math.round(st.mtimeMs)}`;
       if (vistos[chave]) continue;
       if (agora - st.mtimeMs < 1500) continue; // ainda baixando: pega na próxima volta
