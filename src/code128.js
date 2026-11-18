@@ -111,4 +111,34 @@ function lerCodigos(img) {
   return [...achados.values()];
 }
 
-module.exports = { lerCodigos, decodificarLarguras };
+// Larguras (em módulos) que um texto só de dígitos tem em Code 128 subconjunto C
+function largurasEsperadas(digitos) {
+  if (!/^\d+$/.test(digitos) || digitos.length % 2) return null;
+  const cods = [105];
+  for (let i = 0; i < digitos.length; i += 2) cods.push(Number(digitos.slice(i, i + 2)));
+  let soma = 105; cods.slice(1).forEach((c, i) => { soma += c * (i + 1); });
+  cods.push(soma % 103, 106);
+  return cods.flatMap((c) => [...PADROES[c]].map(Number));
+}
+// Confere se um código de barras desenhado (mesmo com barras irregulares) é o desta chave:
+// compara barra a barra com o que a chave deveria ter. Serve para não juntar o DANFE de um
+// pacote com a etiqueta de outro. Devolve a fração de barras que bate (1 = idêntico).
+function confereCodigo(img, y0, y1, digitos) {
+  const esperado = largurasEsperadas(digitos);
+  if (!esperado) return 0;
+  let melhor = 0;
+  for (const y of [Math.round((y0 + y1) / 2), y0 + 10, y1 - 10]) {
+    const base = y * img.l, runs = [];
+    let cor = img.bits[base], ini = 0;
+    for (let x = 1; x <= img.l; x++) { const c = x < img.l ? img.bits[base + x] : -1; if (c !== cor) { runs.push([cor, x - ini]); cor = c; ini = x; } }
+    while (runs.length && runs[0][0] !== 1) runs.shift();
+    while (runs.length && runs[runs.length - 1][0] !== 1) runs.pop();
+    if (runs.length !== esperado.length) continue;
+    const modulo = runs.reduce((t, r) => t + r[1], 0) / esperado.reduce((t, v) => t + v, 0);
+    const ok = runs.filter((r, i) => Math.abs(r[1] / modulo - esperado[i]) <= 0.75).length / esperado.length;
+    melhor = Math.max(melhor, ok);
+  }
+  return melhor;
+}
+
+module.exports = { lerCodigos, decodificarLarguras, confereCodigo };

@@ -617,10 +617,86 @@ async function casarTikTok(folha) {
   return null;
 }
 
+// Faixas de linhas com tinta, separadas por linhas em branco: [[y0, y1], ...]
+function faixasDeTinta(img) {
+  const out = []; let ini = -1;
+  for (let y = 0; y < img.a; y++) {
+    const tem = linhaTemPreto(img, y);
+    if (tem && ini < 0) ini = y;
+    if (!tem && ini >= 0) { out.push([ini, y - 1]); ini = -1; }
+  }
+  if (ini >= 0) out.push([ini, img.a - 1]);
+  return out;
+}
+// linhas horizontais longas (molduras), para achar onde cortar a etiqueta da iMile
+function linhasLongas(img, min = 500) {
+  const ys = [];
+  for (let y = 0; y < img.a; y++) {
+    let run = 0, maior = 0;
+    for (let x = 0; x < img.l; x++) { if (img.bits[y * img.l + x]) { run++; if (run > maior) maior = run; } else run = 0; }
+    if (maior >= min) ys.push(y);
+  }
+  return ys;
+}
+// recorta as linhas [y0, y1] de uma imagem
+function linhas(img, y0, y1) { return { l: img.l, a: y1 - y0 + 1, bits: img.bits.slice(y0 * img.l, (y1 + 1) * img.l) }; }
+
+// TikTok com o DANFE simplificado completo: etiqueta da iMile até a caixa "Qntd | Peso | D2D" (o
+// bloco de baixo repete o código de rastreio do topo) + título + emissão/tipo/série/número +
+// código de barras e chave + protocolo, emitente e destinatário, copiados do DANFE do TikTok.
+// "danfe" é a página de NF-e do mesmo pacote (mesma posição no lote). Se não couber, null.
+async function casarTikTokCompleto(folha, danfes) {
+  // aceita uma página ou a lista do lote: usa a que tem o código de barras desta chave
+  for (const d of [].concat(danfes || [])) {
+    const r = await casarComDanfe(folha, d);
+    if (r) return r;
+  }
+  return null;
+}
+async function casarComDanfe(folha, danfe) {
+  const { lerCodigos } = require('./code128');
+  const cod = lerCodigos(folha).find((c) => chaveValida(c.texto));
+  if (!cod || cod.y0 < folha.a / 2 || !danfe) return null;
+  const chave = cod.texto;
+  // corte: última moldura horizontal antes do bloco de baixo (código de rastreio repetido)
+  const molduras = linhasLongas(folha).filter((y) => y < cod.y0 - 120);
+  if (!molduras.length) return null;
+  const corte = molduras[molduras.length - 1] + 1;
+  // DANFE: título, linha da chave, emissão/número, código de barras da chave, protocolo..destinatário
+  const fx = faixasDeTinta(danfe);
+  const barra = fx.find(([a, b]) => b - a > 60 && a < danfe.a / 2); // código de barras da chave
+  if (!barra) return null;
+  // trava: o código de barras do DANFE tem que ser o desta chave (senão é de outro pacote)
+  const { confereCodigo } = require('./code128');
+  if (confereCodigo(danfe, barra[0], barra[1], chave) < 0.97) return null;
+  const antes = fx.filter(([a, b]) => b < barra[0] && b - a > 4); // título, chave em texto, emissão, número
+  if (antes.length < 3) return null;
+  const blocoA = { y0: antes[2][0], y1: antes[antes.length - 1][1] }; // emissão/tipo/série + número
+  let fimB = barra[1];
+  for (const [a, b] of fx) { if (a <= barra[1]) continue; if (a - fimB > 150) break; fimB = b; } // até o destinatário
+  const imgA = apertar(linhas(danfe, blocoA.y0, blocoA.y1), 4);
+  const imgB = apertar(linhas(danfe, barra[1] + 1, fimB), 4);
+  const tit0 = await bloco(`^FO${MX},0^GB${UTIL},3,3^FS\n^FO${MX},10^A0N,28,28^FB${UTIL},1,0,C^FH^FD${codificarFH('DANFE SIMPLIFICADO - ETIQUETA')}^FS`, 60);
+  const tit = recortar(tit0, ultimaLinha(tit0) + 1);
+  for (const altB of [64, 48]) {
+    const bc0 = await bloco(`^FO123,0^BY2,,0^BCN,${altB},N,N,N^FD>;${chave}^FS\n^FO${MX},${altB + 4}^A0N,22,22^FB${UTIL},1,0,C^FD${chave.replace(/(\d{4})(?=\d)/g, '$1 ')}^FS`, 160);
+    const bc = recortar(bc0, ultimaLinha(bc0) + 1);
+    const pecas = [tit, imgA, bc, imgB];
+    const total = pecas.reduce((t, p) => t + p.a, 0) + 6 * pecas.length;
+    if (corte + total > LINHAS_MAX - MY) continue;
+    const out = { l: L, a: A, bits: new Uint8Array(L * A) };
+    out.bits.set(folha.bits.subarray(0, corte * L));
+    let y = corte + 6;
+    for (const p of pecas) { colar(out, p, 0, y, L, p.a); y += p.a + 6; }
+    return { img: out, chave, numero: String(parseInt(chave.slice(25, 34), 10)), serie: String(parseInt(chave.slice(22, 25), 10)) };
+  }
+  return null;
+}
+
 // Recebe o ZPL completo de UM envio (1 ou 2 páginas) e devolve as etiquetas 10x15 prontas.
 // modo 'junto'  : envio + faixa fiscal na mesma etiqueta, no modelo do Mercado Livre (padrão)
 // modo 'cheio'  : cada página numa etiqueta inteira
-async function montar(zpl, modo = 'junto') {
+async function montar(zpl, modo = 'junto', opcoes = {}) {
   const paginas = separarPaginas(zpl);
   if (!paginas.length) throw new Error('Nenhuma etiqueta ZPL (^XA...^XZ) encontrada');
   if (ehImagemPronta(paginas[0])) {
@@ -630,7 +706,7 @@ async function montar(zpl, modo = 'junto') {
       const h = require('crypto').createHash('sha1').update(p).digest('hex').slice(0, 6);
       if (ehTikTok(p)) {
         const img = await encaixarImagem(p);
-        const casada = modo === 'junto' ? await casarTikTok(img) : null;
+        const casada = modo !== 'junto' ? null : ((opcoes.danfes && await casarTikTokCompleto(img, opcoes.danfes)) || await casarTikTok(img));
         saidaImg.push(casada
           ? { id: 'TikTok NF ' + casada.numero, tipo: 'envio + Danfe (TikTok)', img: casada.img, chave: casada.chave }
           : { id: 'TikTok ' + h, tipo: 'TikTok Shop', img });
@@ -769,4 +845,4 @@ function paraTsplSku(etiquetas, opts = {}) {
   return Buffer.from(cmds.join('\r\n') + '\r\n', 'latin1');
 }
 
-module.exports = { casarTikTok, paraTsplZlib, LAYOUT_SKU, chaveValida, acharChave, montar, separarEnvios, separarPaginas, paraPng, paraTspl, paraTsplCompacto, paraTsplSku, lerFiscal, etiquetaRegua, PREAMBULO };
+module.exports = { casarTikTok, casarTikTokCompleto, ehTikTok, ehImagemPronta, paraTsplZlib, LAYOUT_SKU, chaveValida, acharChave, montar, separarEnvios, separarPaginas, paraPng, paraTspl, paraTsplCompacto, paraTsplSku, lerFiscal, etiquetaRegua, PREAMBULO };

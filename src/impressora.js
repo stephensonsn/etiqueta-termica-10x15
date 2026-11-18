@@ -390,7 +390,7 @@ function descartarPedido(jid) {
 }
 
 // Recebe ZPL (um ou vários envios), monta as etiquetas 10x15 e imprime ou segura para conferência.
-async function receberZpl(zpl, { origem = 'manual', imprimir = cfg.imprimir === 'direto', modo = cfg.modo } = {}) {
+async function receberZpl(zpl, { origem = 'manual', imprimir = cfg.imprimir === 'direto', modo = cfg.modo, danfesTikTok = null } = {}) {
   const envios = separarEnvios(zpl);
   if (!envios.length) throw new Error('ZPL sem etiqueta (^XA...^XZ)');
   const feitos = [];
@@ -418,7 +418,8 @@ async function receberZpl(zpl, { origem = 'manual', imprimir = cfg.imprimir === 
     if (numero) porNumero.set(numero, { origem, quando: Date.now() });
     let etiquetas;
     try {
-      etiquetas = await montar(envio, modo);
+      // padrão: faixa simples igual às outras plataformas; DANFE completo só com cfg.tiktokDanfeCompleto
+      etiquetas = await montar(envio, modo, danfesTikTok && cfg.tiktokDanfeCompleto ? { danfes: danfesTikTok } : {});
     } catch (e) {
       // nunca some em silêncio: libera para uma nova tentativa (não conta como repetido), guarda o
       // ZPL para ajuste e põe um item com o erro na fila do painel
@@ -495,7 +496,7 @@ function apagarSeImprimiu(arquivo) {
 const PASTA = path.join(require('os').homedir(), 'Downloads');
 const lotesTikTok = new Map(); // "<data>" do nome do arquivo -> { etiqueta, nfe }
 function descartarNfeTikTok(caminho, nome) {
-  log(`TikTok: ${nome} não imprime separado; a DANFE já vai na etiqueta de envio (faixa fiscal com a chave)`);
+  log(`TikTok: ${nome} não imprime separado; o DANFE simplificado vai junto na etiqueta de envio`);
   if (cfg.limparDownloads) { try { fs.rmSync(caminho, { force: true }); } catch (_) { /* fica */ } }
 }
 async function imprimirNfeSozinha(lote) {
@@ -507,6 +508,8 @@ async function imprimirNfeSozinha(lote) {
     const feitos = await receberZpl(lerZplDeArquivo(caminho), { origem: 'Downloads' });
     for (const p of feitos) p.arquivo = caminho;
     apagarSeImprimiu(caminho);
+    for (const c of l.copias || []) if (cfg.limparDownloads) { try { fs.rmSync(c, { force: true }); } catch (_) { /* fica */ } }
+    l.copias = [];
   } catch (e) { log(`ERRO ao imprimir ${nome}: ${e.message}`); }
 }
 const ARQ_VISTOS = path.join(RAIZ, 'logs', 'arquivos-vistos.json');
@@ -539,15 +542,30 @@ async function varrerDownloads(inicial) {
         const l = lotesTikTok.get(lote) || {};
         lotesTikTok.set(lote, l);
         if (l.etiqueta) { descartarNfeTikTok(caminho, nome); continue; }
+        // o navegador às vezes baixa em dobro ("NF-e (1).txt"): guarda todas as cópias para apagar juntas
+        if (l.nfe) { l.copias = (l.copias || []).concat(caminho); log(`TikTok: ${nome} é cópia de ${l.nfe.nome}; será apagado junto`); continue; }
         l.nfe = { caminho, nome, relogio: setTimeout(() => imprimirNfeSozinha(lote), 10 * 60 * 1000) };
         log(`TikTok: ${nome} guardado; a DANFE sai junto com a etiqueta de envio do mesmo lote (até 10 min)`);
         continue;
       }
+      let danfesTikTok = null;
       if (!inicial && lote && /_Shipping label/i.test(nome)) {
         const l = lotesTikTok.get(lote) || {};
         lotesTikTok.set(lote, l);
+        // o TikTok baixa a NF-e e a etiqueta quase juntas: espera a NF-e do lote por até 15 s
+        if (!l.nfe && (!l.espera || agora - l.espera < 15000)) { if (!l.espera) l.espera = agora; delete vistos[chave]; continue; }
         l.etiqueta = true;
-        if (l.nfe) { clearTimeout(l.nfe.relogio); descartarNfeTikTok(l.nfe.caminho, l.nfe.nome); l.nfe = null; }
+        if (l.nfe) {
+          clearTimeout(l.nfe.relogio);
+          try {
+            const { separarEnvios: sep } = require('./etiqueta');
+            danfesTikTok = [];
+            for (const pg of sep(lerZplDeArquivo(l.nfe.caminho))) danfesTikTok.push((await montar(pg, 'cheio'))[0].img);
+          } catch (e) { log(`TikTok: não li as páginas de ${l.nfe.nome} (${e.message}); sai a faixa simples`); danfesTikTok = null; }
+          descartarNfeTikTok(l.nfe.caminho, l.nfe.nome); l.nfe = null;
+          for (const c of l.copias || []) if (cfg.limparDownloads) { try { fs.rmSync(c, { force: true }); } catch (_) { /* fica */ } }
+          l.copias = [];
+        }
       }
       // na primeira volta só marca o que já existia, para não imprimir arquivo antigo
       if (!inicial) {
@@ -555,7 +573,7 @@ async function varrerDownloads(inicial) {
           const zpl = lerZplDeArquivo(caminho);
           if (zpl) {
             log(`arquivo novo em Downloads: ${nome}`);
-            const feitos = await receberZpl(zpl, { origem: 'Downloads' });
+            const feitos = await receberZpl(zpl, { origem: 'Downloads', danfesTikTok });
             // o arquivo só é apagado depois que TODAS as etiquetas dele imprimirem (ver apagarSeImprimiu)
             for (const p of feitos) p.arquivo = caminho;
             apagarSeImprimiu(caminho);
