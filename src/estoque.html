@@ -212,6 +212,36 @@
     <div class="linha-acoes"><button class="btn btn-sec" id="loja-sincronizar">Sincronizar com o site</button><span class="card-sub" id="loja-atualizado"></span></div>
     <details style="margin-top:12px"><summary>Últimos movimentos</summary><div class="rolagem"><table class="mov"><thead><tr><th>Hora</th><th>Produto</th><th style="text-align:right">De</th><th style="text-align:right">Para</th><th>Situação</th></tr></thead><tbody id="loja-movimentos"></tbody></table></div></details>
   </section>
+
+  <!-- Mercado Livre: anúncios ligados aos produtos da loja -->
+  <section class="card" id="ml" aria-labelledby="t-ml">
+    <div class="card-title" id="t-ml">Mercado Livre <span class="selo alerta" id="ml-selo">Não conectado</span></div>
+    <div class="card-sub">Cada anúncio fica ligado a um produto da loja: a venda no Mercado Livre tira do estoque do site, e o estoque do site vira a quantidade do anúncio</div>
+    <details id="ml-ligar" style="margin-top:12px">
+      <summary>Conectar a conta</summary>
+      <ol class="card-sub" style="margin:10px 0;padding-left:20px;line-height:1.6">
+        <li>Entre em developers.mercadolivre.com.br com a conta que vende e crie uma aplicação.</li>
+        <li>Em "URI de redirect" coloque o endereço de retorno abaixo; marque leitura e escrita e "offline access".</li>
+        <li>Copie o ID do aplicativo e a chave secreta para cá e clique em Salvar.</li>
+        <li>Clique em Autorizar a conta. Depois de aceitar, o navegador abre o site da loja: copie o endereço inteiro da barra (tem "?code=") e cole no último campo.</li>
+      </ol>
+      <div class="loja-grade">
+        <div class="field"><label for="ml-app">ID do aplicativo</label><input id="ml-app" autocomplete="off"></div>
+        <div class="field"><label for="ml-segredo">Chave secreta</label><div class="senha"><input id="ml-segredo" type="password" autocomplete="off"><button type="button" data-olho="ml-segredo">Mostrar</button></div></div>
+        <div class="field"><label for="ml-retorno">Endereço de retorno</label><input id="ml-retorno" type="url"></div>
+      </div>
+      <div class="linha-acoes"><button class="btn btn-sec" id="ml-salvar">Salvar</button><button class="btn btn-primary" id="ml-autorizar">Autorizar a conta</button></div>
+      <div class="field" style="margin-top:12px"><label for="ml-colado">Endereço depois de autorizar</label><input id="ml-colado" autocomplete="off" placeholder="https://trendtoy.com.br/?code=TG-..."></div>
+      <div class="linha-acoes"><button class="btn btn-primary" id="ml-concluir">Concluir a conexão</button><button class="btn btn-sec" id="ml-desconectar">Desconectar</button></div>
+    </details>
+    <div class="linha-acoes">
+      <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="ml-baixar"> Venda no Mercado Livre baixa o estoque do site</label>
+      <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="ml-enviar"> Estoque do site vira a quantidade dos anúncios</label>
+    </div>
+    <div class="linha-acoes"><button class="btn btn-sec" id="ml-anuncios">Atualizar anúncios</button><button class="btn btn-sec" id="ml-enviar-agora">Enviar estoque agora</button><span class="card-sub" id="ml-info"></span></div>
+    <div class="rolagem"><table class="mov"><thead><tr><th>Anúncio</th><th style="text-align:right">No ML</th><th>Produto da loja</th><th style="text-align:right">Unidades por venda</th><th>Situação</th></tr></thead><tbody id="ml-tabela"></tbody></table></div>
+    <details style="margin-top:12px"><summary>Registro do Mercado Livre</summary><ul id="ml-eventos" class="card-sub" style="padding-left:18px;line-height:1.6"></ul></details>
+  </section>
 </main>
 
 <div class="barra">
@@ -479,6 +509,57 @@ $('bipe-codigo').addEventListener('keydown', async (e) => {
 
 mostrarMedidas(); atualizar(); verImpressora(); carregarLoja();
 setInterval(verImpressora, 10000); setInterval(carregarLoja, 15000);
+
+// ---------- Mercado Livre ----------
+let mlEst = null;
+const selo = (txt, tipo) => { const sp = document.createElement('span'); sp.className = 'selo ' + tipo; sp.textContent = txt; return sp; };
+function desenharMl() {
+  if (!mlEst) return;
+  const e = mlEst;
+  $('ml-selo').textContent = e.conectado ? 'Conectado' : e.appId ? 'Falta autorizar' : 'Não conectado';
+  $('ml-selo').className = 'selo ' + (e.conectado ? 'ok' : 'alerta');
+  $('ml-ligar').open = !e.conectado;
+  if (!$('ml-app').value) $('ml-app').value = e.appId || '';
+  if (!$('ml-retorno').value) $('ml-retorno').value = e.retorno || '';
+  $('ml-baixar').checked = !!e.baixarVendas; $('ml-enviar').checked = !!e.enviarEstoque;
+  $('ml-baixar').disabled = $('ml-enviar').disabled = !e.conectado;
+  const anuncios = e.anuncios || [];
+  const vinc = anuncios.filter((a) => a.vinculo).length;
+  $('ml-info').textContent = anuncios.length ? `${anuncios.length} anúncio(s) · ${vinc} vinculado(s)` : '';
+  const prods = produtos();
+  $('ml-tabela').replaceChildren(...anuncios.map((a) => {
+    const tr = document.createElement('tr');
+    const t = document.createElement('td'); const link = document.createElement('a'); link.href = a.link || '#'; link.target = '_blank'; link.rel = 'noopener'; link.textContent = a.titulo; t.append(link);
+    const q = document.createElement('td'); q.style.textAlign = 'right'; q.textContent = a.quantidade ?? '';
+    const sel = document.createElement('select'); sel.setAttribute('aria-label', 'Produto da loja para ' + a.titulo);
+    sel.append(new Option('sem vínculo', ''));
+    for (const p of prods) sel.append(new Option(p.nome + (p.cor ? ' ' + p.cor : ''), p.chave));
+    const un = document.createElement('input'); un.type = 'number'; un.min = 1; un.style.width = '72px'; un.setAttribute('aria-label', 'Unidades por venda');
+    const sit = document.createElement('td');
+    if (a.vinculo) { sel.value = a.vinculo.chave; un.value = a.vinculo.unidades; sit.append(selo('Vinculado', 'ok')); }
+    else if (a.sugestao) { sel.value = a.sugestao.chave; un.value = a.sugestao.unidades; sit.append(selo('Sugestão: confira', 'alerta')); }
+    else { un.value = 1; sit.append(selo('Sem vínculo', 'neutro')); }
+    const ok = document.createElement('button'); ok.className = 'btn btn-sec'; ok.textContent = 'Salvar'; ok.style.marginLeft = '8px';
+    ok.onclick = () => mlFazer(() => apiLoja('/api/ml/vincular', { anuncio: a.chave, chave: sel.value, unidades: Number(un.value) || 1 }), sel.value ? 'Vínculo salvo' : 'Vínculo removido');
+    sit.append(ok);
+    const tdSel = document.createElement('td'); tdSel.append(sel);
+    const tdUn = document.createElement('td'); tdUn.style.textAlign = 'right'; tdUn.append(un);
+    tr.append(t, q, tdSel, tdUn, sit);
+    return tr;
+  }));
+  $('ml-eventos').replaceChildren(...(e.eventos || []).map((ev) => { const li = document.createElement('li'); li.textContent = new Date(ev.hora).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) + ' · ' + ev.txt; return li; }));
+}
+async function carregarMl() { try { mlEst = await apiLoja('/api/ml'); if (!document.activeElement || !document.activeElement.closest('#ml-tabela')) desenharMl(); } catch (_) { /* ponte fora do ar */ } }
+async function mlFazer(fn, ok) { try { mlEst = await fn(); desenharMl(); if (ok) toast(ok); } catch (e) { toast(e.message); carregarMl(); } }
+$('ml-salvar').onclick = () => mlFazer(async () => { const r = await apiLoja('/api/ml/config', { appId: $('ml-app').value, segredo: $('ml-segredo').value || undefined, retorno: $('ml-retorno').value }); $('ml-segredo').value = ''; return r; }, 'Aplicativo salvo');
+$('ml-autorizar').onclick = async () => { try { const r = await apiLoja('/api/ml/autorizar'); window.open(r.url, '_blank', 'noopener'); } catch (e) { toast(e.message); } };
+$('ml-concluir').onclick = () => mlFazer(async () => { await apiLoja('/api/ml/autorizar', { colado: $('ml-colado').value }); $('ml-colado').value = ''; return apiLoja('/api/ml/anuncios', {}); }, 'Conta conectada e anúncios lidos');
+$('ml-desconectar').onclick = () => mlFazer(() => apiLoja('/api/ml/config', { desconectar: true }), 'Conta desconectada deste computador');
+$('ml-baixar').onchange = () => mlFazer(() => apiLoja('/api/ml/config', { baixarVendas: $('ml-baixar').checked }), $('ml-baixar').checked ? 'Vendas a partir de agora baixam o estoque' : 'Baixa por venda desligada');
+$('ml-enviar').onchange = () => mlFazer(() => apiLoja('/api/ml/config', { enviarEstoque: $('ml-enviar').checked }), $('ml-enviar').checked ? 'Estoque do site vai para os anúncios' : 'Envio de estoque desligado');
+$('ml-anuncios').onclick = () => mlFazer(() => apiLoja('/api/ml/anuncios', {}), 'Anúncios atualizados');
+$('ml-enviar-agora').onclick = () => mlFazer(() => apiLoja('/api/ml/enviar-estoque', {}), 'Estoque enviado aos anúncios vinculados');
+carregarMl(); setInterval(carregarMl, 30000);
 </script>
 </body>
 </html>

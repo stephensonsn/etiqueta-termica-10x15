@@ -146,8 +146,46 @@ async function bipar({ codigo, modo = 'consulta', qtd = 1 }) {
   dados.movimentos.unshift(mov);
   dados.movimentos = dados.movimentos.slice(0, 500);
   gravar();
+  if (mov.situacao === 'gravado') aoMudarEstoque(p);
   return { achou: true, produto: p, movimento: mov };
 }
+
+// Movimento por chave do produto (usado pelas vendas do Mercado Livre). Saída que deixaria o
+// estoque negativo para em zero e fica registrada, em vez de travar a baixa do pedido.
+async function movimentar({ chave, delta, origem = '' }) {
+  const p = dados.produtos.find((x) => x.chave === chave);
+  if (!p) throw new Error('produto não encontrado na loja');
+  if (!temChave()) throw new Error('loja sem chave de acesso');
+  const mov = { idMov: crypto.randomUUID(), hora: new Date().toISOString(), codigo: origem, chave: p.chave, nome: p.nome, cor: p.cor, delta };
+  try {
+    let r;
+    try { r = await aplicarNoSite(p, delta); }
+    catch (e) {
+      if (!(e.definitivo && delta < 0 && /não dá para tirar/.test(e.message))) throw e;
+      const { dados: atual } = await chamar('GET', caminhoDe(p));
+      const antes = atual.manage_stock ? Number(atual.stock_quantity || 0) : 0;
+      await chamar('PUT', caminhoDe(p), { manage_stock: true, stock_quantity: 0 });
+      r = { antes, depois: 0 };
+      mov.aviso = `vendeu ${-delta}, havia ${antes} no site`;
+    }
+    p.estoque = r.depois;
+    Object.assign(mov, { de: r.antes, para: r.depois, situacao: mov.aviso ? `gravado (${mov.aviso})` : 'gravado' });
+  } catch (e) {
+    if (e.definitivo) throw e;
+    mov.situacao = 'pendente';
+    dados.pendentes.push(mov);
+  }
+  dados.movimentos.unshift(mov);
+  dados.movimentos = dados.movimentos.slice(0, 500);
+  gravar();
+  aoMudarEstoque(p);
+  return { produto: p, movimento: mov };
+}
+
+const ouvintes = [];
+function quandoMudarEstoque(fn) { ouvintes.push(fn); }
+function aoMudarEstoque(p) { for (const fn of ouvintes) Promise.resolve().then(() => fn(p)).catch((e) => log(`loja: aviso de estoque falhou: ${e.message}`)); }
+const produtoPorChave = (chave) => dados.produtos.find((x) => x.chave === chave);
 
 let reenviando = false;
 async function reenviarPendentes() {
@@ -165,6 +203,7 @@ async function reenviarPendentes() {
         if (m) Object.assign(m, mov);
         dados.pendentes = dados.pendentes.filter((x) => x.idMov !== mov.idMov);
         log(`loja: movimento pendente gravado (${mov.nome} ${mov.delta > 0 ? '+' : ''}${mov.delta})`);
+        aoMudarEstoque(p);
       } catch (e) {
         if (e.definitivo) { mov.situacao = `recusado: ${e.message}`; dados.pendentes = dados.pendentes.filter((x) => x.idMov !== mov.idMov); }
         else break; // site ainda fora: tenta de novo no próximo minuto
@@ -228,4 +267,4 @@ function estadoLoja() {
   };
 }
 
-module.exports = { iniciar, sincronizar, bipar, definirCodigo, gerarEan13, salvarConfig, estadoLoja, reenviarPendentes };
+module.exports = { movimentar, quandoMudarEstoque, produtoPorChave, iniciar, sincronizar, bipar, definirCodigo, gerarEan13, salvarConfig, estadoLoja, reenviarPendentes };

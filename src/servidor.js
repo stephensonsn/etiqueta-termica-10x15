@@ -12,6 +12,9 @@ let siteVisto = 0; // última vez que o site do Mercado Livre procurou a impress
 const { enviarBruto, bleInformar, lerZplDeArquivo, iniciarVigia, bleProximo, bleFeito, receberZpl, imprimirPedido, descartarPedido, diagnostico, salvarConfig, estado, log, cfg, RAIZ } = require('./impressora');
 const loja = require('./loja');
 loja.iniciar({ cfg, log, RAIZ });
+const ml = require('./ml');
+ml.iniciar({ cfg, log, RAIZ, loja });
+ml.aoSalvarConfig(() => salvarConfig({}));
 
 const DISPOSITIVO = {
   deviceType: 'printer',
@@ -83,6 +86,8 @@ const servidor = http.createServer(async (req, res) => {
       }
       if (req.method === 'GET' && rota === '/api/estado') return json({ ...estado(), siteVisto });
       if (req.method === 'GET' && rota === '/api/loja') return json(loja.estadoLoja());
+      if (req.method === 'GET' && rota === '/api/ml') return json(ml.estadoMl());
+      if (req.method === 'GET' && rota === '/api/ml/autorizar') { try { return json({ url: ml.urlAutorizacao() }); } catch (e) { return json({ erro: e.message }, 400); } }
       if (req.method === 'GET' && rota === '/api/ble/proximo') return json(bleProximo() || {});
       const mPrevia = rota.match(/^\/api\/previa\/([0-9]+-[0-9]+)\.png$/);
       if (req.method === 'GET' && mPrevia) {
@@ -112,6 +117,12 @@ const servidor = http.createServer(async (req, res) => {
           if (rota === '/api/loja/config') { loja.salvarConfig(JSON.parse(txt || '{}')); salvarConfig({}); return json(loja.estadoLoja()); }
           if (rota === '/api/loja/sincronizar') { const n = await loja.sincronizar(); return json({ ...loja.estadoLoja(), importados: n }); }
           if (rota === '/api/loja/bipe') return json(await loja.bipar(JSON.parse(txt || '{}')));
+          // ---------- Mercado Livre ----------
+          if (rota === '/api/ml/config') { ml.salvarConfig(JSON.parse(txt || '{}')); return json(ml.estadoMl()); }
+          if (rota === '/api/ml/autorizar') { await ml.concluirAutorizacao(JSON.parse(txt || '{}').colado); return json(ml.estadoMl()); }
+          if (rota === '/api/ml/anuncios') { const n = await ml.sincronizarAnuncios(); return json({ ...ml.estadoMl(), lidos: n }); }
+          if (rota === '/api/ml/vincular') { ml.vincular(JSON.parse(txt || '{}')); return json(ml.estadoMl()); }
+          if (rota === '/api/ml/enviar-estoque') { const n = await ml.enviarTodos(); return json({ ...ml.estadoMl(), produtos: n }); }
           if (rota === '/api/loja/codigo') return json(await loja.definirCodigo(JSON.parse(txt || '{}')));
           if (rota === '/api/loja/gerar-ean') return json(await loja.gerarEan13(JSON.parse(txt || '{}')));
           if (rota === '/api/ble/estado') { const b = JSON.parse(txt || '{}'); bleInformar({ bt: Number.isInteger(b.bt) ? b.bt : undefined, conectada: b.conectada === true, nome: String(b.nome || '').slice(0, 60), jaRespondeu: b.jaRespondeu === true, respondeAgora: b.respondeAgora === true, estado: Number.isInteger(b.estado) ? b.estado : undefined }); return json({}); }

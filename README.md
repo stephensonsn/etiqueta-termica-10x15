@@ -127,6 +127,19 @@ A tela de estoque (<http://127.0.0.1:9100/estoque>) liga na loja WordPress + Woo
 
 Para ligar: no WordPress, *WooCommerce → Configurações → Avançado → API REST → Adicionar chave*, permissão **Leitura/Gravação**. Cole a chave e o segredo na tela de estoque. Eles ficam só no `config.json` deste computador, que não vai para o git. Sem a chave, a tela só lê o catálogo público (sem quantidade em estoque).
 
+## Anúncios do Mercado Livre ligados ao estoque da loja
+
+Na tela de estoque, o cartão **Mercado Livre** liga cada anúncio a um produto da loja virtual.
+
+1. Crie uma aplicação em developers.mercadolivre.com.br com a conta que vende. URI de redirect: o endereço do seu site (ex.: `https://sualoja.com.br/`); permissões de leitura e escrita e `offline access`.
+2. Cole o ID do aplicativo e a chave secreta, clique em **Autorizar a conta**, aceite e cole de volta o endereço que o navegador abriu (tem `?code=`).
+3. **Atualizar anúncios** traz os anúncios ativos. A ponte sugere o produto da loja pelo nome e o número de unidades por venda (kit com 3, atacado 12...). Confira e clique em Salvar em cada linha.
+4. Duas chaves, desligadas de início:
+   - **Venda no Mercado Livre baixa o estoque do site**: a cada 2 minutos lê os pedidos pagos (só os que chegarem depois de ligar) e tira `quantidade × unidades por venda` do produto ligado. Cada pedido é contado uma vez.
+   - **Estoque do site vira a quantidade dos anúncios**: sempre que o estoque muda (bipe, venda, sincronização), o anúncio recebe `estoque ÷ unidades por venda`, arredondado para baixo.
+
+O token fica só no `config.json` deste computador e é renovado sozinho; **Desconectar** apaga o token e desliga as duas chaves.
+
 ## Calibração
 
 `node ferramentas/grade-calibracao.js` imprime uma grade com régua em milímetros nas quatro bordas e linhas a cada 10 mm. Pela foto dela dá para medir quanto está sendo cortado de cada lado e se a impressão sai torta. O script espera a impressora conectar (até 15 minutos) antes de enviar.
