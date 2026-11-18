@@ -100,6 +100,20 @@ No TikTok Shop (Seller Center Brasil) cada venda sai em **uma etiqueta só**, no
 - **Impressão automática (opcional):** com a extensão, aparece no canto da página o quadro *Impressão automática*. Ligue numa aba do Seller Center aberta só para isso (vale só para aquela aba). A cada 5 minutos ela abre *Pedidos → Para enviar*, emite a NF-e dos pedidos *Sem NF-e* pelo emissor do TikTok e, nos que já têm NF-e, clica em *Criar e imprimir etiqueta*: a etiqueta sai na térmica sem nenhum clique. No máximo 10 pedidos por rodada; se um botão esperado não aparecer (por exemplo, produto sem dados fiscais), ela para e mostra o motivo no quadro.
 - Fora da impressão automática, a extensão só roda em `seller-br.tiktok.com`, não envia nada para fora do computador e não mexe em pedido.
 
+## Mercado Livre: impressão automática (várias contas)
+
+No painel, em *Mercado Livre: impressão automática*, a ponte confere a cada 5 minutos as contas autorizadas e imprime sozinha as etiquetas de **agência e coleta** que ficaram prontas (`ready_to_ship` / `ready_to_print`, tipos `drop_off`, `xd_drop_off` e `cross_docking`), baixadas em ZPL pela API (`/shipment_labels?response_type=zpl2`) e montadas com a DANFE/DACE como sempre. Cada envio sai uma vez só.
+
+1. Crie um aplicativo grátis em developers.mercadolivre.com.br, com o endereço de retorno da sua loja e as permissões de pedidos e envios. Copie o ID e a chave secreta para o painel (ficam só no `config.json` deste computador).
+2. Para cada conta: entre no Mercado Livre com ela, clique em *Autorizar uma conta* e cole o endereço com `?code=` que aparecer.
+3. Marque *Imprimir sozinho as etiquetas prontas*.
+
+Venda com nota pendente (`invoice_pending`) e erro de conta viram pendência.
+
+## Ícone de pendências (extensão)
+
+A extensão mostra no ícone, em vermelho, quantas pendências existem; clicando, abre a lista. Conta como pendência: impressora ou ponte com problema, etiqueta com erro na fila, pedido parado (sem NF-e, nota pendente no Mercado Livre) e automação que parou (TikTok ou Mercado Livre). A extensão consulta `http://127.0.0.1:9100/api/pendencias` a cada minuto.
+
 ## O painel
 
 Em <http://127.0.0.1:9100/painel>, acessível só do próprio computador.

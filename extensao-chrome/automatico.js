@@ -156,9 +156,11 @@
       itens = linhasDePedido().filter((i) => statusNfe(i.linha) === 'emitida' && !ja[i.pedido]).slice(0, MAX_POR_RODADA);
       if (itens.length) await criarEtiquetas(itens);
       if (!semNota.length && !itens.length) log('nenhum pedido novo');
+      try { chrome.runtime.sendMessage({ tipo: 'pendencia', fonte: 'TikTok', texto: null }); } catch (_) { /* nada */ }
       desenhar(`Última conferência ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}. Próxima em 5 minutos.`);
     } catch (e) {
       log('PAROU: ' + e.message);
+      try { chrome.runtime.sendMessage({ tipo: 'pendencia', fonte: 'TikTok', texto: e.message }); } catch (_) { /* extensão recarregada */ }
       desenhar('Parou nesta rodada: ' + e.message + '. Tenta de novo em 5 minutos.');
     } finally {
       rodando = false;

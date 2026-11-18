@@ -15,6 +15,21 @@ loja.iniciar({ cfg, log, RAIZ });
 const ml = require('./ml');
 ml.iniciar({ cfg, log, RAIZ, loja });
 ml.aoSalvarConfig(() => salvarConfig({}));
+const mlEtiquetas = require('./mlEtiquetas');
+mlEtiquetas.iniciar({ cfg, log, RAIZ, receberZpl, salvarConfig: () => salvarConfig({}) });
+
+// Pendências para o ícone vermelho da extensão: impressora/ponte, etiquetas com erro na fila,
+// pedidos parados (sem NF-e) e automações que pararam (Mercado Livre aqui, TikTok pela extensão).
+const pendenciasExtensao = new Map(); // fonte -> { texto, quando }
+function pendencias() {
+  const out = [];
+  const e = estado();
+  if (!e.fila.ok) out.push({ tipo: 'impressora', texto: e.fila.texto });
+  for (const p of e.pedidos) if (p.estado === 'erro') out.push({ tipo: 'etiqueta', texto: p.erro || `etiqueta ${p.id} com erro na fila` });
+  out.push(...mlEtiquetas.pendencias());
+  for (const [fonte, v] of pendenciasExtensao) if (Date.now() - v.quando < 6 * 3600 * 1000) out.push({ tipo: 'automacao', texto: `${fonte}: ${v.texto}` });
+  return out;
+}
 
 const DISPOSITIVO = {
   deviceType: 'printer',
@@ -87,6 +102,9 @@ const servidor = http.createServer(async (req, res) => {
       if (req.method === 'GET' && rota === '/api/estado') return json({ ...estado(), siteVisto });
       if (req.method === 'GET' && rota === '/api/loja') return json(loja.estadoLoja());
       if (req.method === 'GET' && rota === '/api/ml') return json(ml.estadoMl());
+      if (req.method === 'GET' && rota === '/api/pendencias') return json({ pendencias: pendencias() });
+      if (req.method === 'GET' && rota === '/api/ml-etiquetas') return json(mlEtiquetas.estado());
+      if (req.method === 'GET' && rota === '/api/ml-etiquetas/autorizar') { try { return json({ url: mlEtiquetas.urlAutorizacao() }); } catch (e) { return json({ erro: e.message }, 400); } }
       if (req.method === 'GET' && rota === '/api/ml/autorizar') { try { return json({ url: ml.urlAutorizacao() }); } catch (e) { return json({ erro: e.message }, 400); } }
       if (req.method === 'GET' && rota === '/api/ble/proximo') return json(bleProximo() || {});
       const mPrevia = rota.match(/^\/api\/previa\/([0-9]+-[0-9]+)\.png$/);
@@ -118,6 +136,14 @@ const servidor = http.createServer(async (req, res) => {
           if (rota === '/api/loja/sincronizar') { const n = await loja.sincronizar(); return json({ ...loja.estadoLoja(), importados: n }); }
           if (rota === '/api/loja/bipe') return json(await loja.bipar(JSON.parse(txt || '{}')));
           // ---------- Mercado Livre ----------
+          if (rota === '/api/ml-etiquetas/autorizar') { await mlEtiquetas.adicionarConta(JSON.parse(txt || '{}').colado); return json(mlEtiquetas.estado()); }
+          if (rota === '/api/ml-etiquetas/config') { mlEtiquetas.salvarConfig(JSON.parse(txt || '{}')); return json(mlEtiquetas.estado()); }
+          if (rota === '/api/ml-etiquetas/rodada') { await mlEtiquetas.rodada(); return json(mlEtiquetas.estado()); }
+          if (rota === '/api/pendencias/extensao') {
+            const { fonte, texto } = JSON.parse(txt || '{}');
+            if (fonte) { if (texto) pendenciasExtensao.set(String(fonte).slice(0, 40), { texto: String(texto).slice(0, 300), quando: Date.now() }); else pendenciasExtensao.delete(String(fonte)); }
+            return json({ pendencias: pendencias() });
+          }
           if (rota === '/api/ml/config') { ml.salvarConfig(JSON.parse(txt || '{}')); return json(ml.estadoMl()); }
           if (rota === '/api/ml/autorizar') { await ml.concluirAutorizacao(JSON.parse(txt || '{}').colado); return json(ml.estadoMl()); }
           if (rota === '/api/ml/anuncios') { const n = await ml.sincronizarAnuncios(); return json({ ...ml.estadoMl(), lidos: n }); }

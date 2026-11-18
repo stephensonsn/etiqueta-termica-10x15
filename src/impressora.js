@@ -79,7 +79,7 @@ function salvarConfig(novo) {
   fs.writeFileSync(ARQ_CFG, JSON.stringify(cfg, null, 2));
   log(`config salva: conexao=${JSON.stringify(cfg.conexao)}`);
   log(`config salva: imprimir=${cfg.imprimir} modo=${cfg.modo} calib=${JSON.stringify(cfg.calib)}`);
-  return { ...cfg, loja: cfg.loja ? { url: cfg.loja.url, temChave: !!(cfg.loja.chave && cfg.loja.segredo) } : undefined, ml: cfg.ml ? { appId: cfg.ml.appId, conectado: !!(cfg.ml.tokens && cfg.ml.tokens.refresh) } : undefined }; // nunca devolve a chave da loja
+  return { ...cfg, loja: cfg.loja ? { url: cfg.loja.url, temChave: !!(cfg.loja.chave && cfg.loja.segredo) } : undefined, ml: cfg.ml ? { appId: cfg.ml.appId, conectado: !!(cfg.ml.tokens && cfg.ml.tokens.refresh) } : undefined, mlEtiquetas: cfg.mlEtiquetas ? { ligado: !!cfg.mlEtiquetas.ligado, contas: (cfg.mlEtiquetas.contas || []).map((c) => c.apelido) } : undefined }; // nunca devolve a chave da loja
 }
 
 function rodar(cmd, args, tempoMs) {
@@ -688,7 +688,7 @@ function driverProprio() {
 }
 
 function estado() {
-  const config = { ...cfg, loja: cfg.loja ? { url: cfg.loja.url, temChave: !!(cfg.loja.chave && cfg.loja.segredo) } : undefined, ml: cfg.ml ? { appId: cfg.ml.appId, conectado: !!(cfg.ml.tokens && cfg.ml.tokens.refresh) } : undefined };
+  const config = { ...cfg, loja: cfg.loja ? { url: cfg.loja.url, temChave: !!(cfg.loja.chave && cfg.loja.segredo) } : undefined, ml: cfg.ml ? { appId: cfg.ml.appId, conectado: !!(cfg.ml.tokens && cfg.ml.tokens.refresh) } : undefined, mlEtiquetas: cfg.mlEtiquetas ? { ligado: !!cfg.mlEtiquetas.ligado, contas: (cfg.mlEtiquetas.contas || []).map((c) => c.apelido) } : undefined };
   return { config, limites: LIMITES, bleVivo: bleVivo(), bt: Date.now() - bleInfo.quando < 8000 ? bleInfo.bt : undefined, conector: { instalado: fs.existsSync(path.join(RAIZ, 'conector-bluetooth', 'conector-bluetooth')), rodando: Date.now() - bleInfo.quando < 20000 }, driver: driverDoFabricante(), driverProprio: driverProprio(), vigia, fila: situacaoFila(), conexoes: listarConexoes(), pedidos, log: ultimasLinhas.slice(-25).reverse() };
 }
 
