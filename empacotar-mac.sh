@@ -1,6 +1,7 @@
 #!/bin/bash
-# Monta o instalador do macOS (.dmg) com tudo dentro: programa, dependências, Node.js oficial
-# (Apple Silicon e Intel) e o conector Bluetooth já compilado para os dois.
+# Monta o instalador do macOS (.dmg): programa, dependências e o conector Bluetooth já compilado
+# (Apple Silicon e Intel). O Node.js oficial é baixado pelo instalador na hora (baixar-node.sh),
+# o que deixa o .dmg com poucos MB. Com NODE_EMBUTIDO=1 ele vai dentro, para instalar sem internet.
 # Uso: ./empacotar-mac.sh        Saída: dist/EtiquetaTermica-<versão>.dmg
 # Idempotente: reaproveita o que já foi baixado em build/cache.
 set -euo pipefail
@@ -32,12 +33,15 @@ for a in arm64 x64; do
 done
 
 passo "montando a pasta do instalador"
-rm -rf "$RAIZ/build/dmg"; mkdir -p "$PALCO/app" "$PALCO/runtime/arm64" "$PALCO/runtime/x64"
-for a in arm64 x64; do
-  tar -xzf "$CACHE/node-$NODE_V-darwin-$a.tar.gz" -C "$CACHE" "node-$NODE_V-darwin-$a/bin/node" "node-$NODE_V-darwin-$a/LICENSE"
-  cp -p "$CACHE/node-$NODE_V-darwin-$a/bin/node" "$PALCO/runtime/$a/node"
-done
-cp -p "$CACHE/node-$NODE_V-darwin-arm64/LICENSE" "$PALCO/runtime/LICENCA-NODE.txt"
+rm -rf "$RAIZ/build/dmg"; mkdir -p "$PALCO/app"
+if [ "${NODE_EMBUTIDO:-0}" = 1 ]; then
+  mkdir -p "$PALCO/runtime/arm64" "$PALCO/runtime/x64"
+  for a in arm64 x64; do
+    tar -xzf "$CACHE/node-$NODE_V-darwin-$a.tar.gz" -C "$CACHE" "node-$NODE_V-darwin-$a/bin/node" "node-$NODE_V-darwin-$a/LICENSE"
+    cp -p "$CACHE/node-$NODE_V-darwin-$a/bin/node" "$PALCO/runtime/$a/node"
+  done
+  cp -p "$CACHE/node-$NODE_V-darwin-arm64/LICENSE" "$PALCO/runtime/LICENCA-NODE.txt"
+fi
 ( cd "$RAIZ" && git ls-files -z | grep -zv -E '^(empacotar|docs|teste)/|^empacotar-mac\.sh$|^\.gitignore$' | xargs -0 -I{} rsync -R {} "$PALCO/app/" )
 ( cd "$PALCO/app" && "$(command -v npm)" ci --omit=dev --no-audit --no-fund >>"$REG" 2>&1 )
 

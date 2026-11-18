@@ -4,7 +4,8 @@
 set -euo pipefail
 RAIZ="$(cd "$(dirname "$0")" && pwd)"
 NODE="${NODE:-$(command -v node || true)}"
-[ -x "$NODE" ] || { echo "Node.js nao encontrado. Instale em https://nodejs.org e rode de novo." >&2; exit 1; }
+# sem Node no computador: baixa o oficial para dentro do programa (sem pedir para instalar nada)
+if [ ! -x "$NODE" ]; then NODE="$(bash "$RAIZ/baixar-node.sh" "$RAIZ/runtime")" || { echo "Não deu para baixar o Node.js. Confira a internet e rode de novo." >&2; exit 1; }; fi
 ROTULO="${ROTULO:-br.local.etiqueta-ml}"
 PLIST="$HOME/Library/LaunchAgents/$ROTULO.plist"
 # (re)instala um serviço do usuário; espera o anterior sair de verdade antes de subir o novo
