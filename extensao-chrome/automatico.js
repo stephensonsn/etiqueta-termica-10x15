@@ -16,6 +16,10 @@
   const esperar = (ms) => new Promise((ok) => setTimeout(ok, ms));
   const texto = (el) => (el && (el.innerText || el.textContent) || '').trim();
   const visivel = (el) => !!el && el.getClientRects().length > 0;
+  // pedidos já enviados para a térmica (guardados nesta aba por 2 dias): nunca imprime duas vezes
+  const FEITOS = CHAVE + '-feitos';
+  const feitos = () => { try { const m = JSON.parse(localStorage.getItem(FEITOS) || '{}'); const lim = Date.now() - 2 * 864e5; for (const k of Object.keys(m)) if (m[k] < lim) delete m[k]; return m; } catch (_) { return {}; } };
+  const marcarFeito = (ids) => { const m = feitos(); for (const id of ids) m[id] = Date.now(); try { localStorage.setItem(FEITOS, JSON.stringify(m)); } catch (_) { /* sem armazenamento */ } };
 
   // ---------- quadrinho ----------
   const caixa = document.createElement('div');
@@ -111,10 +115,17 @@
     // primeira vez o TikTok pergunta como imprimir: confirma o padrão já configurado
     const padrao = await achar(() => botaoPorTexto(/Imprimir etiquetas no momento do envio/i), 5000);
     if (padrao) padrao.click();
-    const continuar = await achar(() => botaoPorTexto(/^Continuar imprimindo$/i), 4000);
-    if (continuar) continuar.click();
+    // "Etiqueta(s) de envio já impressas": não reimprime sozinho; cancela e registra
+    const jaImpressa = await achar(() => botaoPorTexto(/^Continuar imprimindo$/i), 4000);
+    if (jaImpressa) {
+      const cancelar = botaoPorTexto(/^Cancelar$/i);
+      if (cancelar) cancelar.click();
+      marcarFeito(itens.map((i) => i.pedido));
+      throw new Error('o TikTok avisou que a etiqueta já foi impressa; não reimprimi');
+    }
     // a janela "Imprimir resultado" é baixada pelo tiktok.js; aqui só espera ela aparecer
     const pronto = await achar(() => [...document.querySelectorAll('div')].find((d) => visivel(d) && /Imprimir resultado/.test(texto(d)) && /\.txt/.test(texto(d))), 45000);
+    marcarFeito(itens.map((i) => i.pedido)); // a etiqueta foi criada: não tenta de novo
     if (!pronto) throw new Error('a janela com os arquivos das etiquetas não apareceu');
     await esperar(4000);
     const fechar = botaoPorTexto(/^Fechar$/i);
@@ -141,7 +152,8 @@
       const semNota = itens.filter((i) => statusNfe(i.linha) === 'sem');
       for (const it of semNota) await emitirNfe(it);
       if (semNota.length) { log(`${semNota.length} NF-e em processamento; as etiquetas saem na próxima rodada`); }
-      itens = linhasDePedido().slice(0, MAX_POR_RODADA).filter((i) => statusNfe(i.linha) === 'emitida');
+      const ja = feitos();
+      itens = linhasDePedido().filter((i) => statusNfe(i.linha) === 'emitida' && !ja[i.pedido]).slice(0, MAX_POR_RODADA);
       if (itens.length) await criarEtiquetas(itens);
       if (!semNota.length && !itens.length) log('nenhum pedido novo');
       desenhar(`Última conferência ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}. Próxima em 5 minutos.`);
