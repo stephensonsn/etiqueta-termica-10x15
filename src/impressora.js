@@ -368,8 +368,9 @@ async function imprimirPedido(jid) {
   try {
     // trava aprendida com drivers TSPL prontos: não gastar etiqueta em branco
     if (cobertura(img) < 0.01) throw new Error('etiqueta saiu quase em branco na montagem; não foi enviada');
-    // Bluetooth: imagem comprimida (cfg.compressao, ligada por padrão); sem ela, a compacta de antes
-    await enviar((tipo) => (tipo === 'ble' ? (cfg.compressao === false ? paraTsplCompacto(img, cfg.calib) : paraTsplZlib(img, cfg.calib)) : paraTspl(img, cfg.calib)), `${p.jid}-${p.id || 'teste'}-${p.tipo}`.replace(/[^\w.+-]+/g, '_'));
+    // Bluetooth: compacta (faixas com tinta). A comprimida (BITMAP modo 3) fica só com cfg.compressao=true:
+    // a OIA-8370-B imprimiu um teste pequeno, mas descartou etiquetas inteiras em 18/11/2026
+    await enviar((tipo) => (tipo === 'ble' ? (cfg.compressao === true ? paraTsplZlib(img, cfg.calib) : paraTsplCompacto(img, cfg.calib)) : paraTspl(img, cfg.calib)), `${p.jid}-${p.id || 'teste'}-${p.tipo}`.replace(/[^\w.+-]+/g, '_'));
     p.estado = 'impresso'; p.erro = ''; p.impressoes++;
     apagarSeImprimiu(p.arquivo);
     // as últimas enviadas ficam na memória (até 40) para reimprimir depois de um papel travado;
