@@ -179,8 +179,15 @@ function lerDestinatario(pagina) {
 }
 
 // ---------- imagem ----------
+// Alguns ZPL (logotipo do vendedor em etiquetas do Mercado Livre) vêm com espaços e quebras de linha
+// no meio dos dados de imagem de "^GFA" (ex.: ",,: : : :M01E,"). Impressoras Zebra ignoram, mas o
+// desenhista recusa ("invalid byte ' '"): os espaços dentro dos dados do gráfico são removidos.
+function limparGraficos(zpl) {
+  return zpl.replace(/(\^GF[AB],\d+,\d+,\d+,)([^\^~]*)/g, (_, cab, dados) => cab + dados.replace(/[ \t\r\n]+/g, ''));
+}
+
 async function renderizar(zpl, larg, alt) {
-  const b64 = await zplToBase64Async(zpl, larg / 8, alt / 8, 8);
+  const b64 = await zplToBase64Async(limparGraficos(zpl), larg / 8, alt / 8, 8);
   const png = PNG.sync.read(Buffer.from(b64, 'base64'));
   const bits = new Uint8Array(png.width * png.height);
   for (let i = 0; i < bits.length; i++) {
