@@ -493,6 +493,22 @@ function apagarSeImprimiu(arquivo) {
 // Vigia a pasta Downloads: etiqueta baixada do Mercado Livre ou da Shopee entra sozinha.
 // Idempotente: cada arquivo (nome + tamanho + data) é processado uma vez só, mesmo após reiniciar.
 const PASTA = path.join(require('os').homedir(), 'Downloads');
+const lotesTikTok = new Map(); // "<data>" do nome do arquivo -> { etiqueta, nfe }
+function descartarNfeTikTok(caminho, nome) {
+  log(`TikTok: ${nome} não imprime separado; a DANFE já vai na etiqueta de envio (faixa fiscal com a chave)`);
+  if (cfg.limparDownloads) { try { fs.rmSync(caminho, { force: true }); } catch (_) { /* fica */ } }
+}
+async function imprimirNfeSozinha(lote) {
+  const l = lotesTikTok.get(lote);
+  if (!l || !l.nfe || l.etiqueta) return;
+  const { caminho, nome } = l.nfe; l.nfe = null;
+  log(`TikTok: a etiqueta de envio do lote ${lote} não chegou em 10 min; imprimindo ${nome} sozinho`);
+  try {
+    const feitos = await receberZpl(lerZplDeArquivo(caminho), { origem: 'Downloads' });
+    for (const p of feitos) p.arquivo = caminho;
+    apagarSeImprimiu(caminho);
+  } catch (e) { log(`ERRO ao imprimir ${nome}: ${e.message}`); }
+}
 const ARQ_VISTOS = path.join(RAIZ, 'logs', 'arquivos-vistos.json');
 let vistos = {};
 try { vistos = JSON.parse(fs.readFileSync(ARQ_VISTOS, 'utf8')); } catch (_) { /* primeira vez */ }
@@ -515,6 +531,24 @@ async function varrerDownloads(inicial) {
       if (vistos[chave]) continue;
       if (agora - st.mtimeMs < 1500) continue; // ainda baixando: pega na próxima volta
       vistos[chave] = agora;
+      // TikTok Shop: o mesmo lote vem em dois arquivos ("<data>_NF-e.txt" e "<data>_Shipping label.txt").
+      // A etiqueta de envio já sai casada com a DANFE (chave + faixa fiscal), então o arquivo de NF-e
+      // do mesmo lote não é impresso. Se a etiqueta não chegar em 10 minutos, a NF-e imprime sozinha.
+      const lote = (nome.match(/^(\d{2}-\d{2}_\d{2}-\d{2}-\d{2})_/) || [])[1];
+      if (!inicial && lote && /_NF-e/i.test(nome)) {
+        const l = lotesTikTok.get(lote) || {};
+        lotesTikTok.set(lote, l);
+        if (l.etiqueta) { descartarNfeTikTok(caminho, nome); continue; }
+        l.nfe = { caminho, nome, relogio: setTimeout(() => imprimirNfeSozinha(lote), 10 * 60 * 1000) };
+        log(`TikTok: ${nome} guardado; a DANFE sai junto com a etiqueta de envio do mesmo lote (até 10 min)`);
+        continue;
+      }
+      if (!inicial && lote && /_Shipping label/i.test(nome)) {
+        const l = lotesTikTok.get(lote) || {};
+        lotesTikTok.set(lote, l);
+        l.etiqueta = true;
+        if (l.nfe) { clearTimeout(l.nfe.relogio); descartarNfeTikTok(l.nfe.caminho, l.nfe.nome); l.nfe = null; }
+      }
       // na primeira volta só marca o que já existia, para não imprimir arquivo antigo
       if (!inicial) {
         try {

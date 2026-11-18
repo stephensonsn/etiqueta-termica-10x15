@@ -79,5 +79,15 @@ const medir = (im) => {
   assert.strictEqual(tk.length, 1);
   assert.strictEqual(tk[0].tipo, 'TikTok Shop');
   assert.strictEqual(e.separarEnvios(pgTk + '\n' + pgTk).length, 2);
+  // TikTok casado: lê a chave (Code 128) do rodapé da etiqueta e põe a faixa fiscal no padrão do ML
+  const { lerCodigos } = require('../src/code128.js');
+  const chaveFicticia = '35261100000000000100550020000000031000000017';
+  const chaveOk = e.chaveValida(chaveFicticia) ? chaveFicticia : (() => { for (let d = 0; d < 10; d++) { const c = chaveFicticia.slice(0, 43) + d; if (e.chaveValida(c)) return c; } })();
+  const zEtq = `^XA^PW800^FO40,40^GB720,900,3^FS^FO60,100^A0N,60,60^FDETIQUETA FICTICIA^FS^FO40,980^BY2^BCN,70,N,N,N^FD>;${chaveOk}^FS^XZ`;
+  const etq = await e.montar(zEtq, 'cheio');
+  const lidos = lerCodigos(etq[0].img).map((c) => c.texto);
+  assert.ok(lidos.includes(chaveOk), 'leitor Code 128 acha a chave');
+  const cas = await e.casarTikTok(etq[0].img);
+  assert.ok(cas && cas.chave === chaveOk && cas.numero === '3' && cas.serie === '2', 'faixa fiscal com NF e série da chave');
   console.log('ok: todos os testes passaram');
 })().catch((err) => { console.error('FALHOU:', err.message); process.exit(1); });

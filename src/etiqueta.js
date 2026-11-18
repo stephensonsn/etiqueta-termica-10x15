@@ -582,6 +582,34 @@ async function encaixarImagem(pagina) {
   return folha;
 }
 
+// TikTok Shop no padrão "etiqueta casada" do Mercado Livre: a etiqueta da iMile já traz a chave da
+// NF-e em código de barras no rodapé. A chave é lida da imagem e o rodapé vira a faixa fiscal
+// (DANFE SIMPLIFICADO - ETIQUETA, 1 - Saída | NF | Série, código de barras e chave em grupos de 4).
+// Sem chave legível, devolve null e a etiqueta sai como veio.
+async function casarTikTok(folha) {
+  const { lerCodigos } = require('./code128');
+  const cod = lerCodigos(folha).find((c) => chaveValida(c.texto));
+  if (!cod || cod.y0 < folha.a / 2) return null; // só a etiqueta de envio tem a chave no rodapé
+  const chave = cod.texto;
+  const fiscal = { titulo: 'Danfe Simplificado', numero: String(parseInt(chave.slice(25, 34), 10)), serie: String(parseInt(chave.slice(22, 25), 10)), emissao: '', tipoOp: '1 - Saída', chave };
+  const corte = Math.max(0, cod.y0 - 22); // acima da linha que separa o código da chave
+  for (const compacta of [false, true]) {
+    const fx0 = await bloco(zplFaixaFiscal(fiscal, compacta), 260);
+    const faixa = recortar(fx0, ultimaLinha(fx0) + 1);
+    const yFaixa = LINHAS_MAX - MY - faixa.a;
+    if (corte + 6 > yFaixa) continue;
+    const out = { l: L, a: A, bits: new Uint8Array(L * A) };
+    out.bits.set(folha.bits.subarray(0, corte * L));
+    // fecha a moldura da etiqueta da iMile onde ela foi cortada
+    let xa = -1, xb = -1;
+    for (let x = 0; x < L; x++) if (folha.bits[(corte - 1) * L + x]) { if (xa < 0) xa = x; xb = x; }
+    if (xa >= 0 && xb - xa > L / 2) for (let y = corte - 2; y < corte; y++) for (let x = xa; x <= xb; x++) out.bits[y * L + x] = 1;
+    colar(out, faixa, 0, yFaixa, L, faixa.a);
+    return { img: out, chave, numero: fiscal.numero, serie: fiscal.serie };
+  }
+  return null;
+}
+
 // Recebe o ZPL completo de UM envio (1 ou 2 páginas) e devolve as etiquetas 10x15 prontas.
 // modo 'junto'  : envio + faixa fiscal na mesma etiqueta, no modelo do Mercado Livre (padrão)
 // modo 'cheio'  : cada página numa etiqueta inteira
@@ -593,9 +621,13 @@ async function montar(zpl, modo = 'junto') {
     const saidaImg = [];
     for (const p of paginas) {
       const h = require('crypto').createHash('sha1').update(p).digest('hex').slice(0, 6);
-      saidaImg.push(ehTikTok(p)
-        ? { id: 'TikTok ' + h, tipo: 'TikTok Shop', img: await encaixarImagem(p) }
-        : { id: 'Shopee ' + h, tipo: 'envio + DACE (Shopee)', img: await encaixarImagem(p) });
+      if (ehTikTok(p)) {
+        const img = await encaixarImagem(p);
+        const casada = modo === 'junto' ? await casarTikTok(img) : null;
+        saidaImg.push(casada
+          ? { id: 'TikTok NF ' + casada.numero, tipo: 'envio + Danfe (TikTok)', img: casada.img, chave: casada.chave }
+          : { id: 'TikTok ' + h, tipo: 'TikTok Shop', img });
+      } else saidaImg.push({ id: 'Shopee ' + h, tipo: 'envio + DACE (Shopee)', img: await encaixarImagem(p) });
     }
     return saidaImg;
   }
@@ -730,4 +762,4 @@ function paraTsplSku(etiquetas, opts = {}) {
   return Buffer.from(cmds.join('\r\n') + '\r\n', 'latin1');
 }
 
-module.exports = { paraTsplZlib, LAYOUT_SKU, chaveValida, acharChave, montar, separarEnvios, separarPaginas, paraPng, paraTspl, paraTsplCompacto, paraTsplSku, lerFiscal, etiquetaRegua, PREAMBULO };
+module.exports = { casarTikTok, paraTsplZlib, LAYOUT_SKU, chaveValida, acharChave, montar, separarEnvios, separarPaginas, paraPng, paraTspl, paraTsplCompacto, paraTsplSku, lerFiscal, etiquetaRegua, PREAMBULO };
