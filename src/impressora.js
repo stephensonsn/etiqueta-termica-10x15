@@ -5,7 +5,7 @@ const path = require('path');
 const crypto = require('crypto');
 const net = require('net');
 const { execFile, execFileSync } = require('child_process');
-const { montar, separarEnvios, paraPng, paraTspl, paraTsplCompacto, etiquetaRegua, PREAMBULO } = require('./etiqueta');
+const { montar, separarEnvios, paraPng, paraTspl, paraTsplCompacto, paraTsplZlib, etiquetaRegua, PREAMBULO } = require('./etiqueta');
 
 const RAIZ = path.join(__dirname, '..');
 const ARQ_CFG = path.join(RAIZ, 'config.json');
@@ -368,7 +368,8 @@ async function imprimirPedido(jid) {
   try {
     // trava aprendida com drivers TSPL prontos: não gastar etiqueta em branco
     if (cobertura(img) < 0.01) throw new Error('etiqueta saiu quase em branco na montagem; não foi enviada');
-    await enviar((tipo) => (tipo === 'ble' ? paraTsplCompacto(img, cfg.calib) : paraTspl(img, cfg.calib)), `${p.jid}-${p.id || 'teste'}-${p.tipo}`.replace(/[^\w.+-]+/g, '_'));
+    // Bluetooth: imagem comprimida (cfg.compressao, ligada por padrão); sem ela, a compacta de antes
+    await enviar((tipo) => (tipo === 'ble' ? (cfg.compressao === false ? paraTsplCompacto(img, cfg.calib) : paraTsplZlib(img, cfg.calib)) : paraTspl(img, cfg.calib)), `${p.jid}-${p.id || 'teste'}-${p.tipo}`.replace(/[^\w.+-]+/g, '_'));
     p.estado = 'impresso'; p.erro = ''; p.impressoes++;
     apagarSeImprimiu(p.arquivo);
     // as últimas enviadas ficam na memória (até 40) para reimprimir depois de um papel travado;

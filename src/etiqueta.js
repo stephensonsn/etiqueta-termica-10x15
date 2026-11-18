@@ -312,6 +312,22 @@ function paraTsplCompacto(img0, calib = {}, copias = 1) {
   return Buffer.concat(partes);
 }
 
+// Versão comprimida: a imagem inteira num BITMAP modo 3 (zlib), que a OIA-8370-B aceita (testado
+// em 18/11/2026). Fica de 5 a 10 vezes menor que a compacta, o que no Bluetooth (cerca de 10 KB/s)
+// derruba o tempo por etiqueta de 6-8 s para cerca de 1 s. Mesma imagem, mesmo cabeçalho.
+function paraTsplZlib(img0, calib = {}, copias = 1) {
+  const c = { deslocXmm: 0, deslocYmm: 0, densidade: 6, velocidade: 8, gapMm: 2, offsetMm: 2, ...calib };
+  const img = deslocar(img0, Math.round(c.deslocXmm * 8), Math.round(c.deslocYmm * 8));
+  const lb = Math.ceil(img.l / 8);
+  const alt = Math.min(img.a, LINHAS_MAX);
+  const dados = Buffer.alloc(lb * alt, 0xff); // TSPL: bit 0 = preto
+  for (let y = 0; y < alt; y++) for (let x = 0; x < img.l; x++) if (img.bits[y * img.l + x]) dados[y * lb + (x >> 3)] &= ~(0x80 >> (x & 7));
+  const z = require('zlib').deflateSync(dados, { level: 9 });
+  return Buffer.concat([
+    Buffer.from(`\r\n\r\nSIZE 100 mm,150 mm\r\nREFERENCE 0 ,0 \r\nDIRECTION 0\r\nGAP ${c.gapMm} mm,0 mm\r\nOFFSET ${c.offsetMm} mm\r\nDENSITY ${c.densidade}\r\nSPEED ${c.velocidade}\r\nCLS\r\nBITMAP 0,0,${lb},${alt},3,${z.length},`, 'latin1'),
+    z, Buffer.from(`\r\nPRINT 1,${copias}\r\n`, 'latin1')]);
+}
+
 // Etiqueta de régua: moldura na borda, linhas a cada 10 mm e marcas de canto.
 // Serve para ver no papel onde a impressão começa e o que está sendo cortado.
 async function etiquetaRegua() {
@@ -696,4 +712,4 @@ function paraTsplSku(etiquetas, opts = {}) {
   return Buffer.from(cmds.join('\r\n') + '\r\n', 'latin1');
 }
 
-module.exports = { LAYOUT_SKU, chaveValida, acharChave, montar, separarEnvios, separarPaginas, paraPng, paraTspl, paraTsplCompacto, paraTsplSku, lerFiscal, etiquetaRegua, PREAMBULO };
+module.exports = { paraTsplZlib, LAYOUT_SKU, chaveValida, acharChave, montar, separarEnvios, separarPaginas, paraPng, paraTspl, paraTsplCompacto, paraTsplSku, lerFiscal, etiquetaRegua, PREAMBULO };
