@@ -416,6 +416,17 @@ async function receberZpl(zpl, { origem = 'manual', imprimir = cfg.imprimir === 
     const etiquetas = await montar(envio, modo);
     const id = etiquetas[0].id || `sem-id-${n + 1}`;
     if (cfg.guardarHistorico) fs.writeFileSync(path.join(RAIZ, 'recebidos', `${carimbo()}-${id}.zpl`), envio);
+    // envio + documento fiscal que não couberam numa etiqueta só: guarda o ZPL neste computador
+    // (fora do git, apagado em 7 dias) para dar para ajustar o modelo depois, mesmo sem histórico ligado
+    if (etiquetas.some((e) => e.tipo === 'fiscal')) {
+      try {
+        const dir = path.join(RAIZ, 'logs', 'nao-juntou');
+        fs.mkdirSync(dir, { recursive: true });
+        for (const f of fs.readdirSync(dir)) if (Date.now() - fs.statSync(path.join(dir, f)).mtimeMs > 7 * 864e5) fs.rmSync(path.join(dir, f), { force: true });
+        fs.writeFileSync(path.join(dir, `${carimbo()}-${id}.zpl`), envio);
+        log(`envio ${id}: documento fiscal saiu em etiqueta separada; ZPL guardado em logs/nao-juntou para ajuste`);
+      } catch (e) { log(`não guardou o ZPL de ${id}: ${e.message}`); }
+    }
     for (const e of etiquetas) {
       const p = registrar(id, e.tipo, origem, e.img);
       feitos.push(p);

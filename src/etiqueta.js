@@ -61,10 +61,33 @@ function camposTexto(pagina) {
 }
 
 // ---------- documento fiscal (2ª página: DACE ou DANFE simplificado) ----------
+// Dígito verificador da chave de acesso (módulo 11, pesos 2 a 9 da direita para a esquerda).
+function chaveValida(c) {
+  if (!/^\d{44}$/.test(c)) return false;
+  let soma = 0, peso = 2;
+  for (let i = 42; i >= 0; i--) { soma += Number(c[i]) * peso; peso = peso === 9 ? 2 : peso + 1; }
+  const r = soma % 11, dv = r < 2 ? 0 : 11 - r;
+  return dv === Number(c[43]);
+}
+// Acha a chave de 44 dígitos mesmo quando vem em grupos ("3526 1170 ...") ou com prefixo de
+// código de barras (">;"), em qualquer campo da página; prefere a que passa no dígito verificador.
+function acharChave(campos) {
+  const candidatas = [];
+  for (const c of campos) {
+    for (const m of c.matchAll(/\d[\d .\-]{42,80}\d/g)) {
+      const d = m[0].replace(/\D/g, '');
+      if (d.length === 44) candidatas.push(d);
+    }
+    const so = c.replace(/^>[;:5]?/, '').replace(/\D/g, '');
+    if (so.length === 44) candidatas.push(so);
+  }
+  return candidatas.find(chaveValida) || candidatas[0] || null;
+}
+
 function lerFiscal(pagina) {
   const campos = camposTexto(pagina);
   const tudo = campos.join('\n');
-  const chave = (tudo.match(/(?<!\d)\d{44}(?!\d)/) || [])[0];
+  const chave = acharChave(campos);
   if (!chave) return null;
   const dace = /DACE|DECLARA.{1,6}O AUXILIAR/i.test(tudo);
   const pega = (re) => ((tudo.match(re) || [])[1] || '').trim();
@@ -73,20 +96,29 @@ function lerFiscal(pagina) {
     numero: pega(/N\S{0,6}\s+(\d[\d.]*)/) || String(parseInt(chave.slice(25, 34), 10)),
     serie: pega(/S.RIE:?\s+(\d+)/i) || String(parseInt(chave.slice(22, 25), 10)),
     emissao: pega(/EMISS.O:?\s*(\d{2}[-\/]\d{2}[-\/]\d{4})/i).replace(/-/g, '/'),
+    tipoOp: /(^|\D)0\s*[-–]\s*ENTRADA/i.test(tudo) ? '0 - Entrada' : '1 - Saída',
     chave,
   };
 }
 
-// Faixa fiscal no rodapé, igual ao modelo conjunto do Mercado Livre:
-// título | número/série | emissão, e a chave de acesso em código de barras.
-function zplFaixaFiscal(f) {
+// Faixa fiscal no rodapé, no padrão usado no mercado para "etiqueta casada" (PrintFlow, GFA):
+//   DANFE SIMPLIFICADO - ETIQUETA   (ou DACE RESUMIDA: uma substitui a outra)
+//   1 - Saída | NF: 5 | Série: 1 | Emissão: 17/11/2026
+//   [código de barras da chave]
+//   3526 1170 0509 ... (chave em grupos de 4)
+// compacta: código de barras mais baixo, para envios com topo comprido (J&T, coleta). As barras
+// mantêm 2 pontos de largura: só perdem altura, o que não muda a leitura.
+function zplFaixaFiscal(f, compacta = false) {
+  const altB = compacta ? 56 : 84, yB = 66, yT = yB + altB + 6;
+  const titulo = /DACE/i.test(f.titulo) ? 'DACE RESUMIDA' : 'DANFE SIMPLIFICADO - ETIQUETA';
+  const info = [f.tipoOp, `NF: ${f.numero}`, `Série: ${f.serie}`, f.emissao ? `Emissão: ${f.emissao}` : ''].filter(Boolean).join(' | ');
+  const grupos = f.chave.replace(/(\d{4})(?=\d)/g, '$1 ');
   return ['^XA', '^CI28', '^PW800', '^LH0,0',
-    `^FO${MX},0^GB${UTIL},2,2^FS`,
-    `^FO${MX},14^A0N,26,26^FH^FD${codificarFH(f.titulo)}^FS`,
-    `^FO${MX},16^A0N,22,22^FB${UTIL},1,0,C^FH^FD${codificarFH(`Número ${f.numero}/Série ${f.serie}`)}^FS`,
-    f.emissao ? `^FO${MX},16^A0N,22,22^FB${UTIL},1,0,R^FH^FD${codificarFH(`Emissão ${f.emissao}`)}^FS` : '',
-    '^FO123,50^BY2,,0^BCN,92,N,N,N^FD>;' + f.chave + '^FS',
-    `^FO${MX},150^A0N,24,24^FB${UTIL},1,0,C^FD${f.chave}^FS`,
+    `^FO${MX},0^GB${UTIL},3,3^FS`,
+    `^FO${MX},12^A0N,28,28^FB${UTIL},1,0,C^FH^FD${codificarFH(titulo)}^FS`,
+    `^FO${MX},40^A0N,22,22^FB${UTIL},1,0,C^FH^FD${codificarFH(info)}^FS`,
+    `^FO123,${yB}^BY2,,0^BCN,${altB},N,N,N^FD>;` + f.chave + '^FS',
+    `^FO${MX},${yT}^A0N,22,22^FB${UTIL},1,0,C^FD${grupos}^FS`,
     '^XZ'].join('\n');
 }
 
@@ -399,29 +431,68 @@ async function zonaDestinatario(d, reducao) {
   return recortar(tudo, ultimaLinha(tudo) + 1);
 }
 
+// Encolhe uma imagem só na vertical, até a altura pedida, sem perder linhas finas (cada linha
+// nova é o "ou" das linhas de origem que caem nela). A margem de cima (MY) não encolhe.
+function encolherAltura(img, alturaNova) {
+  if (alturaNova >= img.a) return img;
+  const fixo = Math.min(MY, img.a), resto = img.a - fixo, novoResto = alturaNova - fixo;
+  const out = { l: img.l, a: alturaNova, bits: new Uint8Array(img.l * alturaNova) };
+  out.bits.set(img.bits.subarray(0, fixo * img.l));
+  for (let y = 0; y < novoResto; y++) {
+    const de = fixo + Math.floor(y * resto / novoResto), ate = fixo + Math.max(Math.floor((y + 1) * resto / novoResto), Math.floor(y * resto / novoResto) + 1);
+    const base = (fixo + y) * img.l;
+    for (let s = de; s < ate && s < img.a; s++) {
+      const o = s * img.l;
+      for (let x = 0; x < img.l; x++) if (img.bits[o + x]) out.bits[base + x] = 1;
+    }
+  }
+  return out;
+}
+
 async function montarConjunta(pagEnvio, fiscal) {
   const d = lerDestinatario(pagEnvio);
   if (!d || !d.qr) return null;
   const topo0 = ancorarTopo(await renderizar(ajustarMargens(await ajustarCaixas(d.topo)), L, ENVIO_A));
-  const fx0 = await bloco(zplFaixaFiscal(fiscal), 260);
-  const faixa = recortar(fx0, ultimaLinha(fx0) + 1);
-  const yFaixa = LINHAS_MAX - MY - faixa.a;
-  // tenta primeiro com a letra original; se não couber, aperta os espaços em branco do topo
-  // e só então diminui a letra do destinatário
-  for (let reducao = 0; reducao <= 6; reducao += 2) {
-    const zona = await zonaDestinatario(d, reducao);
-    for (const aperto of [ESPACO_TOPO, 12, 8]) {
-      const topo = apertar(recortar(topo0, ultimaLinha(topo0) + 1), aperto);
-      const sobra = yFaixa - 10 - (topo.a + 10) - zona.a;
-      if (sobra < 0) continue;
-      const folha = { l: L, a: A, bits: new Uint8Array(L * A) };
-      colar(folha, topo, 0, 0, L, topo.a);
-      colar(folha, zona, 0, topo.a + 10 + Math.floor(sobra / 2), L, zona.a); // centralizado no espaço do meio
-      colar(folha, faixa, 0, yFaixa, L, faixa.a);
-      return folha;
+  // Ordem do que se abre mão, do menos ao mais visível: 1) espaço em branco do topo;
+  // 2) letra do destinatário; 3) altura do código de barras da chave (faixa compacta).
+  // O código de barras do envio, o QR e a chave inteira nunca encolhem.
+  for (const compacta of [false, true]) {
+    const fx0 = await bloco(zplFaixaFiscal(fiscal, compacta), 260);
+    const faixa = recortar(fx0, ultimaLinha(fx0) + 1);
+    const yFaixa = LINHAS_MAX - MY - faixa.a;
+    for (let reducao = 0; reducao <= 8; reducao += 2) {
+      const zona = await zonaDestinatario(d, reducao);
+      for (const aperto of [ESPACO_TOPO, 12, 8, 4]) {
+        const topo = apertar(recortar(topo0, ultimaLinha(topo0) + 1), aperto);
+        const sobra = yFaixa - 10 - (topo.a + 10) - zona.a;
+        if (sobra < 0) continue;
+        const folha = { l: L, a: A, bits: new Uint8Array(L * A) };
+        colar(folha, topo, 0, 0, L, topo.a);
+        colar(folha, zona, 0, topo.a + 10 + Math.floor(sobra / 2), L, zona.a); // centralizado no espaço do meio
+        colar(folha, faixa, 0, yFaixa, L, faixa.a);
+        return folha;
+      }
     }
   }
-  return null; // não coube nem com a menor letra: quem chamou imprime separado
+  // Último recurso, para tudo sair numa etiqueta só: encolhe o TOPO só na altura. O topo não tem
+  // QR; os códigos de barras são lidos na horizontal, então perder altura não muda a leitura
+  // (a largura das barras fica igual). Cada linha nova junta as linhas de origem com "ou", para
+  // linhas finas de caixas não sumirem. Abaixo de 60% a letra fica ruim: aí sai separado.
+  const fx0 = await bloco(zplFaixaFiscal(fiscal, true), 260);
+  const faixa = recortar(fx0, ultimaLinha(fx0) + 1);
+  const yFaixa = LINHAS_MAX - MY - faixa.a;
+  const zona = await zonaDestinatario(d, 8);
+  const topo = apertar(recortar(topo0, ultimaLinha(topo0) + 1), 4);
+  const cabe = yFaixa - 20 - zona.a;
+  if (cabe >= topo.a * 0.6) {
+    const baixo = encolherAltura(topo, cabe);
+    const folha = { l: L, a: A, bits: new Uint8Array(L * A) };
+    colar(folha, baixo, 0, 0, L, baixo.a);
+    colar(folha, zona, 0, baixo.a + 10, L, zona.a);
+    colar(folha, faixa, 0, yFaixa, L, faixa.a);
+    return folha;
+  }
+  return null; // nem assim coube: quem chamou imprime separado
 }
 
 // Encaixa uma etiqueta que já vem como imagem (816 x 1218 na Shopee) na área de 800 x 1198,
@@ -463,7 +534,9 @@ async function montar(zpl, modo = 'junto') {
   const id = (paginas[0].match(/"id":"(\d+)"/) || [])[1] || '';
   const fiscal = paginas[1] ? lerFiscal(paginas[1]) : null;
   if (modo === 'junto' && fiscal) {
-    const folha = await montarConjunta(paginas[0], fiscal);
+    // o envio traz "NF:" vazio quando a nota é do vendedor: preenche com o número do documento fiscal
+    const envioComNf = paginas[0].replace(/(\^FD\s*NF:)\s*(\^FS)/, `$1 ${fiscal.numero}$2`);
+    const folha = await montarConjunta(envioComNf, fiscal);
     if (folha) {
       const saida = [{ id, tipo: `envio + ${fiscal.titulo.split(' ')[0]}`, img: folha }];
       for (const extra of paginas.slice(2)) saida.push({ id, tipo: 'extra', img: await renderizar(extra, L, A) });
@@ -589,4 +662,4 @@ function paraTsplSku(etiquetas, opts = {}) {
   return Buffer.from(cmds.join('\r\n') + '\r\n', 'latin1');
 }
 
-module.exports = { LAYOUT_SKU, montar, separarEnvios, separarPaginas, paraPng, paraTspl, paraTsplCompacto, paraTsplSku, lerFiscal, etiquetaRegua, PREAMBULO };
+module.exports = { LAYOUT_SKU, chaveValida, acharChave, montar, separarEnvios, separarPaginas, paraPng, paraTspl, paraTsplCompacto, paraTsplSku, lerFiscal, etiquetaRegua, PREAMBULO };
