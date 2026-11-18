@@ -97,7 +97,8 @@ No TikTok Shop (Seller Center Brasil) cada venda sai em **uma etiqueta só**, no
 - **Configuração no TikTok:** Logística → Envio → Opções de formato de documento: etiqueta A6, *Imprimir em 1 página*, formato **ZPL**. Na impressão, marque *Etiqueta de envio* e *NF-e*.
 - **Como junta:** a etiqueta da iMile já traz a chave da NF-e em código de barras; a ponte lê a chave da imagem (leitor Code 128 próprio, `src/code128.js`) e monta a faixa. O arquivo `<data>_NF-e.txt` do mesmo lote não imprime separado (se a etiqueta não chegar em 10 minutos, ele imprime sozinho).
 - **Impressão direta (sem clicar em baixar):** o TikTok não fala com impressora local; ele gera os arquivos e espera o clique em *Baixar todos os arquivos*. A extensão em `extensao-chrome/` faz esse clique sozinha quando a janela *Imprimir resultado* aparece, e a ponte imprime. Para instalar no Chrome: abra `chrome://extensions`, ligue o *Modo do desenvolvedor*, clique em *Carregar sem compactação* e escolha a pasta `extensao-chrome`. Na primeira vez o Chrome pode perguntar se o site pode baixar vários arquivos: responda *Permitir*.
-- A extensão só roda em `seller-br.tiktok.com`, não envia nada para fora do computador e não mexe em pedido.
+- **Impressão automática (opcional):** com a extensão, aparece no canto da página o quadro *Impressão automática*. Ligue numa aba do Seller Center aberta só para isso (vale só para aquela aba). A cada 5 minutos ela abre *Pedidos → Para enviar*, emite a NF-e dos pedidos *Sem NF-e* pelo emissor do TikTok e, nos que já têm NF-e, clica em *Criar e imprimir etiqueta*: a etiqueta sai na térmica sem nenhum clique. No máximo 10 pedidos por rodada; se um botão esperado não aparecer (por exemplo, produto sem dados fiscais), ela para e mostra o motivo no quadro.
+- Fora da impressão automática, a extensão só roda em `seller-br.tiktok.com`, não envia nada para fora do computador e não mexe em pedido.
 
 ## O painel
 
