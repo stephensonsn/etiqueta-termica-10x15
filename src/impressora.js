@@ -187,10 +187,14 @@ function problemaDaImpressora(e) {
 function situacaoBle() {
   const novo = Date.now() - bleInfo.quando < 8000;
   if (novo && bleInfo.conectada) {
-    const prob = bleInfo.respondeAgora ? problemaDaImpressora(bleInfo.estado) : '';
+    // O OIA-8370-B não responde à consulta de estado pelo Bluetooth; ao ligar, solta um byte avulso
+    // (0xf0) que não é estado. Só vale um byte de estado plausível (bits 6 e 7 zerados), recebido há
+    // pouco. A ligação morta quem detecta é o conector (sinal de vida a cada 5 s), não a falta de estado.
+    const e = bleInfo.estado;
+    const estadoValido = bleInfo.respondeAgora && Number.isInteger(e) && (e & 0xC0) === 0;
+    const prob = estadoValido ? problemaDaImpressora(e) : '';
     if (prob) return { ok: false, texto: `Impressora ${prob}` };
-    if (bleInfo.jaRespondeu && !bleInfo.respondeAgora) return { ok: false, texto: 'Impressora parou de responder (ligada e por perto?)' };
-    if (bleInfo.respondeAgora) return { ok: true, texto: (bleInfo.estado & 0x20) ? 'Imprimindo' : 'Impressora pronta (Bluetooth)' };
+    if (estadoValido) return { ok: true, texto: (e & 0x20) ? 'Imprimindo' : 'Impressora pronta (Bluetooth)' };
     return { ok: true, texto: 'Bluetooth conectado' };
   }
   if (novo && !bleInfo.conectada) return { ok: false, texto: `Procurando ${bleInfo.nome || 'a impressora'} por Bluetooth` };
