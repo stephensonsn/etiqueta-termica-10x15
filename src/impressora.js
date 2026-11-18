@@ -613,7 +613,7 @@ function driverProprio() {
 
 function estado() {
   const config = { ...cfg, loja: cfg.loja ? { url: cfg.loja.url, temChave: !!(cfg.loja.chave && cfg.loja.segredo) } : undefined, ml: cfg.ml ? { appId: cfg.ml.appId, conectado: !!(cfg.ml.tokens && cfg.ml.tokens.refresh) } : undefined };
-  return { config, limites: LIMITES, bleVivo: bleVivo(), bt: Date.now() - bleInfo.quando < 8000 ? bleInfo.bt : undefined, driver: driverDoFabricante(), driverProprio: driverProprio(), vigia, fila: situacaoFila(), conexoes: listarConexoes(), pedidos, log: ultimasLinhas.slice(-25).reverse() };
+  return { config, limites: LIMITES, bleVivo: bleVivo(), bt: Date.now() - bleInfo.quando < 8000 ? bleInfo.bt : undefined, conector: { instalado: fs.existsSync(path.join(RAIZ, 'conector-bluetooth', 'conector-bluetooth')), rodando: Date.now() - bleInfo.quando < 20000 }, driver: driverDoFabricante(), driverProprio: driverProprio(), vigia, fila: situacaoFila(), conexoes: listarConexoes(), pedidos, log: ultimasLinhas.slice(-25).reverse() };
 }
 
 module.exports = { enviarBruto, bleInformar, lerZplDeArquivo, iniciarVigia, bleProximo, bleFeito, receberZpl, imprimirPedido, descartarPedido, diagnostico, salvarConfig, estado, log, cfg, RAIZ };

@@ -487,8 +487,13 @@ function checagem(nome, detalhe, ok, acao) {
 function itensLiberacao() {
   const itens = [];
   if (metodo === 'ble') {
-    const bt = dados.bt;
-    itens.push({
+    const bt = dados.bt, cx = dados.conector || {};
+    // sem o programa do conector, o Bluetooth nunca responde: diz isso em vez de "esperando"
+    if (cx.instalado === false) {
+      itens.push({ ok: false, nome: 'Conector Bluetooth', detalhe: 'Não foi instalado neste Mac. Rode o instalador de novo com internet (ele baixa o conector pronto) ou use o cabo USB.', acao: null });
+    } else if (!cx.rodando && bt === undefined) {
+      itens.push({ ok: false, nome: 'Conector Bluetooth', detalhe: 'Instalado, mas não está rodando. Rode o instalador de novo ou reinicie o Mac.', acao: null });
+    } else itens.push({
       ok: bt === 5, nome: 'Bluetooth do Mac',
       detalhe: bt === 5 ? 'Ligado e liberado para a impressora' : bt === 3 ? 'O macOS bloqueou: libere "conector-bluetooth" em Privacidade e Segurança, Bluetooth' : bt === 4 ? 'Desligado: ligue o Bluetooth do Mac' : 'Esperando o conector Bluetooth responder…',
       acao: bt === 3 ? ['Abrir a liberação', () => abrirAjustes('bluetooth')] : bt === 4 ? ['Abrir Bluetooth', () => abrirAjustes('bluetoothLigar')] : null,
@@ -547,7 +552,7 @@ function desenharGuia() {
       checagem('Imprimir de outros programas (opcional)', dados.driverProprio ? 'Instalado: a impressora "Etiqueta Termica 10x15" aparece no Imprimir do Mac' : 'Instala a impressora no Imprimir do Mac. O macOS pede a sua senha de administrador.', dados.driverProprio,
         ['Instalar', () => fazer('Instalando o driver (o Mac vai pedir a senha)', () => api('/api/instalar-driver', {}))]),
       checagem('Driver do fabricante (opcional)', dados.driver.instalado ? 'Instalado' : 'Não precisa para o Mercado Livre e a Shopee', dados.driver.instalado,
-        ['Baixar no site oficial', () => window.open('https://www.oasismarket.com.br/index.php?c=category&id=12', '_blank', 'noopener')]));
+        ['Baixar o driver para Mac (LabelPrinter 2.3.3)', () => window.open('https://www.cnfujun.com/d/73', '_blank', 'noopener')]));
   }
   if (etapa === 4) $('et-4-resposta').hidden = !testeEnviado;
   if (etapa === 5) {

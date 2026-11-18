@@ -38,6 +38,19 @@ if [ ! -x "$BT/conector-bluetooth" ] || { [ "$BT/main.swift" -nt "$BT/conector-b
   command -v swiftc >/dev/null 2>&1 && \
     swiftc -swift-version 5 -O "$BT/main.swift" -o "$BT/conector-bluetooth" -Xlinker -sectcreate -Xlinker __TEXT -Xlinker __info_plist -Xlinker "$BT/Info.plist"
 fi
+# sem compilador (instalação a partir do código do GitHub): baixa o conector pronto (Apple Silicon + Intel)
+# da última versão publicada, com novas tentativas e espera crescente
+if [ ! -x "$BT/conector-bluetooth" ]; then
+  URL_BT="https://github.com/stephensonsn/etiqueta-termica-10x15/releases/latest/download/conector-bluetooth"
+  for t in 1 2 3 4; do
+    if curl -fsSL --max-time 120 -o "$BT/conector-bluetooth.baixando" "$URL_BT" && file "$BT/conector-bluetooth.baixando" | grep -q "Mach-O"; then
+      mv "$BT/conector-bluetooth.baixando" "$BT/conector-bluetooth"; chmod +x "$BT/conector-bluetooth"
+      xattr -d com.apple.quarantine "$BT/conector-bluetooth" 2>/dev/null || true
+      echo "conector Bluetooth baixado da versão publicada"; break
+    fi
+    rm -f "$BT/conector-bluetooth.baixando"; sleep $((t * 5))
+  done
+fi
 if [ -x "$BT/conector-bluetooth" ]; then
   PBT="$HOME/Library/LaunchAgents/$ROTULO.bluetooth.plist"
   cat > "$PBT" <<PL
@@ -55,7 +68,10 @@ if [ -x "$BT/conector-bluetooth" ]; then
 PL
   subir "$ROTULO.bluetooth" "$PBT"
 else
-  echo "sem o conector Bluetooth: use o cabo, ou instale o compilador com: xcode-select --install"
+  echo ""
+  echo "ATENÇÃO: o Bluetooth NÃO foi instalado (não deu para baixar nem compilar o conector)."
+  echo "  Use o cabo USB, ou rode de novo com internet, ou instale o compilador: xcode-select --install"
+  echo ""
 fi
 # conferência de saúde: até 10 tentativas com espera crescente
 for i in 1 2 3 4 5 6 7 8 9 10; do

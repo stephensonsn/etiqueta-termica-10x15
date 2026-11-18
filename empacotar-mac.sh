@@ -57,6 +57,7 @@ else
 fi
 codesign --force --sign - "$BT/conector-bluetooth" >>"$REG" 2>&1
 touch "$BT/conector-bluetooth" # mais novo que o fonte: o instalador não tenta recompilar
+cp -p "$BT/conector-bluetooth" "$RAIZ/dist/conector-bluetooth" # vai também avulso na release: o instalador baixa quando não há compilador
 
 passo "driver de sistema (filtro TSPL) universal"
 clang -O2 -Wno-deprecated-declarations -arch arm64 -arch x86_64 "$PALCO/app/driver-mac/rastertotspl.c" -o "$PALCO/app/driver-mac/rastertotspl" -lcups >>"$REG" 2>&1 \

@@ -22,7 +22,7 @@ if [ -e /Library/Printers/LabelPOS/rastertodlabel ] || ls /Library/Printers/PPDs
   ok "Driver do fabricante instalado: o assistente reconhece e só liga a impressão direta"
 else
   ok "Driver do fabricante não instalado: as etiquetas do Mercado Livre e da Shopee imprimem sem ele"
-  echo "          (opcional, para imprimir de outros programas: https://www.oasismarket.com.br/index.php?c=category&id=12)"
+  echo "          (opcional, para imprimir de outros programas: https://www.cnfujun.com/d/73 , arquivo LabelPrinter2.3.3.dmg)"
 fi
 [ "$FALTAS" -eq 0 ] && echo "Tudo certo para instalar." || echo "$FALTAS item(ns) acima pedem atenção; a instalação continua com o que está disponível."
 echo

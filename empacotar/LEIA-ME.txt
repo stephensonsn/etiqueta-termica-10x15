@@ -13,6 +13,6 @@ ETIQUETA TÉRMICA 10x15 — instalação no macOS
 
 Painel: http://127.0.0.1:9100/painel
 Para remover: dois cliques em "Desinstalar.command".
-Driver do fabricante (opcional, para outros programas): baixe no site oficial,
-https://www.oasismarket.com.br/index.php?c=category&id=12
+Driver do fabricante (opcional, para outros programas): baixe no site do fabricante (Fujun),
+https://www.cnfujun.com/d/73  (Driver software for Mac-73.zip, com o LabelPrinter2.3.3.dmg dentro)
 Projeto e ajuda: https://github.com/stephensonsn/etiqueta-termica-10x15
