@@ -21,7 +21,9 @@ function separarPaginas(zpl) {
   const re = /((?:~DG[^~^]*)*)\^XA[\s\S]*?\^XZ/g;
   let m;
   while ((m = re.exec(zpl))) {
-    if (/\^ID[^\^]*\^FS/.test(m[0]) && !/\^(FD|XG|GF|GB|B[A-Z0-9])/.test(m[0].replace(/\^ID[^\^]*\^FS/, ''))) continue; // só apaga o gráfico da memória
+    // página sem nada para imprimir (só apaga gráfico da memória, ou só comando de controle como o
+    // "^XA^MCY^XZ" que o Mercado Livre manda depois de cada etiqueta): não vira etiqueta
+    if (!/\^(FD|XG|GF|GB|B[A-Z0-9])/.test(m[0].replace(/\^ID[^\^]*\^FS/, ''))) continue;
     paginas.push(m[0]);
   }
   return paginas;
@@ -142,7 +144,10 @@ function ajustarMargens(zpl, my = MY) {
     if (x === null) return seg;
     seg = seg.replace(/\^A0N,(\d+),(\d+)/, (_, h, w) => `^A0N,${esc(h)},${esc(w)}`);
     // quando o início encosta na margem, a largura encolhe para a borda direita ficar no lugar
-    seg = seg.replace(/\^FB(\d+)/, (_, w) => `^FB${Math.max(1, dir(Number(w)) - x)}`);
+    // texto centralizado (^FB...,C) mantém a largura proporcional: se a caixa for cortada na borda
+    // direita, o centro anda para a esquerda e o texto cai em cima do vizinho (ex.: "CEP:" do Envio Flex)
+    const centralizado = /\^FB\d+,\d+,\d+,C/.test(seg);
+    seg = seg.replace(/\^FB(\d+)/, (_, w) => `^FB${centralizado ? esc(Number(w)) : Math.max(1, dir(Number(w)) - x)}`);
     seg = seg.replace(/\^GB(\d+),(\d+),(\d+)/, (_, w, h, t) => {
       const w2 = Number(w) <= 4 ? Number(w) : Math.max(1, dir(Number(w)) - x);
       return `^GB${w2},${h},${Math.min(Number(t), Math.max(w2, Number(h)))}`;
@@ -449,9 +454,38 @@ function encolherAltura(img, alturaNova) {
   return out;
 }
 
+// Junção para modelos sem a "RECEIVER ZONE" (ex.: Envio Flex, com o QR no meio): o envio é
+// desenhado inteiro e só os espaços em branco entre as linhas são apertados até a faixa fiscal
+// caber embaixo. Nada é encolhido, porque o QR está no meio do desenho.
+async function montarConjuntaGenerica(pagEnvio, fiscal) {
+  const env0 = ancorarTopo(await renderizar(ajustarMargens(await ajustarCaixas(alinharCep(pagEnvio))), L, ENVIO_A));
+  const base = recortar(env0, ultimaLinha(env0) + 1);
+  for (const compacta of [false, true]) {
+    const fx0 = await bloco(zplFaixaFiscal(fiscal, compacta), 260);
+    const faixa = recortar(fx0, ultimaLinha(fx0) + 1);
+    const yFaixa = LINHAS_MAX - MY - faixa.a;
+    for (const aperto of [40, 24, 16, 12, 8, 6]) {
+      const env = apertar(base, aperto);
+      if (env.a + 10 > yFaixa) continue;
+      const folha = { l: L, a: A, bits: new Uint8Array(L * A) };
+      colar(folha, env, 0, 0, L, env.a);
+      colar(folha, faixa, 0, yFaixa, L, faixa.a);
+      return folha;
+    }
+  }
+  return null;
+}
+
+// "CEP:" pequeno ao lado do número grande (Envio Flex): o ML põe os dois pelo topo, e o rótulo fica
+// "voando" acima do número. Alinha o rótulo pela base do número.
+function alinharCep(zpl) {
+  return zpl.replace(/\^FO(\d+),(\d+)(\^A0N,(\d+),\d+[^\n]*?\^FD\s*CEP:\s*\^FS)([\s\S]{0,40}?)\^FO(\d+),(\d+)\^A0N,(\d+)/,
+    (_, x1, y1, resto1, h1, meio, x2, y2, h2) => `^FO${x1},${Number(y2) + Math.round((Number(h2) - Number(h1)) * 0.85)}${resto1}${meio}^FO${x2},${y2}^A0N,${h2}`);
+}
+
 async function montarConjunta(pagEnvio, fiscal) {
   const d = lerDestinatario(pagEnvio);
-  if (!d || !d.qr) return null;
+  if (!d || !d.qr) return montarConjuntaGenerica(pagEnvio, fiscal);
   const topo0 = ancorarTopo(await renderizar(ajustarMargens(await ajustarCaixas(d.topo)), L, ENVIO_A));
   // Ordem do que se abre mão, do menos ao mais visível: 1) espaço em branco do topo;
   // 2) letra do destinatário; 3) altura do código de barras da chave (faixa compacta).
@@ -546,7 +580,7 @@ async function montar(zpl, modo = 'junto') {
   const saida = [];
   for (const [i, p] of paginas.entries()) {
     // a página fiscal original já tem moldura própria até a borda: entra sem margem extra em cima
-    const img0 = i === 0 ? ancorarTopo(await renderizar(ajustarMargens(await ajustarCaixas(p)), L, ENVIO_A)) : await renderizar(ajustarMargens(p, 0), L, ENVIO_A);
+    const img0 = i === 0 ? ancorarTopo(await renderizar(ajustarMargens(await ajustarCaixas(alinharCep(p))), L, ENVIO_A)) : await renderizar(ajustarMargens(p, 0), L, ENVIO_A);
     // a página original do ML passa de 150 mm: aperta os espaços em branco até caber com margem
     let img = recortar(img0, ultimaLinha(img0) + 1);
     for (let g = 40; img.a > LINHAS_MAX - MY && g >= 4; g -= 2) img = apertar(recortar(img0, ultimaLinha(img0) + 1), g);

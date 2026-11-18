@@ -69,5 +69,8 @@ const medir = (im) => {
   assert.ok(/BARCODE \d+,80,"EAN13",58,0,0,2,2,"200000000001"/.test(sku), 'EAN13 com 12 dígitos e módulo de 2 pontos');
   assert.ok(sku.includes('"SQUISHY URSINHO GAME BAR QUE"'), 'nome longo cortado no fim de palavra');
   assert.ok(sku.includes('SIZE 108 mm,25 mm'));
+  // página só de controle que o Mercado Livre manda depois de cada etiqueta não vira etiqueta
+  assert.strictEqual(e.separarPaginas('^XA^MCY^XZ').length, 0);
+  assert.strictEqual(e.separarPaginas('^XA^FO10,10^A0N,30,30^FDOi^FS^XZ\n^XA^MCY^XZ').length, 1);
   console.log('ok: todos os testes passaram');
 })().catch((err) => { console.error('FALHOU:', err.message); process.exit(1); });

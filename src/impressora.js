@@ -363,6 +363,7 @@ async function imprimirPedido(jid) {
   const p = pedidos.find((x) => x.jid === jid);
   const img = imagens.get(jid);
   if (!p || !img) throw new Error('pedido não encontrado (a ponte foi reiniciada?)');
+  if (p.tipo === 'erro') throw new Error('esta etiqueta não foi montada: imprima de novo pelo Mercado Livre ou pela Shopee (a ponte já aceita a nova tentativa)');
   p.estado = 'enviando';
   try {
     // trava aprendida com drivers TSPL prontos: não gastar etiqueta em branco
@@ -413,7 +414,26 @@ async function receberZpl(zpl, { origem = 'manual', imprimir = cfg.imprimir === 
       continue;
     }
     if (numero) porNumero.set(numero, { origem, quando: Date.now() });
-    const etiquetas = await montar(envio, modo);
+    let etiquetas;
+    try {
+      etiquetas = await montar(envio, modo);
+    } catch (e) {
+      // nunca some em silêncio: libera para uma nova tentativa (não conta como repetido), guarda o
+      // ZPL para ajuste e põe um item com o erro na fila do painel
+      recentes.delete(hash);
+      if (numero) porNumero.delete(numero);
+      const idErro = numero || `sem-id-${n + 1}`;
+      try {
+        const dir = path.join(RAIZ, 'logs', 'falhas');
+        fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(path.join(dir, `${carimbo()}-${idErro}.zpl`), envio);
+      } catch (_) { /* segue */ }
+      const p = registrar(idErro, 'erro', origem, { l: 800, a: 1200, bits: new Uint8Array(800 * 1200) });
+      p.estado = 'erro'; p.erro = `Não deu para montar a etiqueta: ${e.message}. Arquivo guardado em logs/falhas para ajuste.`;
+      feitos.push(p); feitos.falhas = (feitos.falhas || 0) + 1;
+      log(`ERRO ao montar o envio ${idErro} (via ${origem}): ${e.message}; ZPL guardado em logs/falhas`);
+      continue;
+    }
     const id = etiquetas[0].id || `sem-id-${n + 1}`;
     if (cfg.guardarHistorico) fs.writeFileSync(path.join(RAIZ, 'recebidos', `${carimbo()}-${id}.zpl`), envio);
     // envio + documento fiscal que não couberam numa etiqueta só: guarda o ZPL neste computador
