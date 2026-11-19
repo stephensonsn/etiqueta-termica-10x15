@@ -1,8 +1,12 @@
 // Integração com o Mercado Livre: anúncios ligados aos produtos da loja e estoque único.
 //
-//  - A conta é autorizada uma vez por um aplicativo do próprio vendedor (developers.mercadolivre.com.br).
-//    O endereço de retorno é o próprio site da loja: depois de autorizar, a pessoa copia o endereço
-//    da barra do navegador (tem "?code=...") e cola no painel. Nada precisa ficar exposto na internet.
+//  - Modelo de integrador (documentação "Autenticação e Autorização" do ML): o app é criado uma vez em
+//    developers.mercadolivre.com.br e cada vendedor clica em "Entrar com o Mercado Livre". O login tem que
+//    ser da conta administradora (operador/colaborador recebe invalid_operator_user_id).
+//  - O endereço de retorno precisa ser fixo e HTTPS: é uma página estática do repositório (GitHub Pages,
+//    docs/ml-retorno.html) que só repassa ?code e ?state para a ponte em 127.0.0.1. O state é aleatório por
+//    tentativa (leva a porta da ponte no começo) e o código é trocado com PKCE S256. Nada fica exposto na
+//    internet; colar o endereço à mão continua valendo como alternativa.
 //  - Cada anúncio é vinculado a um produto da loja e diz quantas unidades consome (kit de 12 = 12).
 //  - Venda paga no Mercado Livre baixa o estoque do produto no site (uma vez por pedido).
 //  - Quando o estoque do site muda, os anúncios vinculados recebem a quantidade disponível
@@ -10,16 +14,19 @@
 //  - As duas sincronizações começam desligadas; ficam ligadas só quando a pessoa liga no painel.
 'use strict';
 const fs = require('fs');
+const crypto = require('crypto');
 const path = require('path');
 
 let cfg, log, RAIZ, loja;
 const ARQ = () => path.join(RAIZ, 'logs', 'ml.json');
 let dados = { anuncios: [], vinculos: {}, pedidosVistos: {}, ultimaConsulta: '', atualizado: '', erro: '', eventos: [] };
 const API = 'https://api.mercadolibre.com';
+const RETORNO_PADRAO = 'https://stephensonsn.github.io/etiqueta-termica-10x15/ml-retorno.html';
 
 function iniciar(contexto) {
   ({ cfg, log, RAIZ, loja } = contexto);
-  if (!cfg.ml) cfg.ml = { appId: '', segredo: '', retorno: 'https://trendtoy.com.br/', tokens: null, baixarVendas: false, enviarEstoque: false };
+  if (!cfg.ml) cfg.ml = { appId: '', segredo: '', retorno: RETORNO_PADRAO, pkce: true, tokens: null, baixarVendas: false, enviarEstoque: false };
+  if (!cfg.ml.tokens && cfg.ml.retorno === 'https://trendtoy.com.br/') cfg.ml.retorno = RETORNO_PADRAO; // padrão antigo, nunca usado
   try { dados = { ...dados, ...JSON.parse(fs.readFileSync(ARQ(), 'utf8')) }; } catch (_) { /* primeira vez */ }
   loja.quandoMudarEstoque((p) => enviarEstoqueDoProduto(p.chave));
   setInterval(() => { consultarPedidos().catch((e) => evento(`pedidos: ${e.message}`)); }, 120000);
@@ -36,26 +43,64 @@ function aoSalvarConfig(fn) { salvarCfg = fn; }
 
 // ---------- autorização ----------
 const conectado = () => !!(cfg.ml.tokens && cfg.ml.tokens.refresh);
-function urlAutorizacao() {
+// tentativas de login em andamento: state -> { verificador, criado } (valem 10 minutos, uma vez só)
+const tentativas = new Map();
+const b64url = (b) => b.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+// destino: 'loja' (conta do estoque, cfg.ml.tokens) ou 'etiquetas' (contas da impressão automática)
+function urlAutorizacao(destino = 'loja') {
   if (!cfg.ml.appId) throw new Error('informe o ID do aplicativo');
-  return `https://auth.mercadolivre.com.br/authorization?response_type=code&client_id=${encodeURIComponent(cfg.ml.appId)}&redirect_uri=${encodeURIComponent(cfg.ml.retorno)}`;
+  if (!cfg.ml.segredo) throw new Error('informe a chave secreta do aplicativo');
+  for (const [k, v] of tentativas) if (Date.now() - v.criado > 600000) tentativas.delete(k);
+  const state = `${cfg.porta}.${b64url(crypto.randomBytes(24))}`;
+  const verificador = b64url(crypto.randomBytes(48));
+  tentativas.set(state, { verificador, criado: Date.now(), destino: destino === 'etiquetas' ? 'etiquetas' : 'loja' });
+  const q = new URLSearchParams({ response_type: 'code', client_id: cfg.ml.appId, redirect_uri: cfg.ml.retorno, state });
+  if (cfg.ml.pkce !== false) { q.set('code_challenge', b64url(crypto.createHash('sha256').update(verificador).digest())); q.set('code_challenge_method', 'S256'); }
+  return `https://auth.mercadolivre.com.br/authorization?${q}`;
 }
-async function token(params) {
+// volta do login: confere o state (veio desta ponte, nos últimos 10 minutos) e troca o código pelo token.
+// Devolve { destino, tokens }; só a conta da loja é guardada aqui (as de etiqueta ficam em mlEtiquetas).
+async function concluirRetorno(code, state) {
+  const t = tentativas.get(String(state || ''));
+  if (!t || Date.now() - t.criado > 600000) throw new Error('este retorno não veio de um login iniciado aqui (ou passou de 10 minutos); clique em Conectar de novo');
+  tentativas.delete(state);
+  if (!/^TG-[A-Za-z0-9-]+$/.test(String(code || ''))) throw new Error('o Mercado Livre não devolveu o código de autorização');
+  const extra = cfg.ml.pkce !== false ? { code_verifier: t.verificador } : {};
+  const params = { grant_type: 'authorization_code', code, redirect_uri: cfg.ml.retorno, ...extra };
+  if (t.destino === 'etiquetas') return { destino: 'etiquetas', tokens: await pedirToken(params) };
+  const tk = await token(params);
+  evento(`conta ${tk.usuario} conectada pelo botão Conectar`);
+  return { destino: 'loja', tokens: tk };
+}
+// troca código/refresh por token, sem guardar (serve às duas integrações)
+async function pedirToken(params) {
+  if (!cfg.ml.appId || !cfg.ml.segredo) throw new Error('cadastre primeiro o ID e a chave secreta do aplicativo do Mercado Livre');
   const corpo = new URLSearchParams({ client_id: cfg.ml.appId, client_secret: cfg.ml.segredo, ...params });
   const r = await fetch(`${API}/oauth/token`, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' }, body: corpo, signal: AbortSignal.timeout(20000) });
   const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(j.message || j.error_description || `o Mercado Livre recusou a autorização (${r.status})`);
-  cfg.ml.tokens = { acesso: j.access_token, refresh: j.refresh_token || cfg.ml.tokens?.refresh, expira: Date.now() + (j.expires_in || 21600) * 1000, usuario: j.user_id };
+  if (!r.ok) {
+    const motivo = { invalid_operator_user_id: 'entre com a conta administradora (titular), não com um colaborador', invalid_grant: 'o código venceu, já foi usado ou o endereço de retorno não bate com o do app', invalid_client: 'ID do aplicativo ou chave secreta errados' }[j.error];
+    throw Object.assign(new Error(motivo || j.message || j.error_description || `o Mercado Livre recusou a autorização (${r.status})`), { codigo: j.error });
+  }
+  return { acesso: j.access_token, refresh: j.refresh_token, expira: Date.now() + (j.expires_in || 21600) * 1000, usuario: j.user_id };
+}
+async function token(params) {
+  let t;
+  try { t = await pedirToken(params); } catch (e) {
+    if (e.codigo === 'invalid_grant' && params.grant_type === 'refresh_token') { cfg.ml.tokens = null; salvarCfg(); evento('autorização perdida (senha trocada, permissão revogada ou 6 meses); conecte de novo'); }
+    throw e;
+  }
+  cfg.ml.tokens = { ...t, refresh: t.refresh || cfg.ml.tokens?.refresh };
   salvarCfg();
   return cfg.ml.tokens;
 }
+// alternativa ao retorno automático: colar o endereço que o navegador abriu (tem ?code= e ?state=)
 async function concluirAutorizacao(colado) {
   const txt = String(colado || '').trim();
-  const code = (txt.match(/[?&]code=([^&\s#]+)/) || [])[1] || (/^TG-/.test(txt) ? txt : '');
+  const code = decodeURIComponent((txt.match(/[?&]code=([^&\s#]+)/) || [])[1] || '');
+  const state = decodeURIComponent((txt.match(/[?&]state=([^&\s#]+)/) || [])[1] || '');
   if (!code) throw new Error('não achei o código: cole o endereço inteiro da barra do navegador, que tem "?code="');
-  const t = await token({ grant_type: 'authorization_code', code: decodeURIComponent(code), redirect_uri: cfg.ml.retorno });
-  evento(`conta ${t.usuario} autorizada`);
-  return t;
+  return (await concluirRetorno(code, state)).tokens;
 }
 async function acesso() {
   if (!conectado()) throw new Error('conta do Mercado Livre não autorizada');
@@ -117,15 +162,15 @@ async function sincronizarAnuncios() {
   }
   const lista = [];
   for (let i = 0; i < ids.length; i += 20) {
-    const r = await chamar('GET', `/items?ids=${ids.slice(i, i + 20).join(',')}&attributes=id,title,available_quantity,status,variations,permalink`);
+    const r = await chamar('GET', `/items?ids=${ids.slice(i, i + 20).join(',')}&attributes=id,title,available_quantity,status,variations,permalink,catalog_product_id,user_product_id`);
     for (const x of r) {
       const it = x.body || {};
       if (it.variations && it.variations.length) {
         for (const v of it.variations) {
           const cor = (v.attribute_combinations || []).map((a) => a.value_name).join(' ');
-          lista.push({ chave: `${it.id}:${v.id}`, item: it.id, varId: v.id, titulo: `${it.title}${cor ? ' · ' + cor : ''}`, quantidade: v.available_quantity, link: it.permalink });
+          lista.push({ chave: `${it.id}:${v.id}`, item: it.id, produto: it.catalog_product_id || '', userProduct: v.user_product_id || it.user_product_id || '', varId: v.id, titulo: `${it.title}${cor ? ' · ' + cor : ''}`, quantidade: v.available_quantity, link: it.permalink });
         }
-      } else lista.push({ chave: it.id, item: it.id, varId: 0, titulo: it.title, quantidade: it.available_quantity, link: it.permalink });
+      } else lista.push({ chave: it.id, item: it.id, produto: it.catalog_product_id || '', userProduct: it.user_product_id || '', varId: 0, titulo: it.title, quantidade: it.available_quantity, link: it.permalink });
     }
   }
   dados.anuncios = lista;
@@ -138,7 +183,7 @@ async function sincronizarAnuncios() {
 function estadoMl() {
   const produtos = loja.estadoLoja().produtos;
   return {
-    appId: cfg.ml.appId, temSegredo: !!cfg.ml.segredo, retorno: cfg.ml.retorno, conectado: conectado(), usuario: cfg.ml.tokens?.usuario || null,
+    appId: cfg.ml.appId, pkce: cfg.ml.pkce !== false, temSegredo: !!cfg.ml.segredo, retorno: cfg.ml.retorno, conectado: conectado(), usuario: cfg.ml.tokens?.usuario || null,
     baixarVendas: !!cfg.ml.baixarVendas, enviarEstoque: !!cfg.ml.enviarEstoque,
     anuncios: dados.anuncios.map((a) => {
       const v = dados.vinculos[a.chave];
@@ -226,10 +271,12 @@ function salvarConfig(novo) {
     if (novo.baixarVendas && !cfg.ml.baixarVendas) dados.ultimaConsulta = new Date().toISOString(); // só vendas daqui para frente
     cfg.ml.baixarVendas = novo.baixarVendas;
   }
+  if (typeof novo.pkce === 'boolean') cfg.ml.pkce = novo.pkce;
   if (typeof novo.enviarEstoque === 'boolean') cfg.ml.enviarEstoque = novo.enviarEstoque;
   if (novo.desconectar) { cfg.ml.tokens = null; cfg.ml.baixarVendas = false; cfg.ml.enviarEstoque = false; }
   gravar();
   salvarCfg();
 }
 
-module.exports = { iniciar, aoSalvarConfig, urlAutorizacao, concluirAutorizacao, sincronizarAnuncios, vincular, enviarTodos, consultarPedidos, salvarConfig, estadoMl, unidadesDoTitulo, sugerir };
+const meusAnuncios = () => dados.anuncios;
+module.exports = { iniciar, concluirRetorno, pedirToken, acesso, chamar, conectado, meusAnuncios, RETORNO_PADRAO, aoSalvarConfig, urlAutorizacao, concluirAutorizacao, sincronizarAnuncios, vincular, enviarTodos, consultarPedidos, salvarConfig, estadoMl, unidadesDoTitulo, sugerir };

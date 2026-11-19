@@ -253,22 +253,27 @@
   <details class="cartao larga" id="sec-ml">
     <summary>Mercado Livre: impressão automática <span id="ml-selo" class="selo cinza">Desligada</span></summary>
     <p class="ajuda">A cada 5 minutos a ponte confere as contas ligadas aqui e imprime sozinha as etiquetas de agência e coleta que ficaram prontas, já com a DANFE. Cada envio sai uma vez só. Venda esperando nota tem a NF-e pedida ao Faturador do Mercado Livre; se faltar dado no cadastro, o envio fica parado aqui e no ícone vermelho da extensão até você corrigir e clicar "Corrigi, tentar de novo".</p>
-    <div id="ml-app">
-      <p class="ajuda"><b>1. Aplicativo do Mercado Livre.</b> Crie um aplicativo grátis em developers.mercadolivre.com.br (Meus aplicativos, Criar), com o endereço de retorno abaixo e as permissões de pedidos, envios e faturamento. Copie o ID e a chave secreta para cá; ficam só neste computador.</p>
+    <div class="botoes">
+      <button type="button" class="acao" id="ml-autorizar">Conectar conta do Mercado Livre</button>
+      <span class="ajuda" id="ml-aviso" style="margin:0"></span>
+    </div>
+    <p class="ajuda">Abre o login do Mercado Livre; entre com a conta titular (não colaborador) e aceite. Volta para cá sozinho, com a conta na lista. Para a segunda conta, saia da primeira no Mercado Livre e clique de novo.</p>
+    <ul class="lista" id="ml-contas"></ul>
+    <details id="ml-app" style="margin-top:8px">
+      <summary>Aplicativo do Mercado Livre (configura uma vez só)</summary>
+      <p class="ajuda">Crie um aplicativo grátis em developers.mercadolivre.com.br (Meus aplicativos, Criar) com o endereço de retorno abaixo e as permissões de pedidos, envios e faturamento. Copie o ID e a chave secreta para cá; ficam só neste computador.</p>
       <div class="grade4">
         <div class="campo"><label for="ml-id">ID do aplicativo</label><input id="ml-id" autocomplete="off"></div>
         <div class="campo"><label for="ml-seg">Chave secreta</label><div style="display:flex;gap:6px"><input id="ml-seg" type="password" autocomplete="off"><button type="button" class="acao mini" id="ml-seg-olho">Mostrar</button></div></div>
-        <div class="campo"><label for="ml-ret">Endereço de retorno</label><input id="ml-ret" placeholder="https://sualoja.com.br/"></div>
+        <div class="campo"><label for="ml-ret">Endereço de retorno</label><input id="ml-ret"></div>
         <div class="campo"><label>&nbsp;</label><button type="button" class="acao" id="ml-app-salvar">Salvar aplicativo</button></div>
       </div>
-    </div>
-    <p class="ajuda" style="margin-top:12px"><b>2. Contas.</b> Entre no Mercado Livre com a conta, clique em Autorizar e cole aqui o endereço que aparecer na barra do navegador (tem "?code="). Repita com a outra conta.</p>
-    <ul class="lista" id="ml-contas"></ul>
-    <div class="botoes">
-      <button type="button" class="acao" id="ml-autorizar">Autorizar uma conta</button>
-      <input id="ml-colado" style="flex:1;min-width:220px;padding:8px 10px;border:1px solid var(--borda);border-radius:8px" placeholder="Cole aqui o endereço com ?code=" aria-label="Endereço com o código de autorização">
-      <button type="button" class="acao" id="ml-adicionar">Adicionar conta</button>
-    </div>
+      <p class="ajuda" style="margin-top:12px">Se o retorno automático não abrir, cole aqui o endereço que ficou na barra do navegador (tem "?code="):</p>
+      <div class="botoes">
+        <input id="ml-colado" style="flex:1;min-width:220px;padding:8px 10px;border:1px solid var(--borda);border-radius:8px" placeholder="Cole aqui o endereço com ?code=" aria-label="Endereço com o código de autorização">
+        <button type="button" class="acao" id="ml-adicionar">Adicionar conta</button>
+      </div>
+    </details>
     <label class="opcao"><input type="checkbox" id="ml-ligado"> <span>Imprimir sozinho as etiquetas prontas (agência e coleta) das contas acima</span></label>
     <label class="opcao"><input type="checkbox" id="ml-nfe"> <span>Emitir a NF-e pelo Faturador do Mercado Livre nas vendas que esperam nota (a etiqueta sai logo depois)</span></label>
     <ul class="lista" id="ml-travados" hidden></ul>
@@ -330,6 +335,10 @@ async function carregarMl() {
     if (!$('ml-id').value) $('ml-id').value = app.appId || '';
     if (!$('ml-ret').value) $('ml-ret').value = app.retorno || '';
     $('ml-seg').placeholder = app.temSegredo ? 'já cadastrada (deixe em branco para manter)' : '';
+    const appPronto = !!(app.appId && app.temSegredo);
+    $('ml-autorizar').disabled = !appPronto;
+    $('ml-autorizar').title = appPronto ? '' : 'Configure o aplicativo abaixo (uma vez só)';
+    if (!appPronto) $('ml-app').open = true;
     $('ml-contas').replaceChildren(...(e.contas.length ? e.contas.map((c) => {
       const li = document.createElement('li');
       const n = document.createElement('span'); n.textContent = c.apelido;
@@ -356,7 +365,18 @@ async function carregarMl() {
 }
 $('ml-seg-olho').onclick = () => { const i = $('ml-seg'); i.type = i.type === 'password' ? 'text' : 'password'; $('ml-seg-olho').textContent = i.type === 'password' ? 'Mostrar' : 'Esconder'; };
 $('ml-app-salvar').onclick = () => fazer('Salvando aplicativo', async () => { await api('/api/ml/config', { appId: $('ml-id').value, segredo: $('ml-seg').value, retorno: $('ml-ret').value }); $('ml-seg').value = ''; carregarMl(); });
-$('ml-autorizar').onclick = () => fazer('Abrindo a autorização', async () => { const { url } = await api('/api/ml-etiquetas/autorizar'); window.open(url, '_blank', 'noopener'); });
+$('ml-autorizar').onclick = () => fazer('Abrindo o login do Mercado Livre', async () => { const { url } = await api('/api/ml-etiquetas/autorizar'); location.assign(url); });
+// volta do login: /painel?ml=ok:... ou ?ml=erro:...
+(() => {
+  const q = new URLSearchParams(location.search).get('ml');
+  if (!q) return;
+  history.replaceState(null, '', location.pathname);
+  const ok = q.startsWith('ok:');
+  $('sec-ml').open = true;
+  $('ml-aviso').textContent = q.replace(/^(ok|erro):/, '');
+  $('ml-aviso').style.color = ok ? 'var(--verde, #15803D)' : 'var(--vermelho, #B91C1C)';
+  $('sec-ml').scrollIntoView({ block: 'start' });
+})();
 $('ml-adicionar').onclick = () => fazer('Adicionando conta', async () => { await api('/api/ml-etiquetas/autorizar', { colado: $('ml-colado').value }); $('ml-colado').value = ''; carregarMl(); });
 $('ml-nfe').onchange = () => fazer('Salvando', async () => { await api('/api/ml-etiquetas/config', { emitirNfe: $('ml-nfe').checked }); carregarMl(); });
 $('ml-ligado').onchange = () => fazer('Salvando', async () => { await api('/api/ml-etiquetas/config', { ligado: $('ml-ligado').checked }); carregarMl(); });

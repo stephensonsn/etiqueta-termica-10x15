@@ -84,7 +84,7 @@ const servidor = http.createServer(async (req, res) => {
   try {
 
     // ---------- painel local (só o próprio computador) ----------
-    if (rota === '/' || rota === '/painel' || rota === '/estoque' || rota.startsWith('/api/')) {
+    if (rota === '/' || rota === '/painel' || rota === '/estoque' || rota === '/ml/retorno' || rota.startsWith('/api/')) {
       const host = (req.headers.host || '').toLowerCase();
       const proprio = [`127.0.0.1:${cfg.porta}`, `localhost:${cfg.porta}`];
       // a extensão do Chrome (ícone de pendências) só pode ler e avisar pendências; o resto é só do painel
@@ -103,6 +103,19 @@ const servidor = http.createServer(async (req, res) => {
       }
       if (req.method === 'GET' && rota === '/api/estado') return json({ ...estado(), siteVisto });
       if (req.method === 'GET' && rota === '/api/loja') return json(loja.estadoLoja());
+      // volta do login do Mercado Livre (a página de retorno HTTPS repassa ?code e ?state para cá)
+      if (req.method === 'GET' && rota === '/ml/retorno') {
+        const q = new URL(req.url, 'http://x').searchParams;
+        let destino = '/painel', aviso;
+        try {
+          if (q.get('erro')) throw new Error('o Mercado Livre não autorizou (' + q.get('erro').slice(0, 60) + ')');
+          const r = await ml.concluirRetorno(q.get('code'), q.get('state'));
+          if (r.destino === 'etiquetas') { const c = await mlEtiquetas.adicionarComTokens(r.tokens); aviso = `ok:Conta ${c.apelido} conectada`; }
+          else { destino = '/estoque'; aviso = 'ok:Conta conectada'; ml.sincronizarAnuncios().catch(() => {}); }
+        } catch (e) { aviso = 'erro:' + e.message; log(`ML retorno: ${e.message}`); }
+        res.writeHead(302, { Location: `${destino}?ml=${encodeURIComponent(aviso)}#sec-ml`, 'Cache-Control': 'no-store' });
+        return res.end();
+      }
       if (req.method === 'GET' && rota === '/api/ml') return json(ml.estadoMl());
       if (req.method === 'GET' && rota === '/api/pendencias') return json({ pendencias: pendencias() });
       if (req.method === 'GET' && rota === '/api/ml-etiquetas') return json(mlEtiquetas.estado());

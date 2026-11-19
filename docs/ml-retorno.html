@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Voltando para a ponte</title>
+<style>
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #F8FAFC; color: #0F172A; font: 15px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+  .caixa { max-width: 440px; margin: 16px; background: #fff; border: 1px solid #E2E8F0; border-radius: 12px; padding: 24px; text-align: center; }
+  h1 { font-size: 18px; margin: 0 0 8px; }
+  p { color: #64748B; margin: 0 0 16px; }
+  a { display: inline-block; background: #2563EB; color: #fff; text-decoration: none; font-weight: 600; padding: 10px 18px; border-radius: 8px; }
+  @media (prefers-color-scheme: dark) { body { background: #0F172A; color: #E2E8F0; } .caixa { background: #1E293B; border-color: #334155; } p { color: #94A3B8; } }
+</style>
+</head>
+<body>
+<div class="caixa">
+  <h1 id="titulo">Voltando para a ponte de etiquetas</h1>
+  <p id="texto">O Mercado Livre autorizou. Esta página só repassa a autorização para o programa no seu computador; nada fica guardado aqui.</p>
+  <a id="link" href="#" hidden>Voltar para a ponte</a>
+</div>
+<script>
+// Retorno fixo (HTTPS) do app do Mercado Livre. Repassa ?code e ?state para a ponte local.
+// A porta vem no começo do state ("9100.xxxx"); a ponte confere o state antes de usar o código.
+(function () {
+  var q = new URLSearchParams(location.search);
+  var state = q.get('state') || '';
+  var porta = (state.match(/^(\d{2,5})\./) || [])[1] || '9100';
+  var destino = 'http://127.0.0.1:' + porta + '/ml/retorno?' + new URLSearchParams({ code: q.get('code') || '', state: state, erro: q.get('error') || '' });
+  history.replaceState(null, '', location.pathname); // tira o código da barra e do histórico
+  var link = document.getElementById('link');
+  link.href = destino; link.hidden = false;
+  if (!q.get('code')) {
+    document.getElementById('titulo').textContent = 'O Mercado Livre não autorizou';
+    document.getElementById('texto').textContent = 'Volte para a ponte e clique em Entrar com o Mercado Livre de novo, usando a conta administradora.';
+  }
+  location.replace(destino);
+})();
+</script>
+</body>
+</html>

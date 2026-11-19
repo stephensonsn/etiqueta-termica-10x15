@@ -223,14 +223,14 @@
         <li>Entre em developers.mercadolivre.com.br com a conta que vende e crie uma aplicação.</li>
         <li>Em "URI de redirect" coloque o endereço de retorno abaixo; marque leitura e escrita e "offline access".</li>
         <li>Copie o ID do aplicativo e a chave secreta para cá e clique em Salvar.</li>
-        <li>Clique em Autorizar a conta. Depois de aceitar, o navegador abre o site da loja: copie o endereço inteiro da barra (tem "?code=") e cole no último campo.</li>
+        <li>Clique em Conectar com o Mercado Livre, entre com a conta titular e aceite: volta para cá sozinho, já conectado. (Se não voltar, cole o endereço da barra, que tem "?code=", no último campo.)</li>
       </ol>
       <div class="loja-grade">
         <div class="field"><label for="ml-app">ID do aplicativo</label><input id="ml-app" autocomplete="off"></div>
         <div class="field"><label for="ml-segredo">Chave secreta</label><div class="senha"><input id="ml-segredo" type="password" autocomplete="off"><button type="button" data-olho="ml-segredo">Mostrar</button></div></div>
         <div class="field"><label for="ml-retorno">Endereço de retorno</label><input id="ml-retorno" type="url"></div>
       </div>
-      <div class="linha-acoes"><button class="btn btn-sec" id="ml-salvar">Salvar</button><button class="btn btn-primary" id="ml-autorizar">Autorizar a conta</button></div>
+      <div class="linha-acoes"><button class="btn btn-sec" id="ml-salvar">Salvar</button><button class="btn btn-primary" id="ml-autorizar">Conectar com o Mercado Livre</button></div>
       <div class="field" style="margin-top:12px"><label for="ml-colado">Endereço depois de autorizar</label><input id="ml-colado" autocomplete="off" placeholder="https://trendtoy.com.br/?code=TG-..."></div>
       <div class="linha-acoes"><button class="btn btn-primary" id="ml-concluir">Concluir a conexão</button><button class="btn btn-sec" id="ml-desconectar">Desconectar</button></div>
     </details>
@@ -552,7 +552,9 @@ function desenharMl() {
 async function carregarMl() { try { mlEst = await apiLoja('/api/ml'); if (!document.activeElement || !document.activeElement.closest('#ml-tabela')) desenharMl(); } catch (_) { /* ponte fora do ar */ } }
 async function mlFazer(fn, ok) { try { mlEst = await fn(); desenharMl(); if (ok) toast(ok); } catch (e) { toast(e.message); carregarMl(); } }
 $('ml-salvar').onclick = () => mlFazer(async () => { const r = await apiLoja('/api/ml/config', { appId: $('ml-app').value, segredo: $('ml-segredo').value || undefined, retorno: $('ml-retorno').value }); $('ml-segredo').value = ''; return r; }, 'Aplicativo salvo');
-$('ml-autorizar').onclick = async () => { try { const r = await apiLoja('/api/ml/autorizar'); window.open(r.url, '_blank', 'noopener'); } catch (e) { toast(e.message); } };
+$('ml-autorizar').onclick = async () => { try { const r = await apiLoja('/api/ml/autorizar'); location.assign(r.url); } catch (e) { toast(e.message); } };
+// volta do login: /estoque?ml=ok:... ou ?ml=erro:...
+(() => { const q = new URLSearchParams(location.search).get('ml'); if (!q) return; history.replaceState(null, '', location.pathname); toast(q.replace(/^(ok|erro):/, '')); $('ml').scrollIntoView({ block: 'start' }); })();
 $('ml-concluir').onclick = () => mlFazer(async () => { await apiLoja('/api/ml/autorizar', { colado: $('ml-colado').value }); $('ml-colado').value = ''; return apiLoja('/api/ml/anuncios', {}); }, 'Conta conectada e anúncios lidos');
 $('ml-desconectar').onclick = () => mlFazer(() => apiLoja('/api/ml/config', { desconectar: true }), 'Conta desconectada deste computador');
 $('ml-baixar').onchange = () => mlFazer(() => apiLoja('/api/ml/config', { baixarVendas: $('ml-baixar').checked }), $('ml-baixar').checked ? 'Vendas a partir de agora baixam o estoque' : 'Baixa por venda desligada');

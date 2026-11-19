@@ -45,32 +45,27 @@ function evento(txt) {
 }
 
 // ---------- contas ----------
-async function trocarToken(params) {
-  const ml = cfg.ml || {};
-  if (!ml.appId || !ml.segredo) throw new Error('cadastre primeiro o ID e o segredo do aplicativo do Mercado Livre');
-  const corpo = new URLSearchParams({ client_id: ml.appId, client_secret: ml.segredo, ...params });
-  const r = await fetch(`${API}/oauth/token`, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' }, body: corpo, signal: AbortSignal.timeout(20000) });
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(j.message || j.error_description || `o Mercado Livre recusou (${r.status})`);
-  return { acesso: j.access_token, refresh: j.refresh_token, expira: Date.now() + (j.expires_in || 21600) * 1000, usuario: j.user_id };
-}
-function urlAutorizacao() {
-  const ml = cfg.ml || {};
-  if (!ml.appId) throw new Error('cadastre primeiro o ID do aplicativo do Mercado Livre');
-  return `https://auth.mercadolivre.com.br/authorization?response_type=code&client_id=${encodeURIComponent(ml.appId)}&redirect_uri=${encodeURIComponent(ml.retorno)}`;
-}
-// cola o endereço com "?code=" depois de autorizar: adiciona (ou renova) a conta
-async function adicionarConta(colado) {
-  const txt = String(colado || '').trim();
-  const code = (txt.match(/[?&]code=([^&\s#]+)/) || [])[1] || (/^TG-/.test(txt) ? txt : '');
-  if (!code) throw new Error('não achei o código: cole o endereço inteiro da barra do navegador, que tem "?code="');
-  const t = await trocarToken({ grant_type: 'authorization_code', code: decodeURIComponent(code), redirect_uri: cfg.ml.retorno });
+// O login é o mesmo da integração de estoque (ml.js): botão Conectar, PKCE e retorno automático para a ponte.
+const ml = require('./ml');
+const trocarToken = (params) => ml.pedirToken(params);
+const urlAutorizacao = () => ml.urlAutorizacao('etiquetas');
+// conta que acabou de voltar do login: adiciona (ou renova) pelo user_id
+async function adicionarComTokens(t) {
   const eu = await fetch(`${API}/users/me`, { headers: { Authorization: `Bearer ${t.acesso}` }, signal: AbortSignal.timeout(20000) }).then((r) => r.json()).catch(() => ({}));
   const conta = { uid: t.usuario, apelido: eu.nickname || String(t.usuario), tokens: t };
   cfg.mlEtiquetas.contas = cfg.mlEtiquetas.contas.filter((c) => c.uid !== conta.uid).concat(conta);
   salvarCfg();
-  evento(`conta ${conta.apelido} autorizada para impressão automática`);
+  evento(`conta ${conta.apelido} conectada para impressão automática`);
   return conta;
+}
+// alternativa: colar o endereço com "?code=" e "?state=" (quando o retorno automático não abriu)
+async function adicionarConta(colado) {
+  const txt = String(colado || '').trim();
+  const code = decodeURIComponent((txt.match(/[?&]code=([^&\s#]+)/) || [])[1] || '');
+  const state = decodeURIComponent((txt.match(/[?&]state=([^&\s#]+)/) || [])[1] || '');
+  if (!code) throw new Error('não achei o código: cole o endereço inteiro da barra do navegador, que tem "?code="');
+  const r = await ml.concluirRetorno(code, state);
+  return r.destino === 'etiquetas' ? adicionarComTokens(r.tokens) : r.tokens;
 }
 function removerConta(uid) {
   cfg.mlEtiquetas.contas = cfg.mlEtiquetas.contas.filter((c) => String(c.uid) !== String(uid));
@@ -224,4 +219,4 @@ function estado() {
 }
 const pendencias = () => (cfg.mlEtiquetas && cfg.mlEtiquetas.ligado ? dados.pendencias : []);
 
-module.exports = { iniciar, urlAutorizacao, adicionarConta, salvarConfig, estado, pendencias, rodada };
+module.exports = { iniciar, urlAutorizacao, adicionarConta, adicionarComTokens, salvarConfig, estado, pendencias, rodada };
