@@ -129,26 +129,43 @@
   }
 
   // ---------- emitir NF-e de um pedido ----------
+  // mensagens rápidas (toast) do TikTok: some em poucos segundos, então lê enquanto espera
+  const avisosNaTela = () => [...document.querySelectorAll('[class*="message"], [class*="toast"], [class*="notification"], [role="alert"]')].filter(visivel).map(texto).filter(Boolean);
+  const ERRO_CADASTRO = /33009007|informa[çc][õo]es (fiscais|obrigat[óo]rias)/i;
+  // erro de cadastro trava o pedido; qualquer outro erro (lentidão, falha de rede) tenta na próxima rodada
+  const erro = (msg, cadastro = false) => Object.assign(new Error(msg), { cadastro });
   async function emitirNfe(item) {
     const link = [...item.linha.querySelectorAll('*')].find((e) => /^Sem NF-e/i.test(texto(e)) && e.children.length <= 1);
-    if (!link) throw new Error(`pedido ${item.pedido}: não achei "Sem NF-e"`);
+    if (!link) throw erro(`pedido ${item.pedido}: não achei "Sem NF-e"`);
     link.click();
-    const gaveta = await achar(() => [...document.querySelectorAll('div')].find((d) => visivel(d) && /Detalhes da NF-e/.test(texto(d)) && /Adicionar NF-e/.test(texto(d))), 15000);
-    if (!gaveta) throw new Error(`pedido ${item.pedido}: a janela da NF-e não abriu`);
-    const opcao = await achar(() => [...gaveta.querySelectorAll('label, [role="radio"], div')].find((e) => visivel(e) && /^Emitir (uma )?NF-e$/i.test(texto(e))), 8000);
-    if (!opcao) { await fecharGaveta(); throw new Error(`pedido ${item.pedido}: não deu para emitir a NF-e (faltam dados fiscais do produto?)`); }
-    opcao.click();
-    await esperar(800);
-    const emitir = await achar(() => botaoPorTexto(/^Emitir NF-e$/i, gaveta) || botaoPorTexto(/^Emitir NF-e$/i), 8000);
-    if (!emitir) { await fecharGaveta(); throw new Error(`pedido ${item.pedido}: o botão "Emitir NF-e" não apareceu (faltam dados fiscais do produto?)`); }
+    // a gaveta "Detalhes da NF-e" carrega em partes: espera o botão "Emitir NF-e" aparecer (até 30 s)
+    const emitir = await achar(() => /Adicionar NF-e/.test(texto(document.body)) && botaoPorTexto(/^Emitir NF-e$/i), 30000);
+    if (!emitir) { await fecharGaveta(); throw erro(`pedido ${item.pedido}: a janela da NF-e não carregou; tento na próxima rodada`); }
+    const opcao = [...document.querySelectorAll('label, [role="radio"]')].find((e) => visivel(e) && /^Emitir (uma )?NF-e$/i.test(texto(e)));
+    if (opcao && !opcao.querySelector('input:checked')) { opcao.click(); await esperar(600); }
+    const antes = new Set(avisosNaTela()); // ignora avisos que já estavam na tela
     emitir.click();
-    await esperar(2500);
-    const confirmar = botaoPorTexto(/^(Confirmar|Emitir)$/i);
-    if (confirmar) { confirmar.click(); await esperar(2000); }
-    const fechar = [...document.querySelectorAll('button, [aria-label="Close"], [class*="close"]')].find((b) => visivel(b) && /^(×|Fechar|Close)?$/.test(texto(b)) && b.closest('div') && gaveta.contains(b));
-    if (fechar) fechar.click(); else await fecharGaveta();
-    await esperar(1000);
-    log(`NF-e emitida: pedido ${item.pedido}`);
+    // resultado: erro de cadastro (33009007), outro erro, ou a NF-e entra em processamento
+    let resultado = null;
+    const fim = Date.now() + 15000;
+    while (Date.now() < fim && !resultado) {
+      await esperar(250);
+      const confirmar = botaoPorTexto(/^(Confirmar|Emitir)$/i);
+      if (confirmar) { confirmar.click(); continue; }
+      for (const a of avisosNaTela().filter((x) => !antes.has(x))) {
+        if (ERRO_CADASTRO.test(a)) { resultado = { cadastro: a }; break; }
+        if (/n[ãa]o foi poss[íi]vel|erro|falh/i.test(a)) { resultado = { outro: a }; break; }
+        if (/sucesso|emitid|processando/i.test(a)) { resultado = { ok: a }; break; }
+      }
+      // o botão vira um "carregando" sem texto enquanto envia: só conta como fechada sem "Adicionar NF-e" na tela
+      if (!resultado && !/Adicionar NF-e/.test(texto(document.body))) resultado = { ok: 'gaveta fechou' };
+    }
+    if (botaoPorTexto(/^Emitir NF-e$/i)) await fecharGaveta();
+    await esperar(800);
+    if (resultado && resultado.cadastro) throw erro(`pedido ${item.pedido}: faltam dados fiscais do produto no cadastro do TikTok (erro 33009007)`, true);
+    if (resultado && resultado.outro) throw erro(`pedido ${item.pedido}: o TikTok recusou agora (${resultado.outro.slice(0, 120)}); tento na próxima rodada`);
+    if (!resultado) throw erro(`pedido ${item.pedido}: o TikTok não respondeu ao emitir; confiro na próxima rodada`);
+    log(`NF-e pedida: pedido ${item.pedido}`);
   }
 
   // ---------- criar e imprimir etiquetas ----------
@@ -219,17 +236,20 @@
       }
       const semNota = linhas.filter((i) => statusNfe(i.linha) === 'sem' && !trav[i.pedido]).slice(0, MAX_POR_RODADA);
       let emitidas = 0;
+      const avisos = [];
       for (const it of semNota) {
         try { await emitirNfe(it); emitidas++; } catch (e) {
-          trav[it.pedido] = { quando: Date.now(), motivo: e.message };
-          log('PENDENTE: ' + e.message + '. Não tento de novo até corrigir o cadastro.');
+          if (e.cadastro) {
+            trav[it.pedido] = { quando: Date.now(), motivo: e.message };
+            log('PENDENTE: ' + e.message + '. Não tento de novo até corrigir o cadastro.');
+          } else { avisos.push(e.message); log('AVISO: ' + e.message); }
         }
       }
       gravarTravados(trav);
       desenharTravados();
       if (emitidas) log(`${emitidas} NF-e em processamento; as etiquetas saem na próxima rodada`);
       if (!semNota.length && !prontos.length) log(Object.keys(trav).length ? 'nenhum pedido novo; há pedido esperando correção do cadastro' : 'nenhum pedido novo');
-      avisarTravados();
+      avisarTravados(avisos.length >= 3 ? avisos : null); // lentidão isolada não acende o vermelho
       desenhar(`Última conferência ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}. Próxima em 5 minutos.`);
     } catch (e) {
       log('PAROU: ' + e.message);
