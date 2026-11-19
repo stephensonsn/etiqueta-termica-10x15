@@ -242,7 +242,22 @@ function conexoesDisponiveis() {
     bluetooth: cx.dispositivo && fs.existsSync(cx.dispositivo) ? { tipo: 'bluetooth', dispositivo: cx.dispositivo } : null,
     rede: cx.tipo === 'rede' && cx.host ? { tipo: 'rede', host: cx.host, portaRede: cx.portaRede } : null,
   };
-  return todas[cx.tipo] ? [todas[cx.tipo]] : [];
+  // troca sozinha entre cabo e Bluetooth: com o cabo ligado vai pelo USB (mais rápido); sem cabo,
+  // pelo Bluetooth. Rede só quando escolhida no painel.
+  if (cx.tipo === 'rede') return todas.rede ? [todas.rede] : [];
+  return [todas.usb, todas.ble, todas.bluetooth].filter(Boolean);
+}
+// a fila do macOS pausa sozinha quando uma impressão falha (ex.: cabo tirado no meio);
+// com a impressora de volta no cabo, a ponte reativa a fila antes de mandar
+function reativarFila(fila) {
+  try {
+    const env = { ...process.env, LANG: 'C', LC_ALL: 'C' };
+    const txt = execFileSync('/usr/bin/lpstat', ['-p', fila], { timeout: 4000, env }).toString();
+    if (/disabled/i.test(txt)) {
+      execFileSync('/usr/sbin/cupsenable', [fila], { timeout: 5000 });
+      log(`fila ${fila} estava pausada no macOS: reativada`);
+    }
+  } catch (e) { log(`não deu para reativar a fila ${fila}: ${e.message}`); }
 }
 
 // Manda a etiqueta pela melhor conexão disponível, com nova tentativa e espera crescente.
@@ -278,7 +293,7 @@ async function enviar(gerar, rotulo) {
         if (cx.tipo === 'ble') r = await escreverBle(bytes, 30000 + Math.ceil(bytes.length / 1024) * 1500);
         else if (cx.tipo === 'bluetooth') r = await escreverSerial(cx.dispositivo, bytes, tempo);
         else if (cx.tipo === 'rede') r = await escreverRede(cx.host, cx.portaRede, bytes, tempo);
-        else { fs.writeFileSync(arq, bytes); r = await lp(arq, tempo, cx.fila); fs.rmSync(arq, { force: true }); }
+        else { reativarFila(cx.fila); fs.writeFileSync(arq, bytes); r = await lp(arq, tempo, cx.fila); fs.rmSync(arq, { force: true }); }
         log(`enviado ${rotulo} por ${cx.tipo} (${bytes.length} bytes, tentativa ${t}): ${r}`);
         return;
       } catch (e) {
@@ -302,7 +317,10 @@ function situacaoPreferida() {
     filaCache = { quando: Date.now(), valor };
     return valor;
   }
-  if (cfg.conexao.tipo === 'ble') return situacaoBle(); // sem cache: muda a cada segundo
+  // cabo e Bluetooth trocam sozinhos: sem a impressora no cabo, vale a situação do Bluetooth
+  const noCabo = listarConexoes().usb.some((u) => u.ligada && u.fila === cfg.fila);
+  if (cfg.conexao.tipo === 'ble' && !noCabo) return situacaoBle(); // sem cache: muda a cada segundo
+  if (cfg.conexao.tipo === 'usb' && !noCabo && bleVivo()) return situacaoBle();
   if (cfg.conexao.tipo === 'rede') {
     valor = { ok: true, texto: `Rede ${cfg.conexao.host}:${cfg.conexao.portaRede}` };
     filaCache = { quando: Date.now(), valor };
@@ -317,7 +335,7 @@ function situacaoPreferida() {
     const env = { ...process.env, LANG: 'C', LC_ALL: 'C' };
     const txt = execFileSync('/usr/bin/lpstat', ['-p', cfg.fila], { timeout: 4000, env }).toString();
     const parados = execFileSync('/usr/bin/lpstat', ['-o', cfg.fila], { timeout: 4000, env }).toString().trim().split('\n').filter(Boolean).length;
-    if (/disabled|desativad/i.test(txt)) valor = { ok: false, texto: 'Impressora pausada no macOS' };
+    if (/disabled|desativad/i.test(txt)) valor = { ok: true, texto: 'Fila pausada no macOS (reativa sozinha ao imprimir)' };
     else if (/offline|not connected|unable|waiting for printer|desconectad|aguardando a impressora/i.test(txt)) valor = { ok: false, texto: 'Impressora desligada ou sem cabo' };
     else valor = { ok: true, texto: parados ? `Imprimindo (${parados} na fila)` : 'Impressora pronta' };
   } catch (e) {
