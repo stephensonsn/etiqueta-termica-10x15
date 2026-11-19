@@ -87,7 +87,9 @@ const servidor = http.createServer(async (req, res) => {
     if (rota === '/' || rota === '/painel' || rota === '/estoque' || rota.startsWith('/api/')) {
       const host = (req.headers.host || '').toLowerCase();
       const proprio = [`127.0.0.1:${cfg.porta}`, `localhost:${cfg.porta}`];
-      if (!proprio.includes(host) || (origem && !proprio.map((x) => `http://${x}`).includes(origem))) {
+      // a extensão do Chrome (ícone de pendências) só pode ler e avisar pendências; o resto é só do painel
+      const daExtensao = /^chrome-extension:\/\/[a-p]{32}$/.test(origem) && (rota === '/api/pendencias' || rota === '/api/pendencias/extensao');
+      if (!proprio.includes(host) || (origem && !daExtensao && !proprio.map((x) => `http://${x}`).includes(origem))) {
         res.writeHead(403, { 'Content-Type': 'text/plain' }); return res.end('acesso negado');
       }
       const json = (obj, cod = 200) => { res.writeHead(cod, { 'Content-Type': 'application/json;charset=UTF-8', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(obj)); };
