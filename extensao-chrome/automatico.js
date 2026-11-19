@@ -80,6 +80,13 @@
     return '?';
   };
 
+  // fecha gaveta/janela aberta (botão de fechar ou Esc)
+  async function fecharGaveta() {
+    const x = [...document.querySelectorAll('[aria-label="Close"], [class*="close-icon"], [class*="drawer-close"], [class*="modal-close"]')].find(visivel);
+    if (x) x.click(); else document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await esperar(800);
+  }
+
   // ---------- emitir NF-e de um pedido ----------
   async function emitirNfe(item) {
     const link = [...item.linha.querySelectorAll('*')].find((e) => /^Sem NF-e/i.test(texto(e)) && e.children.length <= 1);
@@ -88,17 +95,17 @@
     const gaveta = await achar(() => [...document.querySelectorAll('div')].find((d) => visivel(d) && /Detalhes da NF-e/.test(texto(d)) && /Adicionar NF-e/.test(texto(d))), 15000);
     if (!gaveta) throw new Error(`pedido ${item.pedido}: a janela da NF-e não abriu`);
     const opcao = await achar(() => [...gaveta.querySelectorAll('label, [role="radio"], div')].find((e) => visivel(e) && /^Emitir (uma )?NF-e$/i.test(texto(e))), 8000);
-    if (!opcao) throw new Error(`pedido ${item.pedido}: a opção "Emitir uma NF-e" não apareceu (dados fiscais do produto completos?)`);
+    if (!opcao) { await fecharGaveta(); throw new Error(`pedido ${item.pedido}: não deu para emitir a NF-e (faltam dados fiscais do produto?)`); }
     opcao.click();
     await esperar(800);
     const emitir = await achar(() => botaoPorTexto(/^Emitir NF-e$/i, gaveta) || botaoPorTexto(/^Emitir NF-e$/i), 8000);
-    if (!emitir) throw new Error(`pedido ${item.pedido}: o botão "Emitir NF-e" não apareceu`);
+    if (!emitir) { await fecharGaveta(); throw new Error(`pedido ${item.pedido}: o botão "Emitir NF-e" não apareceu (faltam dados fiscais do produto?)`); }
     emitir.click();
     await esperar(2500);
     const confirmar = botaoPorTexto(/^(Confirmar|Emitir)$/i);
     if (confirmar) { confirmar.click(); await esperar(2000); }
     const fechar = [...document.querySelectorAll('button, [aria-label="Close"], [class*="close"]')].find((b) => visivel(b) && /^(×|Fechar|Close)?$/.test(texto(b)) && b.closest('div') && gaveta.contains(b));
-    if (fechar) fechar.click(); else document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    if (fechar) fechar.click(); else await fecharGaveta();
     await esperar(1000);
     log(`NF-e emitida: pedido ${item.pedido}`);
   }
@@ -123,13 +130,22 @@
       marcarFeito(itens.map((i) => i.pedido));
       throw new Error('o TikTok avisou que a etiqueta já foi impressa; não reimprimi');
     }
-    // a janela "Imprimir resultado" é baixada pelo tiktok.js; aqui só espera ela aparecer
-    const pronto = await achar(() => [...document.querySelectorAll('div')].find((d) => visivel(d) && /Imprimir resultado/.test(texto(d)) && /\.txt/.test(texto(d))), 45000);
+    // às vezes o TikTok mostra antes a gaveta "Resultado de envio" (etiqueta criada, falta imprimir)
+    const janelaArquivos = () => [...document.querySelectorAll('div')].find((d) => visivel(d) && /Imprimir resultado/.test(texto(d)) && /\.txt/.test(texto(d)));
+    // a janela "Imprimir resultado" é baixada pelo tiktok.js; aqui só espera ela aparecer.
+    // Se só ficou a gaveta "Resultado de envio" (etiqueta criada, sem a janela), pede a impressão nela.
+    let pronto = await achar(janelaArquivos, 30000);
+    if (!pronto) {
+      const imprimir = botaoPorTexto(/^Imprimir etiqueta de envio$/i);
+      if (imprimir) { imprimir.click(); pronto = await achar(janelaArquivos, 30000); }
+    }
     marcarFeito(itens.map((i) => i.pedido)); // a etiqueta foi criada: não tenta de novo
     if (!pronto) throw new Error('a janela com os arquivos das etiquetas não apareceu');
     await esperar(4000);
     const fechar = botaoPorTexto(/^Fechar$/i);
     if (fechar) fechar.click();
+    await esperar(800);
+    if (botaoPorTexto(/^Imprimir etiqueta de envio$/i)) await fecharGaveta(); // fecha "Resultado de envio"
     log(`etiquetas criadas e enviadas para a térmica: ${itens.map((i) => i.pedido.slice(-6)).join(', ')}`);
   }
 
@@ -148,15 +164,20 @@
       const carregou = await achar(() => /pedidos? encontrados?|Nenhum pedido/i.test(texto(document.body)), 30000);
       if (!carregou) throw new Error('a lista de pedidos não carregou');
       await esperar(2500);
-      let itens = linhasDePedido().slice(0, MAX_POR_RODADA);
-      const semNota = itens.filter((i) => statusNfe(i.linha) === 'sem');
-      for (const it of semNota) await emitirNfe(it);
-      if (semNota.length) { log(`${semNota.length} NF-e em processamento; as etiquetas saem na próxima rodada`); }
+      // 1) primeiro imprime o que já tem NF-e: um pedido com problema nunca segura os outros
       const ja = feitos();
-      itens = linhasDePedido().filter((i) => statusNfe(i.linha) === 'emitida' && !ja[i.pedido]).slice(0, MAX_POR_RODADA);
-      if (itens.length) await criarEtiquetas(itens);
-      if (!semNota.length && !itens.length) log('nenhum pedido novo');
-      try { chrome.runtime.sendMessage({ tipo: 'pendencia', fonte: 'TikTok', texto: null }); } catch (_) { /* nada */ }
+      const prontos = linhasDePedido().filter((i) => statusNfe(i.linha) === 'emitida' && !ja[i.pedido]).slice(0, MAX_POR_RODADA);
+      if (prontos.length) await criarEtiquetas(prontos);
+      // 2) depois tenta emitir a NF-e dos pedidos "Sem NF-e", um por um; o que falhar vira pendência
+      const falhas = [];
+      const semNota = linhasDePedido().filter((i) => statusNfe(i.linha) === 'sem').slice(0, MAX_POR_RODADA);
+      let emitidas = 0;
+      for (const it of semNota) {
+        try { await emitirNfe(it); emitidas++; } catch (e) { falhas.push(e.message); log('PENDENTE: ' + e.message); }
+      }
+      if (emitidas) log(`${emitidas} NF-e em processamento; as etiquetas saem na próxima rodada`);
+      if (!semNota.length && !prontos.length) log('nenhum pedido novo');
+      try { chrome.runtime.sendMessage({ tipo: 'pendencia', fonte: 'TikTok', texto: falhas.length ? falhas.join(' | ') : null }); } catch (_) { /* nada */ }
       desenhar(`Última conferência ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}. Próxima em 5 minutos.`);
     } catch (e) {
       log('PAROU: ' + e.message);
