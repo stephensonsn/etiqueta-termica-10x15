@@ -63,6 +63,15 @@ codesign --force --sign - "$BT/conector-bluetooth" >>"$REG" 2>&1
 touch "$BT/conector-bluetooth" # mais novo que o fonte: o instalador não tenta recompilar
 cp -p "$BT/conector-bluetooth" "$RAIZ/dist/conector-bluetooth" # vai também avulso na release: o instalador baixa quando não há compilador
 
+passo "conector USB direto universal (Apple Silicon + Intel)"
+CU="$PALCO/app/conector-usb"
+swiftc -O -target arm64-apple-macos14 "$CU/main.swift" -o "$RAIZ/build/usb-arm64" >>"$REG" 2>&1
+if swiftc -O -target x86_64-apple-macos14 "$CU/main.swift" -o "$RAIZ/build/usb-x86_64" >>"$REG" 2>&1; then
+  lipo -create "$RAIZ/build/usb-arm64" "$RAIZ/build/usb-x86_64" -output "$CU/conector-usb"
+else cp "$RAIZ/build/usb-arm64" "$CU/conector-usb"; fi
+codesign --force --sign - "$CU/conector-usb" >>"$REG" 2>&1
+touch "$CU/conector-usb"
+
 passo "driver de sistema (filtro TSPL) universal"
 clang -O2 -Wno-deprecated-declarations -arch arm64 -arch x86_64 "$PALCO/app/driver-mac/rastertotspl.c" -o "$PALCO/app/driver-mac/rastertotspl" -lcups >>"$REG" 2>&1 \
   || clang -O2 -Wno-deprecated-declarations "$PALCO/app/driver-mac/rastertotspl.c" -o "$PALCO/app/driver-mac/rastertotspl" -lcups >>"$REG" 2>&1

@@ -9,3 +9,4 @@ build/
 dist/
 driver-mac/rastertotspl
 ferramentas/*.tspl
+conector-usb/conector-usb

@@ -33,6 +33,11 @@ cat > "$PLIST" <<PL
 </dict></plist>
 PL
 subir "$ROTULO" "$PLIST"
+# envio USB direto (nativo): sem ele a ponte usa a fila do macOS, que gasta ~7 s por etiqueta
+CU="$RAIZ/conector-usb"
+if [ ! -x "$CU/conector-usb" ] || { [ "$CU/main.swift" -nt "$CU/conector-usb" ] && command -v swiftc >/dev/null 2>&1; }; then
+  command -v swiftc >/dev/null 2>&1 && swiftc -O "$CU/main.swift" -o "$CU/conector-usb" || echo "aviso: sem compilador Swift; o cabo USB vai pela fila do macOS (mais lenta)"
+fi
 # conector Bluetooth nativo (opcional: precisa do compilador Swift das Ferramentas de Linha de Comando)
 BT="$RAIZ/conector-bluetooth"
 if [ ! -x "$BT/conector-bluetooth" ] || { [ "$BT/main.swift" -nt "$BT/conector-bluetooth" ] && command -v swiftc >/dev/null 2>&1; }; then

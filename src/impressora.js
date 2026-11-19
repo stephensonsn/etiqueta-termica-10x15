@@ -105,6 +105,22 @@ async function lp(arquivo, tempoMs, fila = cfg.fila) {
   throw new Error('a impressora não respondeu pelo cabo USB (desligada ou sem cabo)');
 }
 
+// Envio USB direto (conector-usb, nativo em Swift/IOKit): a fila do macOS gasta ~7 s por trabalho
+// esperando a impressora "confirmar o fim", mesmo com 20 bytes (medido em 19/11/2026); escrevendo
+// direto no cabo leva ~0,04 s mais o tempo da impressora aceitar os dados. Uma escrita por vez.
+const CONECTOR_USB = path.join(RAIZ, 'conector-usb', 'conector-usb');
+let filaUsbDireta = Promise.resolve();
+function escreverUsbDireto(arquivo, tempoMs) {
+  const vez = filaUsbDireta.then(() => new Promise((ok, erro) => {
+    execFile(CONECTOR_USB, [arquivo], { timeout: tempoMs }, (e, saida, err) => {
+      if (e) erro(new Error((err || '').trim() || (e.killed ? 'o envio pelo cabo passou do tempo' : e.message)));
+      else ok(`direto pelo cabo: ${saida.trim()}`);
+    });
+  }));
+  filaUsbDireta = vez.catch(() => {});
+  return vez;
+}
+
 // Impressoras que o Mac enxerga agora, por tipo de conexão.
 let cxCache = { quando: 0, valor: null };
 function listarConexoes() {
@@ -293,7 +309,17 @@ async function enviar(gerar, rotulo) {
         if (cx.tipo === 'ble') r = await escreverBle(bytes, 30000 + Math.ceil(bytes.length / 1024) * 1500);
         else if (cx.tipo === 'bluetooth') r = await escreverSerial(cx.dispositivo, bytes, tempo);
         else if (cx.tipo === 'rede') r = await escreverRede(cx.host, cx.portaRede, bytes, tempo);
-        else { reativarFila(cx.fila); fs.writeFileSync(arq, bytes); r = await lp(arq, tempo, cx.fila); fs.rmSync(arq, { force: true }); }
+        else {
+          fs.writeFileSync(arq, bytes);
+          try {
+            if (cfg.usbDireto === false || !fs.existsSync(CONECTOR_USB)) throw new Error('sem conector USB direto');
+            r = await escreverUsbDireto(arq, tempo);
+          } catch (eDireto) {
+            if (fs.existsSync(CONECTOR_USB) && cfg.usbDireto !== false) log(`envio direto pelo cabo falhou (${eDireto.message}); indo pela fila do macOS`);
+            reativarFila(cx.fila);
+            r = await lp(arq, tempo, cx.fila);
+          } finally { fs.rmSync(arq, { force: true }); }
+        }
         log(`enviado ${rotulo} por ${cx.tipo} (${bytes.length} bytes, tentativa ${t}): ${r}`);
         return;
       } catch (e) {
@@ -562,7 +588,8 @@ async function varrerDownloads(inicial) {
       if (!st.isFile() || st.size === 0 || st.size > 64 * 1024 * 1024 || (!/\.zip$/i.test(nome) && st.size > 8 * 1024 * 1024)) continue;
       const chave = `${nome}|${st.size}|${Math.round(st.mtimeMs)}`;
       if (vistos[chave]) continue;
-      if (agora - st.mtimeMs < 1500) continue; // ainda baixando: pega na próxima volta
+      // o Chrome baixa em .crdownload e só renomeia no fim; a folga curta cobre outros navegadores
+      if (agora - st.mtimeMs < 400) { setTimeout(varrerJa, 450); continue; } // ainda baixando: pega já já
       vistos[chave] = agora;
       // TikTok Shop: o mesmo lote vem em dois arquivos ("<data>_NF-e.txt" e "<data>_Shipping label.txt").
       // A etiqueta de envio já sai casada com a DANFE (chave + faixa fiscal), então o arquivo de NF-e
@@ -624,8 +651,20 @@ async function varrerDownloads(inicial) {
   }
   varrendo = false;
 }
+// arquivo novo em Downloads entra na hora (aviso do sistema); a volta a cada 1 s fica de reserva
+let varrerDeNovo = false, relogioVigia = null;
+async function varrerJa() {
+  if (varrendo) { varrerDeNovo = true; return; }
+  await varrerDownloads(false);
+  if (varrerDeNovo) { varrerDeNovo = false; setTimeout(varrerJa, 150); }
+}
 function iniciarVigia() {
-  varrerDownloads(true).then(() => setInterval(() => varrerDownloads(false), 2000));
+  varrerDownloads(true).then(() => {
+    setInterval(varrerJa, 1000);
+    try {
+      fs.watch(PASTA, { persistent: false }, () => { clearTimeout(relogioVigia); relogioVigia = setTimeout(varrerJa, 200); });
+    } catch (e) { log(`aviso de arquivo novo indisponível (${e.message}); conferindo a cada 1 s`); }
+  });
 }
 
 // Reimpressão automática: no modo direto, etiqueta que falhou por falta de conexão
