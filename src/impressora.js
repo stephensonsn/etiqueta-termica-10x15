@@ -454,7 +454,7 @@ async function imprimirPedido(jid) {
     // a OIA-8370-B imprimiu um teste pequeno, mas descartou etiquetas inteiras em 18/11/2026
     // cabo USB também vai compacta: a OIA-8370-B recebe ~17 KB/s mesmo no cabo (19/11/2026: 120 KB = 7 s
     // por etiqueta); a compacta manda só as faixas com tinta e a etiqueta seguinte sai logo depois
-    await enviar((tipo) => (tipo === 'ble' && cfg.compressao === true ? paraTsplZlib(img, cfg.calib) : cfg.usbCheia === true && tipo !== 'ble' ? paraTspl(img, cfg.calib) : paraTsplCompacto(img, cfg.calib)), `${p.jid}-${p.id || 'teste'}-${p.tipo}`.replace(/[^\w.+-]+/g, '_'));
+    await enviar((tipo) => semOffsetSeContinua(tipo === 'ble' && cfg.compressao === true ? paraTsplZlib(img, cfg.calib) : cfg.usbCheia === true && tipo !== 'ble' ? paraTspl(img, cfg.calib) : paraTsplCompacto(img, cfg.calib)), `${p.jid}-${p.id || 'teste'}-${p.tipo}`.replace(/[^\w.+-]+/g, '_'));
     p.estado = 'impresso'; p.erro = ''; p.impressoes++;
     apagarSeImprimiu(p.arquivo);
     // as últimas enviadas ficam na memória (até 40) para reimprimir depois de um papel travado;
@@ -476,10 +476,22 @@ function descartarPedido(jid) {
 // Uma fila de impressão para tudo (Mercado Livre, Shopee, TikTok, Downloads): as etiquetas saem na
 // ordem em que ficaram prontas, uma atrás da outra, enquanto as seguintes ainda estão sendo montadas.
 let filaImpressao = Promise.resolve();
+let naFila = 0; // etiquetas na fila de impressão, contando a que está saindo agora
 function naFilaDeImpressao(tarefa) {
-  const vez = filaImpressao.then(tarefa);
+  naFila++;
+  const vez = filaImpressao.then(tarefa).finally(() => { naFila--; });
   filaImpressao = vez.catch(() => {});
   return vez;
+}
+// Sequência contínua: com OFFSET > 0 a impressora empurra o papel até o picote depois de cada
+// etiqueta e puxa de volta antes da próxima ("recua e avança"). Se já há outra etiqueta esperando,
+// esta sai com OFFSET 0 e a próxima emenda direto; só a última da sequência para no picote.
+function semOffsetSeContinua(bytes) {
+  if (cfg.sequenciaContinua === false || naFila <= 1) return bytes;
+  const ini = bytes.toString('latin1', 0, Math.min(bytes.length, 4096));
+  const m = ini.match(/OFFSET [\d.]+ mm\r\n/);
+  if (!m || m[0] === 'OFFSET 0 mm\r\n') return bytes;
+  return Buffer.concat([bytes.subarray(0, m.index), Buffer.from('OFFSET 0 mm\r\n', 'latin1'), bytes.subarray(m.index + m[0].length)]);
 }
 
 // Recebe ZPL (um ou vários envios), monta as etiquetas 10x15 e imprime ou segura para conferência.
