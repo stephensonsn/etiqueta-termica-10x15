@@ -19,15 +19,55 @@
   // pedidos já enviados para a térmica (guardados nesta aba por 2 dias): nunca imprime duas vezes
   const FEITOS = CHAVE + '-feitos';
   const feitos = () => { try { const m = JSON.parse(localStorage.getItem(FEITOS) || '{}'); const lim = Date.now() - 2 * 864e5; for (const k of Object.keys(m)) if (m[k] < lim) delete m[k]; return m; } catch (_) { return {}; } };
+  // pedidos cuja NF-e não emitiu (cadastro fiscal incompleto): não tenta de novo sozinho.
+  // Só volta a tentar quando a pessoa clica "Corrigi, tentar de novo" no quadrinho.
+  // Se a NF-e for emitida à mão (ou o pedido sair da lista), a trava some sozinha.
+  const TRAVADOS = CHAVE + '-travados';
+  const travados = () => { try { return JSON.parse(localStorage.getItem(TRAVADOS) || '{}'); } catch (_) { return {}; } };
+  const gravarTravados = (m) => { try { localStorage.setItem(TRAVADOS, JSON.stringify(m)); } catch (_) { /* sem armazenamento */ } };
   const marcarFeito = (ids) => { const m = feitos(); for (const id of ids) m[id] = Date.now(); try { localStorage.setItem(FEITOS, JSON.stringify(m)); } catch (_) { /* sem armazenamento */ } };
 
   // ---------- quadrinho ----------
   const caixa = document.createElement('div');
   caixa.style.cssText = 'position:fixed;left:16px;bottom:16px;z-index:2147483647;width:300px;background:#fff;border:1px solid #E2E8F0;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.12);font:13px/1.4 -apple-system,BlinkMacSystemFont,sans-serif;color:#0F172A;padding:12px';
-  caixa.innerHTML = '<div style="display:flex;align-items:center;gap:8px;justify-content:space-between"><strong>Impressão automática</strong><button type="button" style="border:0;border-radius:8px;padding:6px 12px;font-weight:600;cursor:pointer"></button></div><div data-estado style="margin-top:6px;color:#64748B"></div><div data-log style="margin-top:6px;max-height:110px;overflow:auto;font-size:12px;color:#334155"></div>';
+  caixa.innerHTML = '<div style="display:flex;align-items:center;gap:8px;justify-content:space-between"><strong>Impressão automática</strong><button type="button" style="border:0;border-radius:8px;padding:6px 12px;font-weight:600;cursor:pointer"></button></div><div data-estado style="margin-top:6px;color:#64748B"></div><div data-travados style="margin-top:8px"></div><div data-log style="margin-top:6px;max-height:110px;overflow:auto;font-size:12px;color:#334155"></div>';
   const botao = caixa.querySelector('button');
   const estado = caixa.querySelector('[data-estado]');
   const registro = caixa.querySelector('[data-log]');
+  const areaTravados = caixa.querySelector('[data-travados]');
+  function desenharTravados() {
+    const m = travados();
+    const ids = Object.keys(m);
+    areaTravados.innerHTML = '';
+    if (!ids.length) return;
+    const box = document.createElement('div');
+    box.style.cssText = 'border:1px solid #FECACA;background:#FEF2F2;border-radius:8px;padding:8px;color:#991B1B';
+    const tit = document.createElement('div');
+    tit.style.cssText = 'font-weight:600;margin-bottom:4px';
+    tit.textContent = `Corrija o cadastro fiscal (${ids.length} pedido${ids.length > 1 ? 's' : ''})`;
+    box.appendChild(tit);
+    for (const id of ids) {
+      const linha = document.createElement('div');
+      linha.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:4px;font-size:12px';
+      const t = document.createElement('span');
+      t.textContent = 'Pedido …' + id.slice(-6);
+      t.title = m[id].motivo || '';
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = 'Corrigi, tentar de novo';
+      b.style.cssText = 'border:0;border-radius:6px;padding:4px 8px;background:#fff;color:#B91C1C;font-weight:600;cursor:pointer;border:1px solid #FCA5A5';
+      b.onclick = () => { const mm = travados(); delete mm[id]; gravarTravados(mm); desenharTravados(); log(`pedido ${id.slice(-6)}: vai tentar emitir de novo`); avisarTravados(); if (ligado()) rodada(); };
+      linha.append(t, b);
+      box.appendChild(linha);
+    }
+    areaTravados.appendChild(box);
+  }
+  function avisarTravados(extra) {
+    const m = travados();
+    const msgs = Object.keys(m).map((id) => `pedido ${id}: corrija o cadastro fiscal do produto e clique "Corrigi, tentar de novo" no quadrinho do TikTok`);
+    if (extra) msgs.push(...extra);
+    try { chrome.runtime.sendMessage({ tipo: 'pendencia', fonte: 'TikTok', texto: msgs.length ? msgs.join(' | ') : null }); } catch (_) { /* extensão recarregada */ }
+  }
   function log(msg) {
     const linha = document.createElement('div');
     linha.textContent = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) + ' ' + msg;
@@ -48,6 +88,7 @@
   try { for (const l of JSON.parse(sessionStorage.getItem(CHAVE + '-log') || '[]').reverse()) { const d = document.createElement('div'); d.textContent = l; registro.prepend(d); } } catch (_) { /* nada */ }
   document.body.appendChild(caixa);
   desenhar();
+  desenharTravados();
 
   // ---------- utilidades da página ----------
   async function achar(fn, ms = 20000) {
@@ -169,19 +210,30 @@
       const prontos = linhasDePedido().filter((i) => statusNfe(i.linha) === 'emitida' && !ja[i.pedido]).slice(0, MAX_POR_RODADA);
       if (prontos.length) await criarEtiquetas(prontos);
       // 2) depois tenta emitir a NF-e dos pedidos "Sem NF-e", um por um; o que falhar vira pendência
-      const falhas = [];
-      const semNota = linhasDePedido().filter((i) => statusNfe(i.linha) === 'sem').slice(0, MAX_POR_RODADA);
+      //    pedido travado por cadastro não é tentado de novo até a pessoa avisar que corrigiu
+      const trav = travados();
+      const linhas = linhasDePedido();
+      for (const id of Object.keys(trav)) {
+        const l = linhas.find((i) => i.pedido === id);
+        if (!l || statusNfe(l.linha) !== 'sem') delete trav[id]; // NF-e emitida à mão ou pedido saiu da lista
+      }
+      const semNota = linhas.filter((i) => statusNfe(i.linha) === 'sem' && !trav[i.pedido]).slice(0, MAX_POR_RODADA);
       let emitidas = 0;
       for (const it of semNota) {
-        try { await emitirNfe(it); emitidas++; } catch (e) { falhas.push(e.message); log('PENDENTE: ' + e.message); }
+        try { await emitirNfe(it); emitidas++; } catch (e) {
+          trav[it.pedido] = { quando: Date.now(), motivo: e.message };
+          log('PENDENTE: ' + e.message + '. Não tento de novo até corrigir o cadastro.');
+        }
       }
+      gravarTravados(trav);
+      desenharTravados();
       if (emitidas) log(`${emitidas} NF-e em processamento; as etiquetas saem na próxima rodada`);
-      if (!semNota.length && !prontos.length) log('nenhum pedido novo');
-      try { chrome.runtime.sendMessage({ tipo: 'pendencia', fonte: 'TikTok', texto: falhas.length ? falhas.join(' | ') : null }); } catch (_) { /* nada */ }
+      if (!semNota.length && !prontos.length) log(Object.keys(trav).length ? 'nenhum pedido novo; há pedido esperando correção do cadastro' : 'nenhum pedido novo');
+      avisarTravados();
       desenhar(`Última conferência ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}. Próxima em 5 minutos.`);
     } catch (e) {
       log('PAROU: ' + e.message);
-      try { chrome.runtime.sendMessage({ tipo: 'pendencia', fonte: 'TikTok', texto: e.message }); } catch (_) { /* extensão recarregada */ }
+      avisarTravados([e.message]);
       desenhar('Parou nesta rodada: ' + e.message + '. Tenta de novo em 5 minutos.');
     } finally {
       rodando = false;
