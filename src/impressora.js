@@ -97,7 +97,7 @@ async function lp(arquivo, tempoMs, fila = cfg.fila) {
   if (!trabalho) return saida;
   const limite = Date.now() + Math.max(15000, tempoMs);
   while (Date.now() < limite) {
-    await new Promise((r) => setTimeout(r, 700));
+    await new Promise((r) => setTimeout(r, 300));
     const pendentes = await rodar('/usr/bin/lpstat', ['-o', fila], 5000).catch(() => trabalho);
     if (!pendentes.includes(trabalho)) return `trabalho ${trabalho} impresso`;
   }
@@ -370,7 +370,9 @@ async function imprimirPedido(jid) {
     if (cobertura(img) < 0.01) throw new Error('etiqueta saiu quase em branco na montagem; não foi enviada');
     // Bluetooth: compacta (faixas com tinta). A comprimida (BITMAP modo 3) fica só com cfg.compressao=true:
     // a OIA-8370-B imprimiu um teste pequeno, mas descartou etiquetas inteiras em 18/11/2026
-    await enviar((tipo) => (tipo === 'ble' ? (cfg.compressao === true ? paraTsplZlib(img, cfg.calib) : paraTsplCompacto(img, cfg.calib)) : paraTspl(img, cfg.calib)), `${p.jid}-${p.id || 'teste'}-${p.tipo}`.replace(/[^\w.+-]+/g, '_'));
+    // cabo USB também vai compacta: a OIA-8370-B recebe ~17 KB/s mesmo no cabo (19/11/2026: 120 KB = 7 s
+    // por etiqueta); a compacta manda só as faixas com tinta e a etiqueta seguinte sai logo depois
+    await enviar((tipo) => (tipo === 'ble' && cfg.compressao === true ? paraTsplZlib(img, cfg.calib) : cfg.usbCheia === true && tipo !== 'ble' ? paraTspl(img, cfg.calib) : paraTsplCompacto(img, cfg.calib)), `${p.jid}-${p.id || 'teste'}-${p.tipo}`.replace(/[^\w.+-]+/g, '_'));
     p.estado = 'impresso'; p.erro = ''; p.impressoes++;
     apagarSeImprimiu(p.arquivo);
     // as últimas enviadas ficam na memória (até 40) para reimprimir depois de um papel travado;
