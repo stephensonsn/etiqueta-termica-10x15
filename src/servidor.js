@@ -213,7 +213,8 @@ const servidor = http.createServer(async (req, res) => {
       try { dados = JSON.parse(txt).data ?? ''; } catch (_) { /* corpo já é o ZPL */ }
       if (/\^XA/i.test(dados)) {
         // responde logo e imprime em fila, um pedido por vez
-        fila = fila.then(() => receberZpl(dados, { origem: origem || 'local' })).catch((e) => log(`ERRO ao receber: ${e.message}`));
+        // a fila do site só ordena a montagem; a impressão segue na fila contínua da ponte
+        fila = fila.then(() => receberZpl(dados, { origem: origem || 'local', esperarImpressao: false })).catch((e) => log(`ERRO ao receber: ${e.message}`));
       } else if (/~HQES/i.test(dados)) {
         respostaPendente = STATUS_OK;
       } else if (/~HS/i.test(dados)) {

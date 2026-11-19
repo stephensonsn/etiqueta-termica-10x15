@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const net = require('net');
-const { execFile, execFileSync } = require('child_process');
+const { execFile, execFileSync, spawn } = require('child_process');
 const { montar, separarEnvios, paraPng, paraTspl, paraTsplCompacto, paraTsplZlib, etiquetaRegua, PREAMBULO } = require('./etiqueta');
 
 const RAIZ = path.join(__dirname, '..');
@@ -105,20 +105,58 @@ async function lp(arquivo, tempoMs, fila = cfg.fila) {
   throw new Error('a impressora não respondeu pelo cabo USB (desligada ou sem cabo)');
 }
 
-// Envio USB direto (conector-usb, nativo em Swift/IOKit): a fila do macOS gasta ~7 s por trabalho
-// esperando a impressora "confirmar o fim", mesmo com 20 bytes (medido em 19/11/2026); escrevendo
-// direto no cabo leva ~0,04 s mais o tempo da impressora aceitar os dados. Uma escrita por vez.
+// Envio USB direto (conector-usb, nativo em Swift/IOKit), sempre aberto (--servidor).
+// A fila do macOS gasta ~7 s fixos por trabalho esperando a impressora "confirmar o fim"; o driver do
+// fabricante (decompilado com REA + Ghidra) só escreve uma etiqueta atrás da outra. Aqui: um processo
+// fica com o cabo aberto e recebe quadros [tamanho][dados]; cada etiqueta sai ~0,2 ms depois da
+// anterior ser aceita (a USB segura sozinha quando o buffer da impressora enche). Antes de cada
+// etiqueta ele confere o estado (sem papel / erro / fora de linha) e recusa sem mandar.
 const CONECTOR_USB = path.join(RAIZ, 'conector-usb', 'conector-usb');
-let filaUsbDireta = Promise.resolve();
-function escreverUsbDireto(arquivo, tempoMs) {
-  const vez = filaUsbDireta.then(() => new Promise((ok, erro) => {
-    execFile(CONECTOR_USB, [arquivo], { timeout: tempoMs }, (e, saida, err) => {
-      if (e) erro(new Error((err || '').trim() || (e.killed ? 'o envio pelo cabo passou do tempo' : e.message)));
-      else ok(`direto pelo cabo: ${saida.trim()}`);
-    });
-  }));
-  filaUsbDireta = vez.catch(() => {});
-  return vez;
+const usbDireto = { proc: null, pronto: null, esperando: [], resto: '' };
+function abrirUsbDireto() {
+  if (usbDireto.proc) return usbDireto.pronto;
+  const proc = spawn(CONECTOR_USB, ['--servidor'], { stdio: ['pipe', 'pipe', 'pipe'] });
+  usbDireto.proc = proc; usbDireto.resto = '';
+  usbDireto.pronto = new Promise((ok, erro) => {
+    const t = setTimeout(() => erro(new Error('o conector USB não abriu em 5 s')), 5000);
+    usbDireto.aoPronto = () => { clearTimeout(t); ok(); };
+    usbDireto.aoFalhar = (e) => { clearTimeout(t); erro(e); };
+  });
+  usbDireto.pronto.catch(() => {});
+  let errTxt = '';
+  proc.stderr.on('data', (d) => { errTxt += d; });
+  proc.stdout.on('data', (d) => {
+    usbDireto.resto += d;
+    let i;
+    while ((i = usbDireto.resto.indexOf('\n')) >= 0) {
+      const linha = usbDireto.resto.slice(0, i).trim(); usbDireto.resto = usbDireto.resto.slice(i + 1);
+      if (linha === 'pronto') { usbDireto.aoPronto(); continue; }
+      const w = usbDireto.esperando.shift();
+      if (!w) continue;
+      clearTimeout(w.relogio);
+      if (linha.startsWith('ok ')) w.ok(`direto pelo cabo: ${linha.slice(3)} bytes`);
+      else w.erro(Object.assign(new Error(linha.replace(/^erro (estado )?/, '')), { estado: linha.startsWith('erro estado') }));
+    }
+  });
+  proc.on('exit', (c) => {
+    const e = new Error((errTxt.trim() || `conector USB saiu (código ${c})`));
+    usbDireto.proc = null;
+    usbDireto.aoFalhar(e);
+    for (const w of usbDireto.esperando.splice(0)) { clearTimeout(w.relogio); w.erro(e); }
+  });
+  proc.stdin.on('error', () => {});
+  return usbDireto.pronto;
+}
+async function escreverUsbDireto(bytes, tempoMs) {
+  await abrirUsbDireto();
+  return new Promise((ok, erro) => {
+    const w = { ok, erro };
+    // passou do tempo: fecha o conector (o próximo envio abre de novo) e devolve erro
+    w.relogio = setTimeout(() => { const i = usbDireto.esperando.indexOf(w); if (i >= 0) usbDireto.esperando.splice(i, 1); try { usbDireto.proc && usbDireto.proc.kill(); } catch (_) {} erro(new Error('o envio pelo cabo passou do tempo')); }, tempoMs);
+    usbDireto.esperando.push(w);
+    const cab = Buffer.alloc(4); cab.writeUInt32BE(bytes.length);
+    usbDireto.proc.stdin.write(Buffer.concat([cab, bytes]));
+  });
 }
 
 // Impressoras que o Mac enxerga agora, por tipo de conexão.
@@ -310,15 +348,15 @@ async function enviar(gerar, rotulo) {
         else if (cx.tipo === 'bluetooth') r = await escreverSerial(cx.dispositivo, bytes, tempo);
         else if (cx.tipo === 'rede') r = await escreverRede(cx.host, cx.portaRede, bytes, tempo);
         else {
-          fs.writeFileSync(arq, bytes);
           try {
             if (cfg.usbDireto === false || !fs.existsSync(CONECTOR_USB)) throw new Error('sem conector USB direto');
-            r = await escreverUsbDireto(arq, tempo);
+            r = await escreverUsbDireto(bytes, tempo);
           } catch (eDireto) {
+            if (eDireto.estado) throw eDireto; // sem papel / erro / fora de linha: não manda por outro caminho
             if (fs.existsSync(CONECTOR_USB) && cfg.usbDireto !== false) log(`envio direto pelo cabo falhou (${eDireto.message}); indo pela fila do macOS`);
-            reativarFila(cx.fila);
-            r = await lp(arq, tempo, cx.fila);
-          } finally { fs.rmSync(arq, { force: true }); }
+            fs.writeFileSync(arq, bytes);
+            try { reativarFila(cx.fila); r = await lp(arq, tempo, cx.fila); } finally { fs.rmSync(arq, { force: true }); }
+          }
         }
         log(`enviado ${rotulo} por ${cx.tipo} (${bytes.length} bytes, tentativa ${t}): ${r}`);
         return;
@@ -435,11 +473,21 @@ function descartarPedido(jid) {
   return p;
 }
 
+// Uma fila de impressão para tudo (Mercado Livre, Shopee, TikTok, Downloads): as etiquetas saem na
+// ordem em que ficaram prontas, uma atrás da outra, enquanto as seguintes ainda estão sendo montadas.
+let filaImpressao = Promise.resolve();
+function naFilaDeImpressao(tarefa) {
+  const vez = filaImpressao.then(tarefa);
+  filaImpressao = vez.catch(() => {});
+  return vez;
+}
+
 // Recebe ZPL (um ou vários envios), monta as etiquetas 10x15 e imprime ou segura para conferência.
-async function receberZpl(zpl, { origem = 'manual', imprimir = cfg.imprimir === 'direto', modo = cfg.modo, danfesTikTok = null } = {}) {
+async function receberZpl(zpl, { origem = 'manual', imprimir = cfg.imprimir === 'direto', modo = cfg.modo, danfesTikTok = null, esperarImpressao = true } = {}) {
   const envios = separarEnvios(zpl);
   if (!envios.length) throw new Error('ZPL sem etiqueta (^XA...^XZ)');
   const feitos = [];
+  const impressoes = [];
   for (const [n, envio] of envios.entries()) {
     // SHA1 normalizado: remove espaços e quebras de linha para que API e Downloads
     // com o mesmo conteúdo (mas formatação diferente) tenham o mesmo hash.
@@ -499,10 +547,15 @@ async function receberZpl(zpl, { origem = 'manual', imprimir = cfg.imprimir === 
     for (const e of etiquetas) {
       const p = registrar(id, e.tipo, origem, e.img);
       feitos.push(p);
-      if (imprimir) await imprimirPedido(p.jid).catch((err) => { p.repetir = true; log(`ERRO ao imprimir ${id}: ${err.message} (vai tentar de novo sozinho)`); });
+      // fluxo contínuo: a etiqueta entra na fila de impressão e a próxima já começa a ser montada
+      if (imprimir) impressoes.push(naFilaDeImpressao(() => imprimirPedido(p.jid)).catch((err) => { p.repetir = true; log(`ERRO ao imprimir ${id}: ${err.message} (vai tentar de novo sozinho)`); }));
     }
-    log(`${imprimir ? 'impresso' : 'aguardando conferência'}: envio ${id} via ${origem} (${etiquetas.map((e) => e.tipo).join(', ')})`);
+    log(`${imprimir ? 'na fila de impressão' : 'aguardando conferência'}: envio ${id} via ${origem} (${etiquetas.map((e) => e.tipo).join(', ')})`);
+    await new Promise((ok) => setImmediate(ok)); // deixa a impressão andar entre uma montagem e outra
   }
+  // esperarImpressao=false: devolve assim que tudo foi montado e entrou na fila (o site do Mercado
+  // Livre manda o próximo lote e ele já começa a ser montado enquanto este imprime)
+  if (esperarImpressao) await Promise.all(impressoes);
   return feitos;
 }
 
@@ -630,14 +683,17 @@ async function varrerDownloads(inicial) {
           const zpl = lerZplDeArquivo(caminho);
           if (zpl) {
             log(`arquivo novo em Downloads: ${nome}`);
-            const feitos = await receberZpl(zpl, { origem: 'Downloads', danfesTikTok });
-            // o arquivo só é apagado depois que TODAS as etiquetas dele imprimirem (ver apagarSeImprimiu)
-            for (const p of feitos) p.arquivo = caminho;
-            apagarSeImprimiu(caminho);
-            // arquivo só com cópias do que já veio pelo site: não tem mais serventia
-            if (!feitos.length && feitos.ignorados && cfg.limparDownloads) {
-              try { fs.rmSync(caminho, { force: true }); log(`arquivo apagado (cópia do que já foi impresso): ${nome}`); } catch (_) { /* fica */ }
-            }
+            // não espera imprimir: o próximo arquivo (ex.: o 2º pacote de um lote grande) já entra e
+            // as etiquetas dele vão para a mesma fila, sem buraco entre um pacote e outro
+            receberZpl(zpl, { origem: 'Downloads', danfesTikTok }).then((feitos) => {
+              // o arquivo só é apagado depois que TODAS as etiquetas dele imprimirem (ver apagarSeImprimiu)
+              for (const p of feitos) p.arquivo = caminho;
+              apagarSeImprimiu(caminho);
+              // arquivo só com cópias do que já veio pelo site: não tem mais serventia
+              if (!feitos.length && feitos.ignorados && cfg.limparDownloads) {
+                try { fs.rmSync(caminho, { force: true }); log(`arquivo apagado (cópia do que já foi impresso): ${nome}`); } catch (_) { /* fica */ }
+              }
+            }).catch((e) => log(`ERRO ao ler ${nome}: ${e.message}`));
           }
         } catch (e) { log(`ERRO ao ler ${nome}: ${e.message}`); }
       }

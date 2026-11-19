@@ -28,6 +28,7 @@ cat > "$PLIST" <<PL
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
   <key>ThrottleInterval</key><integer>10</integer>
+  <key>ProcessType</key><string>Interactive</string>
   <key>StandardOutPath</key><string>$RAIZ/logs/servico.log</string>
   <key>StandardErrorPath</key><string>$RAIZ/logs/servico.log</string>
 </dict></plist>
@@ -68,6 +69,7 @@ if [ -x "$BT/conector-bluetooth" ]; then
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
   <key>ThrottleInterval</key><integer>10</integer>
+  <key>ProcessType</key><string>Interactive</string>
   <key>StandardOutPath</key><string>$RAIZ/logs/bluetooth.log</string>
   <key>StandardErrorPath</key><string>$RAIZ/logs/bluetooth.log</string>
 </dict></plist>
