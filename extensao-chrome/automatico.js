@@ -30,8 +30,29 @@
   // ---------- quadrinho ----------
   const caixa = document.createElement('div');
   caixa.style.cssText = 'position:fixed;left:16px;bottom:16px;z-index:2147483647;width:300px;background:#fff;border:1px solid #E2E8F0;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.12);font:13px/1.4 -apple-system,BlinkMacSystemFont,sans-serif;color:#0F172A;padding:12px';
-  caixa.innerHTML = '<div style="display:flex;align-items:center;gap:8px;justify-content:space-between"><strong>Impressão automática</strong><button type="button" style="border:0;border-radius:8px;padding:6px 12px;font-weight:600;cursor:pointer"></button></div><div data-estado style="margin-top:6px;color:#64748B"></div><div data-travados style="margin-top:8px"></div><div data-log style="margin-top:6px;max-height:110px;overflow:auto;font-size:12px;color:#334155"></div>';
-  const botao = caixa.querySelector('button');
+  caixa.innerHTML = '<div style="display:flex;align-items:center;gap:8px;justify-content:space-between"><strong>Impressão automática</strong><span style="display:flex;gap:6px;align-items:center"><button type="button" data-ligar style="border:0;border-radius:8px;padding:6px 12px;font-weight:600;cursor:pointer"></button><button type="button" data-fechar title="Recolher" aria-label="Recolher" style="border:0;background:transparent;color:#64748B;font-size:20px;line-height:1;width:28px;height:28px;border-radius:6px;cursor:pointer">×</button></span></div><div data-estado style="margin-top:6px;color:#64748B"></div><div data-travados style="margin-top:8px"></div><div data-log style="margin-top:6px;max-height:110px;overflow:auto;font-size:12px;color:#334155"></div>';
+  const botao = caixa.querySelector('[data-ligar]');
+  // recolhido: vira uma pílula pequena com a situação e o botão de ligar/desligar (lembrado nesta aba)
+  const MIN = CHAVE + '-recolhido';
+  const pilula = document.createElement('div');
+  pilula.style.cssText = 'position:fixed;left:16px;bottom:16px;z-index:2147483647;display:none;align-items:center;gap:8px;background:#fff;border:1px solid #E2E8F0;border-radius:999px;box-shadow:0 4px 14px rgba(0,0,0,.12);font:600 12px/1 -apple-system,BlinkMacSystemFont,sans-serif;color:#0F172A;padding:6px 6px 6px 12px';
+  pilula.innerHTML = '<span data-ponto style="width:8px;height:8px;border-radius:50%"></span><button type="button" data-abrir title="Abrir" style="border:0;background:transparent;font:inherit;color:inherit;cursor:pointer;padding:0">Impressão automática</button><button type="button" data-ligar2 style="border:0;border-radius:999px;padding:5px 10px;font:inherit;cursor:pointer"></button>';
+  const recolhido = () => { try { return localStorage.getItem(MIN) === '1'; } catch (_) { return false; } };
+  function mostrar() {
+    caixa.style.display = recolhido() ? 'none' : '';
+    pilula.style.display = recolhido() ? 'flex' : 'none';
+    const lig = ligado();
+    const temTrava = Object.keys(travados()).length > 0;
+    pilula.querySelector('[data-ponto]').style.background = temTrava ? '#DC2626' : lig ? '#16A34A' : '#94A3B8';
+    const b2 = pilula.querySelector('[data-ligar2]');
+    b2.textContent = lig ? 'Desligar' : 'Ligar';
+    b2.style.background = lig ? '#FEE2E2' : '#2563EB';
+    b2.style.color = lig ? '#B91C1C' : '#fff';
+  }
+  const recolher = (sim) => { try { localStorage.setItem(MIN, sim ? '1' : '0'); } catch (_) { /* nada */ } mostrar(); };
+  caixa.querySelector('[data-fechar]').onclick = () => recolher(true);
+  pilula.querySelector('[data-abrir]').onclick = () => recolher(false);
+  pilula.querySelector('[data-ligar2]').onclick = () => botao.onclick();
   const estado = caixa.querySelector('[data-estado]');
   const registro = caixa.querySelector('[data-log]');
   const areaTravados = caixa.querySelector('[data-travados]');
@@ -39,6 +60,7 @@
     const m = travados();
     const ids = Object.keys(m);
     areaTravados.innerHTML = '';
+    try { mostrar(); } catch (_) { /* ainda montando */ }
     if (!ids.length) return;
     const box = document.createElement('div');
     box.style.cssText = 'border:1px solid #FECACA;background:#FEF2F2;border-radius:8px;padding:8px;color:#991B1B';
@@ -80,6 +102,7 @@
     botao.style.background = ligado() ? '#FEE2E2' : '#2563EB';
     botao.style.color = ligado() ? '#B91C1C' : '#fff';
     estado.textContent = msg || (ligado() ? 'Ligada nesta aba: confere a cada 5 minutos. Deixe esta aba aberta.' : 'Desligada. Ligue numa aba só para isso.');
+    mostrar();
   }
   botao.onclick = () => {
     if (ligado()) { sessionStorage.removeItem(CHAVE); desenhar(); log('desligada'); return; }
@@ -87,6 +110,7 @@
   };
   try { for (const l of JSON.parse(sessionStorage.getItem(CHAVE + '-log') || '[]').reverse()) { const d = document.createElement('div'); d.textContent = l; registro.prepend(d); } } catch (_) { /* nada */ }
   document.body.appendChild(caixa);
+  document.body.appendChild(pilula);
   desenhar();
   desenharTravados();
 
