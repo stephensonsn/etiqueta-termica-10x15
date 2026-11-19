@@ -110,6 +110,11 @@ No painel, em *Mercado Livre: impressão automática*, a ponte confere a cada 5 
 
 Venda com nota pendente (`invoice_pending`) e erro de conta viram pendência.
 
+
+**NF-e automática:** com "Emitir a NF-e pelo Faturador do Mercado Livre" marcado, a venda que espera nota tem a NF-e pedida ao Faturador (o mesmo emissor do painel do Mercado Livre, com a série e o certificado já configurados lá). Na rodada seguinte a etiqueta fica pronta e imprime. Se faltar dado (cadastro fiscal do anúncio, CPF do comprador etc.), o envio fica parado no painel e no ícone vermelho até você corrigir e clicar "Corrigi, tentar de novo". O TikTok segue a mesma regra no quadrinho da aba do Seller Center.
+
+**Cabo ou Bluetooth:** a ponte troca sozinha. Com a impressora no cabo USB vai pelo cabo (mais rápido); sem cabo, pelo Bluetooth.
+
 ## Ícone de pendências (extensão)
 
 A extensão mostra no ícone, em vermelho, quantas pendências existem; clicando, abre a lista. Conta como pendência: impressora ou ponte com problema, etiqueta com erro na fila, pedido parado (sem NF-e, nota pendente no Mercado Livre) e automação que parou (TikTok ou Mercado Livre). A extensão consulta `http://127.0.0.1:9100/api/pendencias` a cada minuto.

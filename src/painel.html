@@ -252,9 +252,9 @@
 
   <details class="cartao larga" id="sec-ml">
     <summary>Mercado Livre: impressão automática <span id="ml-selo" class="selo cinza">Desligada</span></summary>
-    <p class="ajuda">A cada 5 minutos a ponte confere as contas ligadas aqui e imprime sozinha as etiquetas de agência e coleta que ficaram prontas, já com a DANFE. Cada envio sai uma vez só. Venda esperando nota aparece como pendência no ícone da extensão.</p>
+    <p class="ajuda">A cada 5 minutos a ponte confere as contas ligadas aqui e imprime sozinha as etiquetas de agência e coleta que ficaram prontas, já com a DANFE. Cada envio sai uma vez só. Venda esperando nota tem a NF-e pedida ao Faturador do Mercado Livre; se faltar dado no cadastro, o envio fica parado aqui e no ícone vermelho da extensão até você corrigir e clicar "Corrigi, tentar de novo".</p>
     <div id="ml-app">
-      <p class="ajuda"><b>1. Aplicativo do Mercado Livre.</b> Crie um aplicativo grátis em developers.mercadolivre.com.br (Meus aplicativos, Criar), com o endereço de retorno abaixo e as permissões de pedidos e envios. Copie o ID e a chave secreta para cá; ficam só neste computador.</p>
+      <p class="ajuda"><b>1. Aplicativo do Mercado Livre.</b> Crie um aplicativo grátis em developers.mercadolivre.com.br (Meus aplicativos, Criar), com o endereço de retorno abaixo e as permissões de pedidos, envios e faturamento. Copie o ID e a chave secreta para cá; ficam só neste computador.</p>
       <div class="grade4">
         <div class="campo"><label for="ml-id">ID do aplicativo</label><input id="ml-id" autocomplete="off"></div>
         <div class="campo"><label for="ml-seg">Chave secreta</label><div style="display:flex;gap:6px"><input id="ml-seg" type="password" autocomplete="off"><button type="button" class="acao mini" id="ml-seg-olho">Mostrar</button></div></div>
@@ -270,6 +270,8 @@
       <button type="button" class="acao" id="ml-adicionar">Adicionar conta</button>
     </div>
     <label class="opcao"><input type="checkbox" id="ml-ligado"> <span>Imprimir sozinho as etiquetas prontas (agência e coleta) das contas acima</span></label>
+    <label class="opcao"><input type="checkbox" id="ml-nfe"> <span>Emitir a NF-e pelo Faturador do Mercado Livre nas vendas que esperam nota (a etiqueta sai logo depois)</span></label>
+    <ul class="lista" id="ml-travados" hidden></ul>
     <pre id="ml-eventos" style="max-height:140px"></pre>
   </details>
 
@@ -337,6 +339,18 @@ async function carregarMl() {
     }) : [Object.assign(document.createElement('li'), { textContent: 'Nenhuma conta autorizada ainda.', style: 'display:block;color:var(--suave)' })]));
     $('ml-ligado').checked = !!e.ligado;
     $('ml-ligado').disabled = !e.contas.length;
+    $('ml-nfe').checked = e.emitirNfe !== false;
+    $('ml-nfe').disabled = !e.contas.length;
+    // envios travados por cadastro: só tenta de novo quando a pessoa avisa que corrigiu
+    const trav = e.travados || [];
+    $('ml-travados').hidden = !trav.length;
+    $('ml-travados').replaceChildren(...trav.map((t) => {
+      const li = document.createElement('li');
+      const n = document.createElement('span'); n.textContent = `${t.conta || ''}: ${t.motivo}`;
+      const b = document.createElement('button'); b.className = 'acao mini'; b.type = 'button'; b.textContent = 'Corrigi, tentar de novo';
+      b.onclick = () => fazer('Liberando o envio', async () => { await api('/api/ml-etiquetas/config', { liberar: t.envio }); carregarMl(); });
+      li.append(n, b); return li;
+    }));
     $('ml-eventos').textContent = [...e.pendencias.map((p) => 'PENDENTE: ' + p.texto), ...e.eventos.map((v) => hora(v.hora) + '  ' + v.txt)].join('\n') || 'Sem registros ainda.';
   } catch (_) { /* ponte fora do ar: o resto do painel já avisa */ }
 }
@@ -344,6 +358,7 @@ $('ml-seg-olho').onclick = () => { const i = $('ml-seg'); i.type = i.type === 'p
 $('ml-app-salvar').onclick = () => fazer('Salvando aplicativo', async () => { await api('/api/ml/config', { appId: $('ml-id').value, segredo: $('ml-seg').value, retorno: $('ml-ret').value }); $('ml-seg').value = ''; carregarMl(); });
 $('ml-autorizar').onclick = () => fazer('Abrindo a autorização', async () => { const { url } = await api('/api/ml-etiquetas/autorizar'); window.open(url, '_blank', 'noopener'); });
 $('ml-adicionar').onclick = () => fazer('Adicionando conta', async () => { await api('/api/ml-etiquetas/autorizar', { colado: $('ml-colado').value }); $('ml-colado').value = ''; carregarMl(); });
+$('ml-nfe').onchange = () => fazer('Salvando', async () => { await api('/api/ml-etiquetas/config', { emitirNfe: $('ml-nfe').checked }); carregarMl(); });
 $('ml-ligado').onchange = () => fazer('Salvando', async () => { await api('/api/ml-etiquetas/config', { ligado: $('ml-ligado').checked }); carregarMl(); });
 setTimeout(carregarMl, 300); setInterval(carregarMl, 30000);
 
