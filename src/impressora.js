@@ -512,6 +512,16 @@ async function imprimirNfeSozinha(lote) {
     l.copias = [];
   } catch (e) { log(`ERRO ao imprimir ${nome}: ${e.message}`); }
 }
+// a NF-e e a etiqueta do mesmo lote podem sair com 1 ou 2 segundos de diferença no nome
+// ("23-53-08_NF-e.txt" e "23-53-09_Shipping label.txt"): junta no lote já aberto até 5 s antes ou depois
+function segundosDoLote(l) { const [mm, dd, h, mi, se] = l.split(/[-_]/).map(Number); return (((mm * 31 + dd) * 24 + h) * 60 + mi) * 60 + se; }
+function loteTikTok(l) {
+  if (!l) return l;
+  if (lotesTikTok.has(l)) return l;
+  const s = segundosDoLote(l);
+  for (const k of lotesTikTok.keys()) if (Math.abs(segundosDoLote(k) - s) <= 5) return k;
+  return l;
+}
 const ARQ_VISTOS = path.join(RAIZ, 'logs', 'arquivos-vistos.json');
 let vistos = {};
 try { vistos = JSON.parse(fs.readFileSync(ARQ_VISTOS, 'utf8')); } catch (_) { /* primeira vez */ }
@@ -537,7 +547,7 @@ async function varrerDownloads(inicial) {
       // TikTok Shop: o mesmo lote vem em dois arquivos ("<data>_NF-e.txt" e "<data>_Shipping label.txt").
       // A etiqueta de envio já sai casada com a DANFE (chave + faixa fiscal), então o arquivo de NF-e
       // do mesmo lote não é impresso. Se a etiqueta não chegar em 10 minutos, a NF-e imprime sozinha.
-      const lote = (nome.match(/^(\d{2}-\d{2}_\d{2}-\d{2}-\d{2})_/) || [])[1];
+      const lote = loteTikTok((nome.match(/^(\d{2}-\d{2}_\d{2}-\d{2}-\d{2})_/) || [])[1]);
       if (!inicial && lote && /_NF-e/i.test(nome)) {
         const l = lotesTikTok.get(lote) || {};
         lotesTikTok.set(lote, l);
