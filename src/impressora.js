@@ -52,15 +52,14 @@ function salvarConfig(novo) {
     if (n.tipo === 'usb') {
       cxCache.quando = 0;
       if (n.uri) {
-        // cria uma fila em modo bruto para a impressora que está no cabo (dispensa o driver do fabricante)
+        // impressora no cabo sem fila no macOS: o conector USB fala direto com ela, sem criar fila
+        // (fila crua aparecia na janela de imprimir e o PDF ia para ela sem converter)
         const achada = listarConexoes().usb.find((u) => u.semFila && u.uri === n.uri);
         if (!achada) throw new Error('impressora não encontrada no cabo USB');
-        execFileSync('/usr/sbin/lpadmin', ['-p', 'Etiqueta_10x15', '-E', '-v', achada.uri, '-m', 'raw', '-D', 'Etiqueta 10x15'], { timeout: 15000 });
-        n.fila = 'Etiqueta_10x15';
-        cxCache.quando = 0;
+        n.fila = '';
       }
-      if (n.fila !== undefined && !listarConexoes().usb.some((u) => u.fila === n.fila)) throw new Error('fila USB não encontrada no macOS');
-      if (n.fila) cfg.fila = n.fila;
+      if (n.fila && !listarConexoes().usb.some((u) => u.fila === n.fila)) throw new Error('fila USB não encontrada no macOS');
+      if (n.fila !== undefined) cfg.fila = n.fila;
       cfg.conexao.tipo = 'usb';
     } else if (n.tipo === 'bluetooth') {
       if (!/^\/dev\/cu\.[\w.-]+$/.test(n.dispositivo || '') || !fs.existsSync(n.dispositivo)) throw new Error('porta Bluetooth não encontrada; pareie a impressora nos Ajustes do Sistema');
@@ -158,6 +157,9 @@ async function escreverUsbDireto(bytes, tempoMs) {
     usbDireto.proc.stdin.write(Buffer.concat([cab, bytes]));
   });
 }
+
+// A térmica no cabo: a da fila escolhida ou, sem fila (modo direto), qualquer uma ligada no USB.
+const usbEscolhida = (lista) => lista.find((u) => u.ligada && (cfg.fila ? u.fila === cfg.fila : true));
 
 // Impressoras que o Mac enxerga agora, por tipo de conexão.
 let cxCache = { quando: 0, valor: null };
@@ -289,7 +291,7 @@ function escreverBle(bytes, tempoMs) {
 function conexoesDisponiveis() {
   const cx = cfg.conexao;
   const achadas = listarConexoes();
-  const usb = achadas.usb.find((u) => u.ligada && u.fila === cfg.fila);
+  const usb = usbEscolhida(achadas.usb);
   const todas = {
     usb: usb ? { tipo: 'usb', fila: usb.fila } : null,
     ble: bleVivo() ? { tipo: 'ble' } : null,
@@ -353,6 +355,7 @@ async function enviar(gerar, rotulo) {
             r = await escreverUsbDireto(bytes, tempo);
           } catch (eDireto) {
             if (eDireto.estado) throw eDireto; // sem papel / erro / fora de linha: não manda por outro caminho
+            if (!cx.fila) throw eDireto; // sem fila no macOS: o cabo direto é o único caminho
             if (fs.existsSync(CONECTOR_USB) && cfg.usbDireto !== false) log(`envio direto pelo cabo falhou (${eDireto.message}); indo pela fila do macOS`);
             fs.writeFileSync(arq, bytes);
             try { reativarFila(cx.fila); r = await lp(arq, tempo, cx.fila); } finally { fs.rmSync(arq, { force: true }); }
@@ -382,7 +385,7 @@ function situacaoPreferida() {
     return valor;
   }
   // cabo e Bluetooth trocam sozinhos: sem a impressora no cabo, vale a situação do Bluetooth
-  const noCabo = listarConexoes().usb.some((u) => u.ligada && u.fila === cfg.fila);
+  const noCabo = !!usbEscolhida(listarConexoes().usb);
   if (cfg.conexao.tipo === 'ble' && !noCabo) return situacaoBle(); // sem cache: muda a cada segundo
   if (cfg.conexao.tipo === 'usb' && !noCabo && bleVivo()) return situacaoBle();
   if (cfg.conexao.tipo === 'rede') {
@@ -390,8 +393,13 @@ function situacaoPreferida() {
     filaCache = { quando: Date.now(), valor };
     return valor;
   }
-  if (!listarConexoes().usb.some((u) => u.ligada && u.fila === cfg.fila)) {
+  if (!usbEscolhida(listarConexoes().usb)) {
     valor = { ok: false, texto: 'Impressora desligada ou sem cabo' };
+    filaCache = { quando: Date.now(), valor };
+    return valor;
+  }
+  if (!cfg.fila) {
+    valor = { ok: true, texto: 'Impressora pronta (cabo direto)' };
     filaCache = { quando: Date.now(), valor };
     return valor;
   }

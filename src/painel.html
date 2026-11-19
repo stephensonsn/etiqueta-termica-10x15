@@ -449,7 +449,7 @@ function desenharConexoes() {
   if (!bleCar) bleEstado(bleLigado ? 'Conectada' + (config.conexao.bleNome ? ' em ' + config.conexao.bleNome : '') + '. Liga sozinha e reconecta se cair. Este modelo não avisa papel travado nem tampa aberta' : config.conexao.bleNome ? 'Procurando ' + config.conexao.bleNome + '… Deixe a impressora ligada e perto do computador' : 'Clique em Escolher impressora (uma vez só, no Google Chrome)');
   const usb = conexoes.usb.find((u) => u.ligada) || conexoes.usb[0];
   $('cx-usb-det').textContent = !usb ? 'Nenhuma impressora encontrada no USB' : usb.ligada ? usb.nome + ' ligada no cabo' : usb.nome + ' está desligada ou sem cabo';
-  $('cx-usb-lado').replaceChildren(...(tipo === 'usb' && usb && usb.ligada && !usb.semFila ? [emUso()] : usb && usb.ligada && (tipo !== 'usb' || usb.semFila) ? [usar(usb.semFila ? { tipo: 'usb', uri: usb.uri } : { tipo: 'usb', fila: usb.fila })] : []));
+  $('cx-usb-lado').replaceChildren(...(tipo === 'usb' && usb && usb.ligada && (!usb.semFila || !config.fila) ? [emUso()] : usb && usb.ligada && (tipo !== 'usb' || usb.semFila) ? [usar(usb.semFila ? { tipo: 'usb', uri: usb.uri } : { tipo: 'usb', fila: usb.fila })] : []));
 
   $('cx-ble-lado').replaceChildren(...[
     tipo === 'ble' && bleLigado ? emUso() : null,
