@@ -24,6 +24,14 @@ chrome.runtime.onMessage.addListener((msg) => {
   fetch(`${PONTE}/api/tiktok/enderecos`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lista: msg.lista.slice(0, 50) }) }).catch(() => {});
 });
 
+// a automação pergunta quais rastreios do TikTok já saíram na térmica (para reimprimir o que faltou)
+chrome.runtime.onMessage.addListener((msg, _de, responder) => {
+  if (!msg || msg.tipo !== 'impressos') return;
+  fetch(`${PONTE}/api/tiktok/impressos`, { cache: 'no-store' }).then((r) => r.json()).then((j) => responder({ ok: true, rastreios: j.rastreios || [] }))
+    .catch(() => responder({ ok: false, rastreios: [] }));
+  return true; // resposta assíncrona
+});
+
 // a automação do TikTok (página) avisa quando para ou volta a funcionar
 chrome.runtime.onMessage.addListener((msg) => {
   if (!msg || msg.tipo !== 'pendencia') return;

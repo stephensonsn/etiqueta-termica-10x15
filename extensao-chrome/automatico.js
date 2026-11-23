@@ -10,6 +10,7 @@
 (() => {
   'use strict';
   const URL_PEDIDOS = 'https://seller-br.tiktok.com/order?order_status[]=1&selected_sort=1&tab=to_ship';
+  const URL_COLETA = 'https://seller-br.tiktok.com/order?order_status[]=2&selected_sort=1&tab=to_ship'; // Aguardando coleta
   const INTERVALO = 60 * 1000;        // pedido novo: confere a cada 1 minuto
   const RAPIDO = 15 * 1000;           // NF-e pedida ou "Processando NF-e": confere a cada 15 s e imprime assim que sair
   const RAPIDO_MAX = 16;              // no máximo 4 minutos no ritmo rápido; depois volta para 1 minuto
@@ -37,6 +38,40 @@
   const TRAVADOS = CHAVE + '-travados';
   const travados = () => { try { return JSON.parse(localStorage.getItem(TRAVADOS) || '{}'); } catch (_) { return {}; } };
   const gravarTravados = (m) => { try { localStorage.setItem(TRAVADOS, JSON.stringify(m)); } catch (_) { /* sem armazenamento */ } };
+  // Conferência: etiqueta criada pela automação tem que aparecer na ponte (rastreio impresso).
+  // Se em 3 minutos não apareceu (TikTok lento, arquivo não baixou), reimprime pela lista
+  // "Aguardando coleta" (até 3 vezes). Guardado por 2 dias.
+  const CONFERIR = CHAVE + '-conferir';
+  const lerConferir = () => { try { return JSON.parse(localStorage.getItem(CONFERIR) || '{}'); } catch (_) { return {}; } };
+  const gravarConferir = (m) => { try { localStorage.setItem(CONFERIR, JSON.stringify(m)); } catch (_) { /* sem armazenamento */ } };
+  const aConferir = (ids) => { const m = lerConferir(); for (const id of ids) if (!m[id]) m[id] = { quando: Date.now(), tentativas: 0 }; gravarConferir(m); };
+  const impressosNaPonte = () => new Promise((ok) => { try { chrome.runtime.sendMessage({ tipo: 'impressos' }, (r) => ok(r && r.ok ? new Set(r.rastreios) : null)); } catch (_) { ok(null); } });
+  async function rastreiosDe(ids) {
+    const r = await fetch('/api/fulfillment/order/get?aid=4068&locale=pt-BR', { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ main_order_id: ids }) });
+    const j = await r.json();
+    const m = {};
+    for (const o of (j && j.data && j.data.main_order) || []) { const t = ((o.delivery_module || [])[0] || {}).tracking_no; if (t) m[String(o.main_order_id)] = t; }
+    return m;
+  }
+  // pedidos criados que ainda não saíram na térmica (null = não deu para conferir agora)
+  async function faltandoImprimir(minIdadeMs) {
+    const m = lerConferir();
+    const lim = Date.now() - 2 * 864e5;
+    for (const k of Object.keys(m)) if (m[k].quando < lim) delete m[k];
+    const ids = Object.keys(m).filter((id) => Date.now() - m[id].quando >= minIdadeMs);
+    if (!ids.length) { gravarConferir(m); return []; }
+    const ponte = await impressosNaPonte();
+    if (!ponte) return null;
+    let rast; try { rast = await rastreiosDe(ids); } catch (_) { return null; }
+    const falta = [];
+    for (const id of ids) {
+      if (rast[id] && ponte.has(rast[id])) { delete m[id]; continue; } // saiu na térmica
+      if (m[id].tentativas >= 3) { log(`pedido ${id.slice(-6)}: etiqueta não chegou na térmica depois de 3 tentativas; imprima à mão`); delete m[id]; continue; }
+      falta.push(id);
+    }
+    gravarConferir(m);
+    return falta;
+  }
   const marcarFeito = (ids) => { const m = feitos(); for (const id of ids) m[id] = Date.now(); try { localStorage.setItem(FEITOS, JSON.stringify(m)); } catch (_) { /* sem armazenamento */ } };
 
   // ---------- quadrinho ----------
@@ -242,6 +277,7 @@
     const criar = await achar(() => botaoPorTexto(/^Criar e imprimir etiqueta/i), 8000);
     if (!criar) throw new Error('o botão "Criar e imprimir etiqueta" não ficou disponível');
     criar.click();
+    aConferir(itens.map((i) => i.pedido)); // a conferência reimprime se o arquivo não chegar na térmica
     capturarEnderecos(itens.map((i) => i.pedido)); // em paralelo: a ponte espera o endereço até 20 s
     // primeira vez o TikTok pergunta como imprimir: confirma o padrão já configurado
     const padrao = await achar(() => botaoPorTexto(/Imprimir etiquetas no momento do envio/i), 5000);
@@ -258,13 +294,13 @@
     const janelaArquivos = () => [...document.querySelectorAll('div')].find((d) => visivel(d) && /Imprimir resultado/.test(texto(d)) && /\.txt/.test(texto(d)));
     // a janela "Imprimir resultado" é baixada pelo tiktok.js; aqui só espera ela aparecer.
     // Se só ficou a gaveta "Resultado de envio" (etiqueta criada, sem a janela), pede a impressão nela.
-    let pronto = await achar(janelaArquivos, 30000);
+    let pronto = await achar(janelaArquivos, 90000); // TikTok lento: espera até 1,5 min
     if (!pronto) {
       const imprimir = botaoPorTexto(/^Imprimir etiqueta de envio$/i);
-      if (imprimir) { imprimir.click(); pronto = await achar(janelaArquivos, 30000); }
+      if (imprimir) { imprimir.click(); pronto = await achar(janelaArquivos, 60000); }
     }
-    marcarFeito(itens.map((i) => i.pedido)); // a etiqueta foi criada: não tenta de novo
-    if (!pronto) throw new Error('a janela com os arquivos das etiquetas não apareceu');
+    marcarFeito(itens.map((i) => i.pedido)); // a etiqueta foi criada: não cria de novo (a conferência reimprime se faltar)
+    if (!pronto) throw new Error('a janela com os arquivos das etiquetas não apareceu; a conferência reimprime em 3 minutos');
     await esperar(4000);
     const fechar = botaoPorTexto(/^Fechar$/i);
     if (fechar) fechar.click();
@@ -273,12 +309,50 @@
     log(`etiquetas criadas e enviadas para a térmica: ${itens.map((i) => i.pedido.slice(-6)).join(', ')}`);
   }
 
+  // ---------- reimprimir o que não chegou na térmica (lista "Aguardando coleta") ----------
+  const REIMPRIMIR = CHAVE + '-reimprimir';
+  async function reimprimir(ids) {
+    const carregou = await achar(() => /pedidos? encontrados?|Nenhum pedido/i.test(texto(document.body)), 45000);
+    if (!carregou) throw new Error('a lista "Aguardando coleta" não carregou');
+    await esperar(2500);
+    const linhas = linhasDePedido().filter((i) => ids.includes(i.pedido));
+    const m = lerConferir();
+    for (const id of ids) if (m[id]) m[id].tentativas = (m[id].tentativas || 0) + 1;
+    gravarConferir(m);
+    if (!linhas.length) { log('reimpressão: pedidos não estão em "Aguardando coleta"'); return; }
+    for (const it of linhas) { const cb = it.linha.querySelector('input[type="checkbox"]'); if (cb && !cb.checked) { (cb.closest('label') || cb).click(); await esperar(300); } }
+    const doc = await achar(() => botaoPorTexto(/^Imprimir documentos?$/i), 8000);
+    if (!doc) throw new Error('o botão "Imprimir documento" não apareceu');
+    doc.click();
+    // janela "Imprimir documento" (etiqueta de envio + NF-e, ZPL): botão Imprimir
+    const imp = await achar(() => { const d = [...document.querySelectorAll('[role="dialog"], [class*="modal"]')].find((x) => visivel(x) && /Imprimir documento/.test(texto(x))); return d && botaoPorTexto(/^Imprimir$/i, d); }, 15000);
+    if (!imp) throw new Error('a janela "Imprimir documento" não abriu');
+    imp.click();
+    // já impressa no TikTok, mas a ponte confirmou que NÃO saiu na térmica: continua
+    const cont = await achar(() => botaoPorTexto(/^Continuar imprimindo$/i), 15000);
+    if (cont) cont.click();
+    const janela = await achar(() => [...document.querySelectorAll('div')].find((d) => visivel(d) && /Imprimir resultado/.test(texto(d)) && /\.txt/.test(texto(d))), 90000);
+    if (!janela) throw new Error('a janela com os arquivos não apareceu na reimpressão');
+    await esperar(4000); // o tiktok.js baixa os arquivos; a ponte imprime
+    const fechar = botaoPorTexto(/^Fechar$/i); if (fechar) fechar.click();
+    log(`reimpresso (não tinha chegado na térmica): ${linhas.map((i) => i.pedido.slice(-6)).join(', ')}`);
+  }
+
   // ---------- rodada ----------
   let rodando = false;
   let emitiuAgora = false;
   async function rodada() {
     if (!ligado() || rodando) return;
-    if (!location.href.startsWith('https://seller-br.tiktok.com/order') || !/tab=to_ship/.test(location.href)) {
+    // reimpressão pendente: esta página é a lista "Aguardando coleta"
+    let pend = null; try { pend = JSON.parse(sessionStorage.getItem(REIMPRIMIR) || 'null'); } catch (_) { /* nada */ }
+    if (pend && pend.length) {
+      if (!/order_status(%5B%5D|\[\])=2/.test(location.href)) { location.href = URL_COLETA; return; }
+      rodando = true;
+      try { sessionStorage.removeItem(REIMPRIMIR); desenhar('Reimprimindo o que não chegou na térmica…'); await reimprimir(pend); } catch (e) { log('AVISO: ' + e.message); }
+      finally { rodando = false; setTimeout(() => { if (ligado()) location.href = URL_PEDIDOS; }, 3000); }
+      return;
+    }
+    if (!location.href.startsWith('https://seller-br.tiktok.com/order') || !/tab=to_ship/.test(location.href) || /order_status(%5B%5D|\[\])=2/.test(location.href)) {
       desenhar('Indo para Pedidos > Para enviar…');
       location.href = URL_PEDIDOS;
       return;
@@ -286,6 +360,14 @@
     rodando = true;
     try {
       desenhar('Conferindo pedidos…');
+      // 0) etiqueta criada há 3 min ou mais e que não saiu na térmica: vai reimprimir
+      const falta = await faltandoImprimir(3 * 60 * 1000);
+      if (falta && falta.length) {
+        log(`etiqueta não chegou na térmica: ${falta.map((i) => i.slice(-6)).join(', ')}; reimprimindo`);
+        try { sessionStorage.setItem(REIMPRIMIR, JSON.stringify(falta.slice(0, MAX_POR_RODADA))); } catch (_) { /* nada */ }
+        location.href = URL_COLETA;
+        return;
+      }
       const carregou = await achar(() => /pedidos? encontrados?|Nenhum pedido/i.test(texto(document.body)), 30000);
       if (!carregou) throw new Error('a lista de pedidos não carregou');
       await esperar(2500);

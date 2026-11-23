@@ -88,7 +88,7 @@ const servidor = http.createServer(async (req, res) => {
       const host = (req.headers.host || '').toLowerCase();
       const proprio = [`127.0.0.1:${cfg.porta}`, `localhost:${cfg.porta}`];
       // a extensão do Chrome (ícone de pendências) só pode ler e avisar pendências; o resto é só do painel
-      const daExtensao = /^chrome-extension:\/\/[a-p]{32}$/.test(origem) && (rota === '/api/pendencias' || rota === '/api/pendencias/extensao' || rota === '/api/tiktok/enderecos');
+      const daExtensao = /^chrome-extension:\/\/[a-p]{32}$/.test(origem) && (rota === '/api/pendencias' || rota === '/api/pendencias/extensao' || rota === '/api/tiktok/enderecos' || rota === '/api/tiktok/impressos');
       if (!proprio.includes(host) || (origem && !daExtensao && !proprio.map((x) => `http://${x}`).includes(origem))) {
         res.writeHead(403, { 'Content-Type': 'text/plain' }); return res.end('acesso negado');
       }
@@ -118,6 +118,7 @@ const servidor = http.createServer(async (req, res) => {
       }
       if (req.method === 'GET' && rota === '/api/ml') return json(ml.estadoMl());
       if (req.method === 'GET' && rota === '/api/pendencias') return json({ pendencias: pendencias() });
+      if (req.method === 'GET' && rota === '/api/tiktok/impressos') return json({ rastreios: require('./impressora').rastreiosImpressosTikTok() });
       if (req.method === 'GET' && rota === '/api/ml-etiquetas') return json(mlEtiquetas.estado());
       if (req.method === 'GET' && rota === '/api/ml-etiquetas/autorizar') { try { return json({ url: mlEtiquetas.urlAutorizacao() }); } catch (e) { return json({ erro: e.message }, 400); } }
       if (req.method === 'GET' && rota === '/api/ml/autorizar') { try { return json({ url: ml.urlAutorizacao() }); } catch (e) { return json({ erro: e.message }, 400); } }
@@ -155,7 +156,7 @@ const servidor = http.createServer(async (req, res) => {
           if (rota === '/api/ml-etiquetas/config') { mlEtiquetas.salvarConfig(JSON.parse(txt || '{}')); return json(mlEtiquetas.estado()); }
           if (rota === '/api/ml-etiquetas/rodada') { await mlEtiquetas.rodada(); return json(mlEtiquetas.estado()); }
           // endereços dos pedidos do TikTok (só na memória, 1 h), para escrever rua e número antes do complemento
-          if (rota === '/api/tiktok/enderecos') {
+          if (rota === '/api/tiktok/enderecos' || rota === '/api/tiktok/impressos') {
             const n = require('./etiqueta').registrarEnderecosTikTok(JSON.parse(txt || '{}').lista);
             log(`TikTok: ${n} endereço(s) recebido(s) da extensão`);
             return json({ recebidos: n });

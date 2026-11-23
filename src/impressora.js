@@ -467,6 +467,7 @@ async function imprimirPedido(jid) {
     // por etiqueta); a compacta manda só as faixas com tinta e a etiqueta seguinte sai logo depois
     await enviar((tipo) => semOffsetSeContinua(tipo === 'ble' && cfg.compressao === true ? paraTsplZlib(img, cfg.calib) : cfg.usbCheia === true && tipo !== 'ble' ? paraTspl(img, cfg.calib) : paraTsplCompacto(img, cfg.calib)), `${p.jid}-${p.id || 'teste'}-${p.tipo}`.replace(/[^\w.+-]+/g, '_'));
     p.estado = 'impresso'; p.erro = ''; p.impressoes++;
+    if (p.rastreio) marcarImpressoTikTok(p.rastreio);
     apagarSeImprimiu(p.arquivo);
     // as últimas enviadas ficam na memória (até 40) para reimprimir depois de um papel travado;
     // sem "guardar histórico", nada disso vai para o disco além da prévia temporária
@@ -483,6 +484,20 @@ function descartarPedido(jid) {
   if (p && (p.estado === 'aguardando' || p.estado === 'erro')) { p.estado = 'descartado'; p.repetir = false; }
   return p;
 }
+
+// Rastreios do TikTok que já saíram na térmica (3 dias, em disco): a extensão confere e reimprime o
+// que foi criado no TikTok mas não chegou aqui (TikTok lento, arquivo que não baixou).
+const ARQ_IMPRESSOS_TT = path.join(RAIZ, 'logs', 'tiktok-impressos.json');
+let impressosTikTok = {};
+try { impressosTikTok = JSON.parse(fs.readFileSync(ARQ_IMPRESSOS_TT, 'utf8')); } catch (_) { /* primeira vez */ }
+function marcarImpressoTikTok(rastreio) {
+  if (!rastreio) return;
+  const lim = Date.now() - 3 * 864e5;
+  for (const k of Object.keys(impressosTikTok)) if (impressosTikTok[k] < lim) delete impressosTikTok[k];
+  impressosTikTok[rastreio] = Date.now();
+  try { fs.writeFileSync(ARQ_IMPRESSOS_TT, JSON.stringify(impressosTikTok)); } catch (_) { /* fica na memória */ }
+}
+const rastreiosImpressosTikTok = () => Object.keys(impressosTikTok);
 
 // Uma fila de impressão para tudo (Mercado Livre, Shopee, TikTok, Downloads): as etiquetas saem na
 // ordem em que ficaram prontas, uma atrás da outra, enquanto as seguintes ainda estão sendo montadas.
@@ -573,6 +588,7 @@ async function receberZpl(zpl, { origem = 'manual', imprimir = cfg.imprimir === 
     }
     for (const e of etiquetas) {
       const p = registrar(id, e.tipo, origem, e.img);
+      if (e.rastreio) p.rastreio = e.rastreio;
       feitos.push(p);
       // fluxo contínuo: a etiqueta entra na fila de impressão e a próxima já começa a ser montada
       if (imprimir) impressoes.push(naFilaDeImpressao(() => imprimirPedido(p.jid)).catch((err) => { p.repetir = true; log(`ERRO ao imprimir ${id}: ${err.message} (vai tentar de novo sozinho)`); }));
@@ -844,4 +860,4 @@ function estado() {
   return { config, limites: LIMITES, bleVivo: bleVivo(), bt: Date.now() - bleInfo.quando < 8000 ? bleInfo.bt : undefined, conector: { instalado: fs.existsSync(path.join(RAIZ, 'conector-bluetooth', 'conector-bluetooth')), rodando: Date.now() - bleInfo.quando < 20000 }, driver: driverDoFabricante(), driverProprio: driverProprio(), vigia, fila: situacaoFila(), conexoes: listarConexoes(), pedidos, log: ultimasLinhas.slice(-25).reverse() };
 }
 
-module.exports = { enviarBruto, bleInformar, lerZplDeArquivo, iniciarVigia, bleProximo, bleFeito, receberZpl, imprimirPedido, descartarPedido, diagnostico, salvarConfig, estado, log, cfg, RAIZ };
+module.exports = { rastreiosImpressosTikTok, enviarBruto, bleInformar, lerZplDeArquivo, iniciarVigia, bleProximo, bleFeito, receberZpl, imprimirPedido, descartarPedido, diagnostico, salvarConfig, estado, log, cfg, RAIZ };

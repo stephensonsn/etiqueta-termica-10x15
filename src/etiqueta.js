@@ -693,9 +693,9 @@ async function reescreverEnderecoTikTok(folha, { esperarMs = 0 } = {}) {
   if (!rastreio) return { img: null, motivo: 'rastreio não lido na etiqueta' };
   let e = enderecosTikTok.get(rastreio);
   for (const fim = Date.now() + esperarMs; !e && Date.now() < fim;) { await new Promise((ok) => setTimeout(ok, 500)); e = enderecosTikTok.get(rastreio); }
-  if (!e) return { img: null, motivo: `endereço do rastreio ${rastreio} não chegou da extensão` };
+  if (!e) return { img: null, rastreio, motivo: `endereço do rastreio ${rastreio} não chegou da extensão` };
   const cx = caixaEnderecoTikTok(folha);
-  if (!cx) return { img: null, motivo: 'caixa do destinatário fora do padrão da iMile' };
+  if (!cx) return { img: null, rastreio, motivo: 'caixa do destinatário fora do padrão da iMile' };
   const larg = cx.x1 - cx.x0;
   const end = textoEndereco(e.campos).map(codificarFH).join('\\&');
   // 1º tenta com o nome do destinatário (nome da NF-e) no lugar do apelido; se não couber, mantém o nome original
@@ -758,7 +758,7 @@ async function reescreverEnderecoTikTok(folha, { esperarMs = 0 } = {}) {
       return { img: out, rastreio, nome: tv.nome, nick: tv.nick, escala: esc };
     }
   }
-  return { img: null, motivo: 'endereço não coube na caixa' };
+  return { img: null, rastreio, motivo: 'endereço não coube na caixa' };
 }
 
 // Faixas de linhas com tinta, separadas por linhas em branco: [[y0, y1], ...]
@@ -856,8 +856,8 @@ async function montar(zpl, modo = 'junto', opcoes = {}) {
         const aviso = end.img ? `endereço${end.nome ? ', nome' : ''}${end.nick ? ', nick' : ''} reescritos (rastreio ${end.rastreio}; letra ${end.escala.end})` : `endereço como veio do TikTok: ${end.motivo}`;
         const casada = modo !== 'junto' ? null : ((opcoes.danfes && await casarTikTokCompleto(img, opcoes.danfes)) || await casarTikTok(img));
         saidaImg.push(casada
-          ? { id: 'TikTok NF ' + casada.numero, tipo: 'envio + Danfe (TikTok)', img: casada.img, chave: casada.chave, aviso }
-          : { id: 'TikTok ' + h, tipo: 'TikTok Shop', img, aviso });
+          ? { id: 'TikTok NF ' + casada.numero, tipo: 'envio + Danfe (TikTok)', img: casada.img, chave: casada.chave, aviso, rastreio: end.rastreio }
+          : { id: 'TikTok ' + h, tipo: 'TikTok Shop', img, aviso, rastreio: end.rastreio });
       } else saidaImg.push({ id: 'Shopee ' + h, tipo: 'envio + DACE (Shopee)', img: await encaixarImagem(p) });
     }
     return saidaImg;
