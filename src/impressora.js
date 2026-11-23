@@ -7,14 +7,20 @@ const net = require('net');
 const { execFile, execFileSync, spawn } = require('child_process');
 const { montar, separarEnvios, paraPng, paraTspl, paraTsplCompacto, paraTsplZlib, etiquetaRegua, PREAMBULO } = require('./etiqueta');
 
-const RAIZ = path.join(__dirname, '..');
-const ARQ_CFG = path.join(RAIZ, 'config.json');
+const RAIZ = path.join(__dirname, '..'); // código (conectores, driver, config.exemplo)
+// dados (config, logs, prévias, recebidos): a instalação usa a própria pasta; os testes passam
+// ETIQUETA_DADOS com uma pasta temporária e nunca tocam a config real
+const DADOS = process.env.ETIQUETA_DADOS ? path.resolve(process.env.ETIQUETA_DADOS) : RAIZ;
+// saída falsa para testes: os bytes vão para arquivos nesta pasta em vez da impressora
+const SAIDA_TESTE = process.env.ETIQUETA_SAIDA_TESTE ? path.resolve(process.env.ETIQUETA_SAIDA_TESTE) : '';
+const ARQ_CFG = path.join(DADOS, 'config.json');
 if (!fs.existsSync(ARQ_CFG)) fs.copyFileSync(path.join(RAIZ, 'config.exemplo.json'), ARQ_CFG); // primeira execução
 const cfg = JSON.parse(fs.readFileSync(ARQ_CFG, 'utf8'));
+if (Number(process.env.ETIQUETA_PORTA)) cfg.porta = Number(process.env.ETIQUETA_PORTA); // testes: porta própria (não grava)
 if (!cfg.conexao) cfg.conexao = { tipo: 'usb', dispositivo: '', host: '', portaRede: 9100 };
-for (const d of ['logs', 'recebidos', 'previa']) fs.mkdirSync(path.join(RAIZ, d), { recursive: true });
+for (const d of ['logs', 'recebidos', 'previa']) fs.mkdirSync(path.join(DADOS, d), { recursive: true });
 // prévias são temporárias: ao iniciar sem histórico, limpa as que sobraram da vez anterior
-if (!cfg.guardarHistorico) for (const f of fs.readdirSync(path.join(RAIZ, 'previa'))) fs.rmSync(path.join(RAIZ, 'previa', f), { force: true });
+if (!cfg.guardarHistorico) for (const f of fs.readdirSync(path.join(DADOS, 'previa'))) fs.rmSync(path.join(DADOS, 'previa', f), { force: true });
 
 const ultimasLinhas = [];
 // Registro: sempre fica na memória (o painel mostra as últimas linhas). Só vai para arquivo
@@ -22,7 +28,7 @@ const ultimasLinhas = [];
 function log(msg) {
   const agora = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString(); // hora local
   const linha = `${agora.replace('T', ' ').slice(0, 19)} ${msg}`;
-  if (cfg.guardarHistorico) fs.appendFileSync(path.join(RAIZ, 'logs', `etiqueta-${agora.slice(0, 10)}.log`), linha + '\n');
+  if (cfg.guardarHistorico) fs.appendFileSync(path.join(DADOS, 'logs', `etiqueta-${agora.slice(0, 10)}.log`), linha + '\n');
   if (cfg.guardarHistorico || /^(ERRO|falha|ponte ativa)/.test(msg)) process.stdout.write(linha + '\n');
   ultimasLinhas.push(linha);
   if (ultimasLinhas.length > 60) ultimasLinhas.shift();
@@ -340,13 +346,20 @@ function comCalibracao(bytes) {
 }
 
 async function enviar(gerar, rotulo) {
+  if (SAIDA_TESTE) { // teste: grava o que iria para a impressora e não manda nada
+    const bytes = comCalibracao(gerar('usb'));
+    fs.mkdirSync(SAIDA_TESTE, { recursive: true });
+    fs.writeFileSync(path.join(SAIDA_TESTE, `${Date.now()}-${rotulo}.tspl`), bytes);
+    log(`enviado ${rotulo} por teste (${bytes.length} bytes)`);
+    return;
+  }
   let ultimo = new Error(situacaoPreferida().texto || 'impressora não conectada');
   for (let t = 1; t <= cfg.tentativas; t++) {
     const opcoes = conexoesDisponiveis();
     for (const cx of opcoes) {
       const bytes = comCalibracao(gerar(cx.tipo));
       const tempo = Math.min(10000 + Math.ceil(bytes.length / 1024) * 50, 60000); // base + por KB, com teto
-      const arq = path.join(RAIZ, 'recebidos', `${rotulo}.tspl`);
+      const arq = path.join(DADOS, 'recebidos', `${rotulo}.tspl`);
       try {
         let r;
         if (cx.tipo === 'ble') r = await escreverBle(bytes, 30000 + Math.ceil(bytes.length / 1024) * 1500);
@@ -441,13 +454,13 @@ function carimbo() {
 function registrar(id, tipo, origem, img) {
   const jid = `${carimbo()}-${++seq}`;
   const p = { jid, id, tipo, origem, hora: new Date().toISOString(), estado: 'aguardando', erro: '', impressoes: 0 };
-  fs.writeFileSync(path.join(RAIZ, 'previa', `${jid}.png`), paraPng(img));
+  fs.writeFileSync(path.join(DADOS, 'previa', `${jid}.png`), paraPng(img));
   pedidos.unshift(p);
   imagens.set(jid, img);
   while (pedidos.length > 40) {
     const velho = pedidos.pop();
     imagens.delete(velho.jid);
-    fs.rmSync(path.join(RAIZ, 'previa', `${velho.jid}.png`), { force: true });
+    fs.rmSync(path.join(DADOS, 'previa', `${velho.jid}.png`), { force: true });
   }
   return p;
 }
@@ -487,7 +500,7 @@ function descartarPedido(jid) {
 
 // Rastreios do TikTok que já saíram na térmica (3 dias, em disco): a extensão confere e reimprime o
 // que foi criado no TikTok mas não chegou aqui (TikTok lento, arquivo que não baixou).
-const ARQ_IMPRESSOS_TT = path.join(RAIZ, 'logs', 'tiktok-impressos.json');
+const ARQ_IMPRESSOS_TT = path.join(DADOS, 'logs', 'tiktok-impressos.json');
 let impressosTikTok = {};
 try { impressosTikTok = JSON.parse(fs.readFileSync(ARQ_IMPRESSOS_TT, 'utf8')); } catch (_) { /* primeira vez */ }
 function marcarImpressoTikTok(rastreio) {
@@ -563,7 +576,7 @@ async function receberZpl(zpl, { origem = 'manual', imprimir = cfg.imprimir === 
       if (numero) porNumero.delete(numero);
       const idErro = numero || `sem-id-${n + 1}`;
       try {
-        const dir = path.join(RAIZ, 'logs', 'falhas');
+        const dir = path.join(DADOS, 'logs', 'falhas');
         fs.mkdirSync(dir, { recursive: true });
         fs.writeFileSync(path.join(dir, `${carimbo()}-${idErro}.zpl`), envio);
       } catch (_) { /* segue */ }
@@ -574,12 +587,12 @@ async function receberZpl(zpl, { origem = 'manual', imprimir = cfg.imprimir === 
       continue;
     }
     const id = etiquetas[0].id || `sem-id-${n + 1}`;
-    if (cfg.guardarHistorico) fs.writeFileSync(path.join(RAIZ, 'recebidos', `${carimbo()}-${id}.zpl`), envio);
+    if (cfg.guardarHistorico) fs.writeFileSync(path.join(DADOS, 'recebidos', `${carimbo()}-${id}.zpl`), envio);
     // envio + documento fiscal que não couberam numa etiqueta só: guarda o ZPL neste computador
     // (fora do git, apagado em 7 dias) para dar para ajustar o modelo depois, mesmo sem histórico ligado
     if (etiquetas.some((e) => e.tipo === 'fiscal')) {
       try {
-        const dir = path.join(RAIZ, 'logs', 'nao-juntou');
+        const dir = path.join(DADOS, 'logs', 'nao-juntou');
         fs.mkdirSync(dir, { recursive: true });
         for (const f of fs.readdirSync(dir)) if (Date.now() - fs.statSync(path.join(dir, f)).mtimeMs > 7 * 864e5) fs.rmSync(path.join(dir, f), { force: true });
         fs.writeFileSync(path.join(dir, `${carimbo()}-${id}.zpl`), envio);
@@ -635,7 +648,7 @@ function apagarSeImprimiu(arquivo) {
 
 // Vigia a pasta Downloads: etiqueta baixada do Mercado Livre ou da Shopee entra sozinha.
 // Idempotente: cada arquivo (nome + tamanho + data) é processado uma vez só, mesmo após reiniciar.
-const PASTA = path.join(require('os').homedir(), 'Downloads');
+const PASTA = process.env.ETIQUETA_DOWNLOADS ? path.resolve(process.env.ETIQUETA_DOWNLOADS) : path.join(require('os').homedir(), 'Downloads');
 const lotesTikTok = new Map(); // "<data>" do nome do arquivo -> { etiqueta, nfe }
 function descartarNfeTikTok(caminho, nome) {
   log(`TikTok: ${nome} não imprime separado; o DANFE simplificado vai junto na etiqueta de envio`);
@@ -664,7 +677,7 @@ function loteTikTok(l) {
   for (const k of lotesTikTok.keys()) if (Math.abs(segundosDoLote(k) - s) <= 5) return k;
   return l;
 }
-const ARQ_VISTOS = path.join(RAIZ, 'logs', 'arquivos-vistos.json');
+const ARQ_VISTOS = path.join(DADOS, 'logs', 'arquivos-vistos.json');
 let vistos = {};
 try { vistos = JSON.parse(fs.readFileSync(ARQ_VISTOS, 'utf8')); } catch (_) { /* primeira vez */ }
 const vigia = { ativo: false, texto: 'Desligado' };
@@ -860,4 +873,4 @@ function estado() {
   return { config, limites: LIMITES, bleVivo: bleVivo(), bt: Date.now() - bleInfo.quando < 8000 ? bleInfo.bt : undefined, conector: { instalado: fs.existsSync(path.join(RAIZ, 'conector-bluetooth', 'conector-bluetooth')), rodando: Date.now() - bleInfo.quando < 20000 }, driver: driverDoFabricante(), driverProprio: driverProprio(), vigia, fila: situacaoFila(), conexoes: listarConexoes(), pedidos, log: ultimasLinhas.slice(-25).reverse() };
 }
 
-module.exports = { rastreiosImpressosTikTok, enviarBruto, bleInformar, lerZplDeArquivo, iniciarVigia, bleProximo, bleFeito, receberZpl, imprimirPedido, descartarPedido, diagnostico, salvarConfig, estado, log, cfg, RAIZ };
+module.exports = { ehTermica, usbEscolhida, conexoesDisponiveis, DADOS, rastreiosImpressosTikTok, enviarBruto, bleInformar, lerZplDeArquivo, iniciarVigia, bleProximo, bleFeito, receberZpl, imprimirPedido, descartarPedido, diagnostico, salvarConfig, estado, log, cfg, RAIZ };

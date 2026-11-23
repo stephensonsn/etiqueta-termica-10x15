@@ -9,14 +9,14 @@ const path = require('path');
 const os = require('os');
 const net = require('net');
 let siteVisto = 0; // última vez que o site do Mercado Livre procurou a impressora
-const { enviarBruto, bleInformar, lerZplDeArquivo, iniciarVigia, bleProximo, bleFeito, receberZpl, imprimirPedido, descartarPedido, diagnostico, salvarConfig, estado, log, cfg, RAIZ } = require('./impressora');
+const { enviarBruto, bleInformar, lerZplDeArquivo, iniciarVigia, bleProximo, bleFeito, receberZpl, imprimirPedido, descartarPedido, diagnostico, salvarConfig, estado, log, cfg, RAIZ, DADOS } = require('./impressora');
 const loja = require('./loja');
-loja.iniciar({ cfg, log, RAIZ });
+loja.iniciar({ cfg, log, RAIZ: DADOS });
 const ml = require('./ml');
-ml.iniciar({ cfg, log, RAIZ, loja });
+ml.iniciar({ cfg, log, RAIZ: DADOS, loja });
 ml.aoSalvarConfig(() => salvarConfig({}));
 const mlEtiquetas = require('./mlEtiquetas');
-mlEtiquetas.iniciar({ cfg, log, RAIZ, receberZpl, salvarConfig: () => salvarConfig({}) });
+mlEtiquetas.iniciar({ cfg, log, RAIZ: DADOS, receberZpl, salvarConfig: () => salvarConfig({}) });
 
 // Pendências para o ícone vermelho da extensão: impressora/ponte, etiquetas com erro na fila,
 // pedidos parados (sem NF-e) e automações que pararam (Mercado Livre aqui, TikTok pela extensão).
@@ -125,7 +125,7 @@ const servidor = http.createServer(async (req, res) => {
       if (req.method === 'GET' && rota === '/api/ble/proximo') return json(bleProximo() || {});
       const mPrevia = rota.match(/^\/api\/previa\/([0-9]+-[0-9]+)\.png$/);
       if (req.method === 'GET' && mPrevia) {
-        const arq = path.join(RAIZ, 'previa', `${mPrevia[1]}.png`);
+        const arq = path.join(DADOS, 'previa', `${mPrevia[1]}.png`);
         if (!fs.existsSync(arq)) { res.writeHead(404); return res.end(); }
         res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'max-age=3600' }); return res.end(fs.readFileSync(arq));
       }
@@ -198,6 +198,16 @@ const servidor = http.createServer(async (req, res) => {
             if (r.e) return json({ erro: /cancel/i.test(String(r.se)) ? 'instalação cancelada' : `não instalou: ${String(r.se || r.e.message).trim().slice(0, 160)}` }, 400);
             return json({ ok: true });
           }
+          if (rota === '/api/driver-fabricante') {
+            // driver do fabricante: baixa pelo link direto (o site só tem uma página que redireciona),
+            // confere assinatura e abre o instalador da Apple, que pede a senha na tela dele
+            const script = path.join(RAIZ, 'driver-mac', 'baixar-driver-fabricante.sh');
+            if (!fs.existsSync(script)) return json({ erro: 'o script do driver não veio nesta instalação' }, 400);
+            const f = require('child_process').spawn('/bin/bash', [script], { detached: true, stdio: 'ignore' });
+            f.unref();
+            log('driver do fabricante: baixando e abrindo o instalador (log em ~/Downloads/driver-etiqueta/baixar-driver.log)');
+            return json({ ok: true });
+          }
           if (rota === '/api/sku/imprimir') {
             const { etiquetas, opts } = JSON.parse(txt || '{}');
             if (!Array.isArray(etiquetas) || !etiquetas.length) return json({ erro: 'lista de etiquetas vazia' }, 400);
@@ -258,7 +268,7 @@ const servidor = http.createServer(async (req, res) => {
 
 // Porta para o driver de sistema: o macOS entrega aqui o trabalho já em TSPL (fila "socket://127.0.0.1:porta").
 // O macOS não aceita programas de entrega de terceiros, então a entrega usa o envio por rede que já vem nele.
-const portaDriver = cfg.portaDriver || 9102;
+const portaDriver = Number(process.env.ETIQUETA_PORTA_DRIVER) || cfg.portaDriver || 9102;
 net.createServer((c) => {
   const partes = [];
   let total = 0;

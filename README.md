@@ -76,7 +76,7 @@ Passo a passo:
    ./instalar.sh
    ```
 4. Na primeira vez o instalador abre o painel (<http://127.0.0.1:9100/painel>) com o **assistente de configuração**, em 5 etapas que só avançam quando a anterior está pronta de verdade: conexão (cabo, Bluetooth ou rede); liberações do macOS (Bluetooth e pasta Downloads, com botão que abre a tela certa dos Ajustes); impressora conectada; etiqueta de teste confirmada; e o Mercado Livre encontrando a impressora. Na etapa da impressora também dá para instalar o driver de sistema: o próprio macOS pede a senha de administrador.
-5. **Cabo USB:** ligue a impressora e clique em *Usar esta impressora*. Se o driver do fabricante já estiver instalado, o assistente reconhece e usa a fila dele. Se não estiver, a ponte cria a própria fila e funciona sem driver. O driver do fabricante só é necessário para imprimir de outros programas; ele não vem neste projeto e deve ser baixado no site do fabricante: [driver para Mac](https://www.cnfujun.com/d/73) (LabelPrinter 2.3.3).
+5. **Cabo USB:** ligue a impressora e clique em *Usar esta impressora*. Se o driver do fabricante já estiver instalado, o assistente reconhece e usa a fila dele. Se não estiver, a ponte cria a própria fila e funciona sem driver. O driver do fabricante só é necessário para imprimir de outros programas; ele não vem neste projeto e deve ser baixado no site do fabricante: [driver para Mac](https://www.cnfujun.com/en/init.php/index/down?id=73) (LabelPrinter 2.3.3).
 6. **Só para Bluetooth:** abra o painel no Google Chrome, clique em *Escolher impressora* na linha Bluetooth e selecione a sua. É uma vez só; daí em diante o computador liga nela sozinho.
 
 ### Ligar no Mercado Livre
@@ -237,8 +237,10 @@ Observações:
 Continua valendo se você preferir. Ele não vem neste projeto:
 
 - O driver oficial da OIA-8370-B é distribuído pela Fujun (cnfujun.com), que fabrica o modelo vendido pela Oásis Market. Downloads:
-  - macOS: <https://www.cnfujun.com/d/73> (arquivo `Driver software for Mac-73.zip`, com o `LabelPrinter2.3.3.dmg` dentro)
-  - Windows: <https://www.cnfujun.com/d/72> (`Label Printer Driver software for Windows-72.exe`)
+  - macOS: <https://www.cnfujun.com/en/init.php/index/down?id=73> (arquivo `Driver software for Mac-73.zip`, com o `LabelPrinter2.3.3.dmg` dentro)
+  - Windows: <https://www.cnfujun.com/en/init.php/index/down?id=72> (`Label Printer Driver software for Windows-72.exe`)
+  - A página `cnfujun.com/d/73` só redireciona e não baixa nada; os links acima são os do arquivo (achados lendo a página em 23/11/2026).
+  - No Mac, o botão *Baixar e instalar* do painel (ou `bash driver-mac/baixar-driver-fabricante.sh`) baixa pelo link direto, com nova tentativa e continuação, confere o zip e o DMG, só abre o pacote assinado por `Developer ID Installer: gonghai wang (W9EBWVXHKB)` e aceito pela Apple, e chama o instalador da Apple, que pede a senha na tela. O registro fica em `~/Downloads/driver-etiqueta/baixar-driver.log`.
 - O assistente de configuração e o instalador verificam se ele está instalado e avisam. Se estiver, usam a fila dele; se não estiver, seguem sem ele e mostram o link.
 
 ## Impressoras compatíveis
