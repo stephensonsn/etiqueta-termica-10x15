@@ -621,7 +621,7 @@ async function casarTikTok(folha) {
 // A etiqueta da iMile escreve o endereço começando pelo complemento ("Casa esquina, Prado Rua ... 149").
 // A extensão lê o endereço em campos no próprio TikTok (rua, número, complemento, bairro, cidade, UF,
 // CEP) e manda para cá pelo rastreio. Aqui o bloco do endereço é redesenhado na ordem certa:
-//   Rua, número / complemento / bairro - cidade/UF / CEP
+//   Rua, número / bairro - cidade/UF / CEP / Compl.: complemento
 // Trava: só troca se o rastreio lido no código de barras da etiqueta for o mesmo do endereço e se a
 // caixa do destinatário estiver onde a iMile põe; senão a etiqueta sai como veio.
 const enderecosTikTok = new Map(); // rastreio -> { campos, quando }
@@ -641,10 +641,11 @@ function registrarEnderecosTikTok(lista) {
   return n;
 }
 function textoEndereco(c) {
+  // endereço de entrega primeiro; complemento (observação do comprador) por último
   const linhas = [c.numero ? `${c.rua}, ${c.numero}` : c.rua];
-  if (c.complemento) linhas.push(c.complemento);
   linhas.push([c.bairro, `${c.cidade}/${c.uf}`].filter(Boolean).join(' - '));
   linhas.push(`CEP ${c.cep.slice(0, 5)}-${c.cep.slice(5)}`);
+  if (c.complemento) linhas.push(`Compl.: ${c.complemento}`);
   return linhas;
 }
 // Caixa do endereço: coluna do texto entre a bolinha "TO" e a linha vertical do QR, do fim do nome
