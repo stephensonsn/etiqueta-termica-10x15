@@ -1,6 +1,6 @@
 // TikTok Shop: impressão automática dos pedidos novos.
-// Liga numa aba própria do Seller Center (vale para o Chrome todo; roda numa aba só). A cada 2 minutos
-// (45 s logo depois de emitir NF-e, para já imprimir):
+// Liga numa aba própria do Seller Center (vale para o Chrome todo; roda numa aba só). A cada 1 minuto
+// (15 s enquanto a NF-e está saindo, para imprimir assim que ela fica pronta):
 //   1) abre Pedidos > Para enviar (Aguardando envio);
 //   2) nos pedidos "Sem NF-e": abre a NF-e, escolhe "Emitir" e emite pelo emissor do TikTok;
 //   3) nos pedidos com NF-e emitida: marca e clica em "Criar e imprimir etiqueta";
@@ -10,8 +10,10 @@
 (() => {
   'use strict';
   const URL_PEDIDOS = 'https://seller-br.tiktok.com/order?order_status[]=1&selected_sort=1&tab=to_ship';
-  const INTERVALO = 2 * 60 * 1000;
-  const LOGO_APOS_EMITIR = 45 * 1000; // NF-e emitida: confere de novo em 45 s para já imprimir
+  const INTERVALO = 60 * 1000;        // pedido novo: confere a cada 1 minuto
+  const RAPIDO = 15 * 1000;           // NF-e pedida ou "Processando NF-e": confere a cada 15 s e imprime assim que sair
+  const RAPIDO_MAX = 16;              // no máximo 4 minutos no ritmo rápido; depois volta para 1 minuto
+  const CH_RAPIDO = CHAVE + '-rapido';
   const MAX_POR_RODADA = 10;
   const CHAVE = 'etiqueta-termica-auto';
   // Liga/desliga vale para o Chrome todo (chrome.storage), não só para esta aba: desligar em qualquer
@@ -112,7 +114,7 @@
     botao.textContent = lig ? 'Desligar' : 'Ligar';
     botao.style.background = lig ? '#FEE2E2' : '#2563EB';
     botao.style.color = lig ? '#B91C1C' : '#fff';
-    estado.textContent = msg || (ligado() ? 'Ligada nesta aba: confere a cada 2 minutos. Deixe esta aba aberta.'
+    estado.textContent = msg || (ligado() ? 'Ligada nesta aba: confere a cada 1 minuto (15 s enquanto a NF-e sai). Deixe esta aba aberta.'
       : ligadoOutra() ? 'Ligada em outra aba do TikTok. Desligar aqui desliga lá também.'
         : 'Desligada: não emite NF-e nem imprime. Ligue numa aba só para isso.');
     mostrar();
@@ -314,18 +316,22 @@
       }
       gravarTravados(trav);
       desenharTravados();
-      emitiuAgora = emitidas > 0;
-      if (emitidas) log(`${emitidas} NF-e em processamento; as etiquetas saem em cerca de 1 minuto`);
+      // NF-e acabou de ser pedida ou ainda está processando: próxima conferência em 15 s
+      const processando = linhasDePedido().filter((i) => statusNfe(i.linha) === 'processando').length;
+      let n = 0; try { n = Number(sessionStorage.getItem(CH_RAPIDO) || 0); } catch (_) { /* nada */ }
+      emitiuAgora = (emitidas > 0 || processando > 0) && n < RAPIDO_MAX;
+      try { sessionStorage.setItem(CH_RAPIDO, emitidas > 0 ? '1' : emitiuAgora ? String(n + 1) : '0'); } catch (_) { /* nada */ }
+      if (emitidas) log(`${emitidas} NF-e pedida(s); confiro a cada 15 s e imprimo assim que sair`);
       if (!semNota.length && !prontos.length) log(Object.keys(trav).length ? 'nenhum pedido novo; há pedido esperando correção do cadastro' : 'nenhum pedido novo');
       avisarTravados(avisos.length >= 3 ? avisos : null); // lentidão isolada não acende o vermelho
-      desenhar(`Última conferência ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}. Próxima em 2 minutos.`);
+      desenhar(`Última conferência ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}. Próxima em ${emitiuAgora ? '15 s' : '1 minuto'}.`);
     } catch (e) {
       log('PAROU: ' + e.message);
       avisarTravados([e.message]);
-      desenhar('Parou nesta rodada: ' + e.message + '. Tenta de novo em 2 minutos.');
+      desenhar('Parou nesta rodada: ' + e.message + '. Tenta de novo em 1 minuto.');
     } finally {
       rodando = false;
-      setTimeout(() => { if (ligado()) location.href = URL_PEDIDOS; }, emitiuAgora ? LOGO_APOS_EMITIR : INTERVALO);
+      setTimeout(() => { if (ligado()) location.href = URL_PEDIDOS; }, emitiuAgora ? RAPIDO : INTERVALO);
     }
   }
   // estado global: carrega e acompanha (desligar em outra aba ou no ícone para esta na hora)
