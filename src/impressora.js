@@ -200,7 +200,7 @@ function listarConexoesAgora() {
     bluetooth = fs.readdirSync('/dev').filter((n) => n.startsWith('cu.') && !/Bluetooth-Incoming-Port|debug-console|wlan|usbmodem|usbserial/i.test(n))
       .map((n) => ({ dispositivo: `/dev/${n}`, nome: n.slice(3) }));
   } catch (_) { /* sem /dev */ }
-  return { usb, bluetooth };
+  return { usb: usb.filter(ehTermica), bluetooth }; // impressora de escritório não aparece nem é usada
 }
 
 // Escreve numa porta serial Bluetooth (criada pelo macOS quando a impressora é pareada).
