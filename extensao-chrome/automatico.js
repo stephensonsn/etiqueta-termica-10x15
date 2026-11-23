@@ -212,6 +212,22 @@
     }
     return out;
   }
+  // lista carregada de verdade: o contador "N pedidos encontrados" apareceu e as linhas na tela
+  // batem com ele. Lista vazia só vale se continuar vazia depois de mais 8 s (o TikTok lento mostra
+  // a tela sem linhas enquanto carrega e a rodada dizia "nenhum pedido novo" com pedido esperando).
+  const contador = () => { const t = texto(document.body); const m = t.match(/(\d+)\s*pedidos? encontrados?/i); return m ? Number(m[1]) : /Nenhum pedido/i.test(t) ? 0 : null; };
+  async function listaCarregada() {
+    const ok = await achar(() => { const n = contador(); if (n === null) return false; return n === 0 || linhasDePedido().length >= Math.min(n, 20); }, 60000);
+    if (!ok) return false;
+    if (contador() === 0 && !linhasDePedido().length) {
+      await esperar(8000);
+      const n = contador();
+      if (n === null) return false;
+      if (n > 0 && !(await achar(() => linhasDePedido().length >= Math.min(n, 20), 30000))) return false;
+    }
+    await esperar(1500);
+    return true;
+  }
   const statusNfe = (linha) => {
     const t = texto(linha);
     if (/Sem NF-e/i.test(t)) return 'sem';
@@ -312,9 +328,7 @@
   // ---------- reimprimir o que não chegou na térmica (lista "Aguardando coleta") ----------
   const REIMPRIMIR = CHAVE + '-reimprimir';
   async function reimprimir(ids) {
-    const carregou = await achar(() => /pedidos? encontrados?|Nenhum pedido/i.test(texto(document.body)), 45000);
-    if (!carregou) throw new Error('a lista "Aguardando coleta" não carregou');
-    await esperar(2500);
+    if (!(await listaCarregada())) throw new Error('a lista "Aguardando coleta" não carregou');
     const linhas = linhasDePedido().filter((i) => ids.includes(i.pedido));
     const m = lerConferir();
     for (const id of ids) if (m[id]) m[id].tentativas = (m[id].tentativas || 0) + 1;
@@ -368,9 +382,7 @@
         location.href = URL_COLETA;
         return;
       }
-      const carregou = await achar(() => /pedidos? encontrados?|Nenhum pedido/i.test(texto(document.body)), 30000);
-      if (!carregou) throw new Error('a lista de pedidos não carregou');
-      await esperar(2500);
+      if (!(await listaCarregada())) throw new Error('a lista de pedidos não carregou');
       // 1) primeiro imprime o que já tem NF-e: um pedido com problema nunca segura os outros
       const ja = feitos();
       const prontos = linhasDePedido().filter((i) => statusNfe(i.linha) === 'emitida' && !ja[i.pedido]).slice(0, MAX_POR_RODADA);
