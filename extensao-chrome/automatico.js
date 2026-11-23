@@ -250,6 +250,43 @@
   const ERRO_CADASTRO = /33009007|informa[çc][õo]es (fiscais|obrigat[óo]rias)/i;
   // erro de cadastro trava o pedido; qualquer outro erro (lentidão, falha de rede) tenta na próxima rodada
   const erro = (msg, cadastro = false) => Object.assign(new Error(msg), { cadastro });
+  // Emissão pela API do próprio Seller Center (a mesma que o botão "Emitir NF-e" chama, mapeada
+  // no código público da página): todos os pedidos numa chamada só, em segundos. Devolve
+  // { ok:[ids], cadastro:{id:msg}, outro:{id:msg} } ou null quando a API não respondeu como
+  // esperado (aí a rodada usa o caminho por cliques).
+  async function emitirNfeApi(ids) {
+    try {
+      const q = '?aid=4068&locale=pt-BR';
+      const r1 = await fetch('/api/fulfillment/order/get' + q, { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ main_order_id: ids }) });
+      const j1 = await r1.json();
+      if (!j1 || j1.code !== 0) return null;
+      const lista = [];
+      for (const o of (j1.data && j1.data.main_order) || []) {
+        const id = String(o.main_order_id);
+        const uni = ((o.fulfill_unit_id_mapper || [])[0] || {}).fulfill_unit_id;
+        if (ids.includes(id) && uni) lista.push({ fulfill_unit_id: String(uni), order_ids: [id] });
+      }
+      if (!lista.length) return null;
+      const r2 = await fetch('/api/fulfillment/invoice/create_by_platform' + q, { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ platform_invoice_list: lista }) });
+      const j2 = await r2.json();
+      if (!j2 || j2.code !== 0) { log('API da NF-e recusou (' + ((j2 && (j2.message || j2.code)) || r2.status) + '); uso os cliques'); return null; }
+      const res = { ok: [], cadastro: {}, outro: {} };
+      const falhas = {};
+      for (const f of (j2.data && j2.data.platform_invoice_list) || []) {
+        const fr = f.fail_reason;
+        if (!fr || (!fr.reason_code && !fr.reason_message)) continue;
+        for (const id of f.order_ids || []) falhas[String(id)] = `${fr.reason_message || ''} (${fr.reason_code || ''})`.trim();
+      }
+      for (const { order_ids: [id] } of lista) {
+        const m = falhas[id];
+        if (!m) res.ok.push(id);
+        else if (ERRO_CADASTRO.test(m)) res.cadastro[id] = m;
+        else res.outro[id] = m;
+      }
+      return res;
+    } catch (e) { log('API da NF-e falhou (' + e.message + '); uso os cliques'); return null; }
+  }
+
   async function emitirNfe(item) {
     const link = [...item.linha.querySelectorAll('*')].find((e) => /^Sem NF-e/i.test(texto(e)) && e.children.length <= 1);
     if (!link) throw erro(`pedido ${item.pedido}: não achei "Sem NF-e"`);
@@ -399,7 +436,20 @@
       const semNota = linhas.filter((i) => statusNfe(i.linha) === 'sem' && !trav[i.pedido]).slice(0, MAX_POR_RODADA);
       let emitidas = 0;
       const avisos = [];
-      for (const it of semNota) {
+      // primeiro pela API (rápido, todos de uma vez); o que ela não resolver vai pelos cliques
+      let viaCliques = semNota;
+      if (semNota.length && ligado()) {
+        const api = await emitirNfeApi(semNota.map((i) => i.pedido));
+        if (api) {
+          emitidas += api.ok.length;
+          if (api.ok.length) log(`NF-e pedida pela API: ${api.ok.map((i) => i.slice(-6)).join(', ')}`);
+          for (const [id, m] of Object.entries(api.cadastro)) { trav[id] = { quando: Date.now(), motivo: m }; log(`PENDENTE: pedido ${id}: faltam dados fiscais do produto no cadastro do TikTok (${m}). Não tento de novo até corrigir o cadastro.`); }
+          for (const [id, m] of Object.entries(api.outro)) { avisos.push(m); log(`AVISO: pedido ${id}: o TikTok recusou agora (${m.slice(0, 120)}); tento na próxima rodada`); }
+          const resolvidos = new Set([...api.ok, ...Object.keys(api.cadastro), ...Object.keys(api.outro)]);
+          viaCliques = semNota.filter((i) => !resolvidos.has(i.pedido));
+        }
+      }
+      for (const it of viaCliques) {
         if (!ligado()) { log('desligada: parei antes de emitir as próximas NF-e'); break; }
         try { await emitirNfe(it); emitidas++; } catch (e) {
           if (e.cadastro) {
