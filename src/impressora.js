@@ -54,7 +54,7 @@ function salvarConfig(novo) {
       if (n.uri) {
         // impressora no cabo sem fila no macOS: o conector USB fala direto com ela, sem criar fila
         // (fila crua aparecia na janela de imprimir e o PDF ia para ela sem converter)
-        const achada = listarConexoes().usb.find((u) => u.semFila && u.uri === n.uri);
+        const achada = listarConexoes().usb.find((u) => u.semFila && u.uri === n.uri && ehTermica(u));
         if (!achada) throw new Error('impressora não encontrada no cabo USB');
         n.fila = '';
       }
@@ -159,7 +159,10 @@ async function escreverUsbDireto(bytes, tempoMs) {
 }
 
 // A térmica no cabo: a da fila escolhida ou, sem fila (modo direto), qualquer uma ligada no USB.
-const usbEscolhida = (lista) => lista.find((u) => u.ligada && (cfg.fila ? u.fila === cfg.fila : true));
+// Nunca uma impressora de escritório (jato de tinta/laser): ela não entende TSPL e imprimiria páginas de lixo.
+const ESCRITORIO = /\b(brother|hp|hewlett|epson|canon|samsung|lexmark|ricoh|kyocera|xerox|oki|sharp|konica|minolta|pantum|dell|fuji)\b|^(dcp|mfc|hl|deskjet|officejet|laserjet|envy|pixma|ecotank|l\d{3,4})[-_ ]/i;
+const ehTermica = (u) => !ESCRITORIO.test(`${u.nome || ''} ${decodeURIComponent(u.uri || '')}`);
+const usbEscolhida = (lista) => lista.find((u) => u.ligada && ehTermica(u) && (cfg.fila ? u.fila === cfg.fila : true));
 
 // Impressoras que o Mac enxerga agora, por tipo de conexão.
 let cxCache = { quando: 0, valor: null };

@@ -35,7 +35,8 @@ func interfacesDeImpressora() -> [io_service_t] {
         if IORegistryEntryGetChildIterator(dev, kIOServicePlane, &filhos) == KERN_SUCCESS {
             while case let f = IOIteratorNext(filhos), f != 0 {
                 if IOObjectConformsTo(f, "IOUSBHostInterface") != 0,
-                   let c = IORegistryEntryCreateCFProperty(f, "bInterfaceClass" as CFString, kCFAllocatorDefault, 0)?.takeRetainedValue() as? Int, c == 7 {
+                   let c = IORegistryEntryCreateCFProperty(f, "bInterfaceClass" as CFString, kCFAllocatorDefault, 0)?.takeRetainedValue() as? Int, c == 7,
+                   ehTermica(f) {
                     out.append(f)
                 } else { IOObjectRelease(f) }
             }
@@ -45,6 +46,16 @@ func interfacesDeImpressora() -> [io_service_t] {
     }
     IOObjectRelease(it)
     return out
+}
+
+// Só a térmica: impressora de escritório (jato de tinta/laser) no mesmo Mac nunca recebe TSPL.
+// Em 23/11/2026 a Brother DCP-T530DW estava no cabo e era a "primeira impressora USB".
+let MARCAS_ESCRITORIO = ["brother", "hp", "hewlett", "epson", "canon", "samsung", "lexmark", "ricoh", "kyocera",
+                         "xerox", "oki", "sharp", "konica", "minolta", "pantum", "dell", "fuji"]
+func ehTermica(_ s: io_service_t) -> Bool {
+    let nome = (((propriedade(s, "USB Vendor Name") as? String) ?? "") + " " + ((propriedade(s, "USB Product Name") as? String) ?? "")).lowercased()
+    let palavras = nome.split(whereSeparator: { !$0.isLetter && !$0.isNumber }).map(String.init)
+    return !MARCAS_ESCRITORIO.contains(where: { m in palavras.contains(where: { $0 == m || $0.hasPrefix(m + "-") }) || nome.hasPrefix(m) })
 }
 
 func propriedade(_ s: io_service_t, _ chave: String) -> Any? {
