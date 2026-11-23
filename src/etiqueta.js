@@ -633,7 +633,7 @@ function registrarEnderecosTikTok(lista) {
   for (const e of [].concat(lista || [])) {
     const rastreio = limpo(e && e.rastreio, 40).replace(/\D/g, '');
     if (rastreio.length < 8) continue;
-    const c = { nome: limpo(e.nome, 60), rua: limpo(e.rua), numero: limpo(e.numero, 20), complemento: limpo(e.complemento), bairro: limpo(e.bairro, 60), cidade: limpo(e.cidade, 60), uf: limpo(e.uf, 30), cep: limpo(e.cep, 12).replace(/\D/g, '') };
+    const c = { nome: limpo(e.nome, 60), nick: limpo(e.nick, 40), usuario: limpo(e.usuario, 40).replace(/^@/, ''), rua: limpo(e.rua), numero: limpo(e.numero, 20), complemento: limpo(e.complemento), bairro: limpo(e.bairro, 60), cidade: limpo(e.cidade, 60), uf: limpo(e.uf, 30), cep: limpo(e.cep, 12).replace(/\D/g, '') };
     if (!c.rua || !c.cidade || c.cep.length !== 8) continue;
     enderecosTikTok.set(rastreio, { campos: c, quando: agora });
     n++;
@@ -699,23 +699,63 @@ async function reescreverEnderecoTikTok(folha, { esperarMs = 0 } = {}) {
   const larg = cx.x1 - cx.x0;
   const end = textoEndereco(e.campos).map(codificarFH).join('\\&');
   // 1º tenta com o nome do destinatário (nome da NF-e) no lugar do apelido; se não couber, mantém o nome original
-  const opcoes = e.campos.nome ? [[cx.yNome, codificarFH(e.campos.nome)], [cx.y0, null]] : [[cx.y0, null]];
-  for (const [y0, nome] of opcoes) {
+  // Escala fixa (203 dpi = 8 pontos/mm), do maior para o menor; usa o primeiro degrau em que tudo cabe:
+  //   nome do destinatário (NF-e) > nick do comprador > endereço. Mínimos: endereço 20 (2,5 mm), nick 16 (2 mm).
+  //   Espaços: 4 entre nome e nick, 8 antes do endereço, 3 entre linhas.
+  const ESCALA = [{ nome: 28, nick: 18, end: 22 }, { nome: 26, nick: 18, end: 22 }, { nome: 26, nick: 16, end: 20 }, { nome: 24, nick: 16, end: 20 }];
+  const nickTxt = (comUsuario) => {
+    const n = e.campos.nick, u = e.campos.usuario;
+    if (!n && !u) return '';
+    if (!u || !comUsuario || (n && n.toLowerCase() === u.toLowerCase())) return `Nick: ${n || '@' + u}`;
+    return n ? `Nick: ${n} (@${u})` : `Nick: @${u}`;
+  };
+  const desenhar = async (txt, t, linhas) => {
+    const img = await bloco(`^FO0,0^A0N,${t},${Math.round(t * 0.92)}^FB${larg},${linhas},3,L^FH^FD${codificarFH(txt)}^FS`, 260);
+    const fim = ultimaLinha(img);
+    return fim < 0 ? null : recortar(img, fim + 1);
+  };
+  const cabe = (img) => { const lim = limites(img); return lim.x1 < larg; };
+  // tentativas: com nome e nick; com nome sem nick; só o endereço (mantém o nome original da etiqueta)
+  const tentativas = [];
+  if (e.campos.nome) { tentativas.push({ nome: true, nick: true }); tentativas.push({ nome: true, nick: false }); }
+  tentativas.push({ nome: false, nick: false });
+  for (const tv of tentativas) {
+    const y0 = tv.nome ? cx.yNome : cx.y0;
     const alt = cx.y1 - y0;
-    for (const [h, w] of [[26, 24], [24, 22], [22, 20], [20, 18]]) {
-      const zNome = nome ? `^FO0,0^A0N,${h + 2},${w + 2}^FB${larg},2,2,L^FH^FD${nome}^FS` : '';
-      const img0 = nome ? await bloco(zNome, 120) : null;
-      const yEnd = img0 ? ultimaLinha(img0) + 8 : 0;
-      if (img0 && yEnd < 8) continue;
-      const img = await bloco(`${zNome}\n^FO0,${yEnd}^A0N,${h},${w}^FB${larg},9,3,L^FH^FD${end}^FS`, 360);
-      const fim = ultimaLinha(img);
-      const lim = limites(img);
-      if (fim < 0 || fim + 1 > alt || (lim && lim.x1 >= larg)) continue;
+    for (const esc of ESCALA) {
+      const partes = [];
+      if (tv.nome) {
+        const n = await desenhar(e.campos.nome, esc.nome, 2);
+        if (!n || !cabe(n)) continue;
+        partes.push([n, 0]);
+        if (tv.nick) {
+          // nick numa linha só: se não couber com o @usuário, vai só o nick; se nem assim, sem nick
+          let k = null;
+          for (const comU of [true, false]) {
+            const t = nickTxt(comU);
+            if (!t) break;
+            const img = await desenhar(t, esc.nick, 1);
+            if (img && cabe(img) && img.a <= esc.nick + 4) { k = img; break; }
+          }
+          if (!k) continue;
+          partes.push([k, 4]);
+        }
+      }
+      const linhasEnd = textoEndereco(e.campos).map(codificarFH).join('\\&');
+      const imgEnd = await bloco(`^FO0,0^A0N,${esc.end},${Math.round(esc.end * 0.92)}^FB${larg},9,3,L^FH^FD${linhasEnd}^FS`, 260);
+      const fimEnd = ultimaLinha(imgEnd);
+      if (fimEnd < 0) continue;
+      const end = recortar(imgEnd, fimEnd + 1);
+      if (!cabe(end)) continue;
+      partes.push([end, partes.length ? 8 : 0]);
+      const total = partes.reduce((t, [img, esp]) => t + esp + img.a, 0);
+      if (total > alt) continue;
       const out = { l: folha.l, a: folha.a, bits: folha.bits.slice() };
       for (let y = y0; y < cx.y1; y++) out.bits.fill(0, y * out.l + cx.x0, y * out.l + cx.x1 + 1);
-      const sobra = nome ? Math.min(6, alt - fim - 1) : Math.floor((alt - fim - 1) / 2);
-      colar(out, recortar(img, fim + 1), cx.x0 + 4, y0 + Math.max(0, sobra), larg, alt);
-      return { img: out, rastreio, nome: !!nome };
+      // com o nome: começa onde o nome original começava; só endereço: centralizado na caixa
+      let y = y0 + (tv.nome ? 0 : Math.floor((alt - total) / 2));
+      for (const [img, esp] of partes) { y += esp; colar(out, img, cx.x0 + 4, y, larg, img.a); y += img.a; }
+      return { img: out, rastreio, nome: tv.nome, nick: tv.nick, escala: esc };
     }
   }
   return { img: null, motivo: 'endereço não coube na caixa' };
@@ -813,7 +853,7 @@ async function montar(zpl, modo = 'junto', opcoes = {}) {
         // endereço na ordem certa (rua e número antes do complemento), com os dados que a extensão mandou
         const end = await reescreverEnderecoTikTok(img, { esperarMs: opcoes.esperarEnderecoMs || 0 });
         if (end.img) img = end.img;
-        const aviso = end.img ? `endereço${end.nome ? ' e nome do destinatário' : ''} reescritos (rastreio ${end.rastreio})` : `endereço como veio do TikTok: ${end.motivo}`;
+        const aviso = end.img ? `endereço${end.nome ? ', nome' : ''}${end.nick ? ', nick' : ''} reescritos (rastreio ${end.rastreio}; letra ${end.escala.end})` : `endereço como veio do TikTok: ${end.motivo}`;
         const casada = modo !== 'junto' ? null : ((opcoes.danfes && await casarTikTokCompleto(img, opcoes.danfes)) || await casarTikTok(img));
         saidaImg.push(casada
           ? { id: 'TikTok NF ' + casada.numero, tipo: 'envio + Danfe (TikTok)', img: casada.img, chave: casada.chave, aviso }

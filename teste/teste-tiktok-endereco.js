@@ -44,13 +44,14 @@ const recorte = (img, x0, x1, y0, y1) => { let n = 0; for (let y = y0; y < y1; y
   r = await et.reescreverEnderecoTikTok(folha);
   assert(!r.img, 'não pode usar o endereço de outro pacote');
 
-  assert.equal(et.registrarEnderecosTikTok([{ rastreio: RASTREIO, rua: 'Rua Exemplo', numero: '100', complemento: 'Apto 12', bairro: 'Centro', cidade: 'Cidade Teste', uf: 'SP', cep: '01310100' }]), 1);
+  assert.equal(et.registrarEnderecosTikTok([{ rastreio: RASTREIO, nome: 'FULANO DE TAL DA SILVA', nick: 'fulano', usuario: 'fulano123', rua: 'Rua Exemplo', numero: '100', complemento: 'Apto 12', bairro: 'Centro', cidade: 'Cidade Teste', uf: 'SP', cep: '01310100' }]), 1);
   r = await et.reescreverEnderecoTikTok(folha);
   assert(r.img, r.motivo);
   assert.equal(r.rastreio, RASTREIO);
+  assert(r.nome && r.nick, 'nome do destinatário e nick devem caber');
   // fora da caixa do endereço nada muda (nome, bolinha, logo, QR e código de barras)
   const iguais = (x0, x1, y0, y1) => recorte(folha, x0, x1, y0, y1) === recorte(r.img, x0, x1, y0, y1);
-  assert(iguais(0, 800, 0, 512), 'topo e nome intactos');
+  assert(iguais(0, 800, 0, 476), 'topo intacto (o nome é trocado pelo da NF-e)');
   assert(iguais(0, 800, 657, 1200), 'logo, código de barras e rodapé intactos');
   assert(iguais(0, 148, 0, 1200), 'bolinha e borda esquerda intactas');
   assert(iguais(520, 800, 0, 1200), 'lado do QR intacto');

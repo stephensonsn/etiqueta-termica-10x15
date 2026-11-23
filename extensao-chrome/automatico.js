@@ -143,7 +143,7 @@
           const rastreio = ((o.delivery_module || [])[0] || {}).tracking_no;
           if (!rastreio) continue;
           const c = Object.fromEntries((((o.buyer_info_module || {}).shipping_address || {}).items || []).map((i) => [i.key, i.value]));
-          lista.push({ rastreio, nome: (o.buyer_info_module || {}).cpf_name || c.name, rua: c.street_name, numero: c.street_number, complemento: c.address_detail, bairro: c.neighborhood, cidade: c.geo_l2, uf: c.geo_l1, cep: c.zipcode });
+          lista.push({ rastreio, nome: (o.buyer_info_module || {}).cpf_name || c.name, nick: (o.buyer_info_module || {}).actual_buyer_nickname, usuario: (o.buyer_info_module || {}).buyer_nickname, rua: c.street_name, numero: c.street_number, complemento: c.address_detail, bairro: c.neighborhood, cidade: c.geo_l2, uf: c.geo_l1, cep: c.zipcode });
           falta.delete(String(o.main_order_id));
         }
         if (lista.length) chrome.runtime.sendMessage({ tipo: 'enderecos', lista });
