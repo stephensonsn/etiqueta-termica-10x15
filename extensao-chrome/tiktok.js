@@ -1,4 +1,4 @@
-// TikTok Shop (Seller Center Brasil): quando a janela "Imprimir resultado" aparece com os arquivos
+// TikTok Shop (Seller Center Brasil): com a impressão automática ligada nesta aba, quando a janela "Imprimir resultado" aparece com os arquivos
 // de etiqueta em ZPL (.txt), clica sozinho em "Baixar todos os arquivos". O arquivo cai em Downloads
 // e a ponte local (Etiqueta Térmica 10x15) imprime na térmica: uma etiqueta por venda, com a DANFE.
 // Não envia nada para fora do computador e não mexe em pedido: só faz o clique de baixar.
@@ -21,7 +21,17 @@
     return [...d.querySelectorAll('button')].find((b) => /Baixar todos os arquivos/i.test(b.innerText || ''));
   }
 
+  // só baixa quando a impressão automática está ligada NESTA aba (desligada = não imprime nada)
+  let dono = null;
+  const meuId = () => { try { return sessionStorage.getItem('etiqueta-termica-auto-id'); } catch (_) { return null; } };
+  try {
+    chrome.storage.local.get('ttAuto').then((r) => { dono = (r.ttAuto || {}).dono || null; });
+    chrome.storage.onChanged.addListener((m, area) => { if (area === 'local' && m.ttAuto) dono = (m.ttAuto.newValue || {}).dono || null; });
+  } catch (_) { /* extensão recarregada */ }
+  const ligadaAqui = () => dono !== null && dono === meuId();
+
   function verificar() {
+    if (!ligadaAqui()) return;
     const d = janelaDeResultado();
     if (!d) return;
     const nomes = assinatura(d);

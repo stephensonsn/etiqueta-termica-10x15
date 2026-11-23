@@ -508,6 +508,9 @@ async function receberZpl(zpl, { origem = 'manual', imprimir = cfg.imprimir === 
   if (!envios.length) throw new Error('ZPL sem etiqueta (^XA...^XZ)');
   const feitos = [];
   const impressoes = [];
+  // TikTok: espera até 20 s o endereço que a extensão manda pelo rastreio; se não vier para uma
+  // etiqueta, as próximas do mesmo arquivo não esperam de novo (saem com o endereço como veio)
+  let esperaEndereco = 20000;
   for (const [n, envio] of envios.entries()) {
     // SHA1 normalizado: remove espaços e quebras de linha para que API e Downloads
     // com o mesmo conteúdo (mas formatação diferente) tenham o mesmo hash.
@@ -533,7 +536,8 @@ async function receberZpl(zpl, { origem = 'manual', imprimir = cfg.imprimir === 
     let etiquetas;
     try {
       // padrão: faixa simples igual às outras plataformas; DANFE completo só com cfg.tiktokDanfeCompleto
-      etiquetas = await montar(envio, modo, danfesTikTok && cfg.tiktokDanfeCompleto ? { danfes: danfesTikTok } : {});
+      etiquetas = await montar(envio, modo, { ...(danfesTikTok && cfg.tiktokDanfeCompleto ? { danfes: danfesTikTok } : {}), esperarEnderecoMs: esperaEndereco });
+      for (const e of etiquetas) if (e.aviso) { log(`TikTok: ${e.aviso}`); if (/não chegou/.test(e.aviso)) esperaEndereco = 0; }
     } catch (e) {
       // nunca some em silêncio: libera para uma nova tentativa (não conta como repetido), guarda o
       // ZPL para ajuste e põe um item com o erro na fila do painel

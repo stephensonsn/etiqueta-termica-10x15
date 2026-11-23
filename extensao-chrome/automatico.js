@@ -12,7 +12,15 @@
   const INTERVALO = 5 * 60 * 1000;
   const MAX_POR_RODADA = 10;
   const CHAVE = 'etiqueta-termica-auto';
-  const ligado = () => sessionStorage.getItem(CHAVE) === '1';
+  // Liga/desliga vale para o Chrome todo (chrome.storage), não só para esta aba: desligar em qualquer
+  // aba ou no quadrinho para a automação em todas. Só UMA aba roda (a "dona", que ligou por último).
+  const GLOBAL = 'ttAuto';
+  let dono = null; // id da aba que está rodando, ou null = desligada
+  const meuId = (() => { try { let v = sessionStorage.getItem(CHAVE + '-id'); if (!v) { v = Math.random().toString(36).slice(2) + Date.now().toString(36); sessionStorage.setItem(CHAVE + '-id', v); } return v; } catch (_) { return 'x'; } })();
+  const ligado = () => dono !== null && dono === meuId;
+  const ligadoOutra = () => dono !== null && dono !== meuId;
+  const gravarDono = (v) => { try { return v ? chrome.storage.local.set({ [GLOBAL]: { dono: v, quando: Date.now() } }) : chrome.storage.local.remove(GLOBAL); } catch (_) { return Promise.resolve(); } };
+  try { sessionStorage.removeItem(CHAVE); } catch (_) { /* marca antiga, por aba */ }
   const esperar = (ms) => new Promise((ok) => setTimeout(ok, ms));
   const texto = (el) => (el && (el.innerText || el.textContent) || '').trim();
   const visivel = (el) => !!el && el.getClientRects().length > 0;
@@ -41,7 +49,7 @@
   function mostrar() {
     caixa.style.display = recolhido() ? 'none' : '';
     pilula.style.display = recolhido() ? 'flex' : 'none';
-    const lig = ligado();
+    const lig = dono !== null;
     const temTrava = Object.keys(travados()).length > 0;
     pilula.querySelector('[data-ponto]').style.background = temTrava ? '#DC2626' : lig ? '#16A34A' : '#94A3B8';
     const b2 = pilula.querySelector('[data-ligar2]');
@@ -98,21 +106,50 @@
     try { const h = JSON.parse(sessionStorage.getItem(CHAVE + '-log') || '[]'); h.unshift(linha.textContent); sessionStorage.setItem(CHAVE + '-log', JSON.stringify(h.slice(0, 30))); } catch (_) { /* sem armazenamento */ }
   }
   function desenhar(msg) {
-    botao.textContent = ligado() ? 'Desligar' : 'Ligar';
-    botao.style.background = ligado() ? '#FEE2E2' : '#2563EB';
-    botao.style.color = ligado() ? '#B91C1C' : '#fff';
-    estado.textContent = msg || (ligado() ? 'Ligada nesta aba: confere a cada 5 minutos. Deixe esta aba aberta.' : 'Desligada. Ligue numa aba só para isso.');
+    const lig = dono !== null;
+    botao.textContent = lig ? 'Desligar' : 'Ligar';
+    botao.style.background = lig ? '#FEE2E2' : '#2563EB';
+    botao.style.color = lig ? '#B91C1C' : '#fff';
+    estado.textContent = msg || (ligado() ? 'Ligada nesta aba: confere a cada 5 minutos. Deixe esta aba aberta.'
+      : ligadoOutra() ? 'Ligada em outra aba do TikTok. Desligar aqui desliga lá também.'
+        : 'Desligada: não emite NF-e nem imprime. Ligue numa aba só para isso.');
     mostrar();
   }
-  botao.onclick = () => {
-    if (ligado()) { sessionStorage.removeItem(CHAVE); desenhar(); log('desligada'); return; }
-    sessionStorage.setItem(CHAVE, '1'); desenhar(); log('ligada'); rodada();
+  botao.onclick = async () => {
+    if (dono !== null) { dono = null; await gravarDono(null); desenhar(); log('desligada (em todas as abas)'); return; }
+    dono = meuId; await gravarDono(meuId); desenhar(); log('ligada'); rodada();
   };
   try { for (const l of JSON.parse(sessionStorage.getItem(CHAVE + '-log') || '[]').reverse()) { const d = document.createElement('div'); d.textContent = l; registro.prepend(d); } } catch (_) { /* nada */ }
   document.body.appendChild(caixa);
   document.body.appendChild(pilula);
   desenhar();
   desenharTravados();
+
+  // ---------- endereço do destinatário ----------
+  // Depois de criar as etiquetas, lê no próprio TikTok o endereço em campos (rua, número, complemento,
+  // bairro, cidade, UF, CEP) com o rastreio da iMile e manda só isso para a ponte local, que escreve
+  // rua e número antes do complemento na etiqueta. Telefone e e-mail não saem daqui.
+  async function capturarEnderecos(ids) {
+    const falta = new Set(ids);
+    const fim = Date.now() + 45000;
+    while (falta.size && Date.now() < fim) {
+      try {
+        const r = await fetch('/api/fulfillment/order/get?aid=4068&locale=pt-BR', { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ main_order_id: [...falta] }) });
+        const j = await r.json();
+        const lista = [];
+        for (const o of (j && j.data && j.data.main_order) || []) {
+          const rastreio = ((o.delivery_module || [])[0] || {}).tracking_no;
+          if (!rastreio) continue;
+          const c = Object.fromEntries((((o.buyer_info_module || {}).shipping_address || {}).items || []).map((i) => [i.key, i.value]));
+          lista.push({ rastreio, rua: c.street_name, numero: c.street_number, complemento: c.address_detail, bairro: c.neighborhood, cidade: c.geo_l2, uf: c.geo_l1, cep: c.zipcode });
+          falta.delete(String(o.main_order_id));
+        }
+        if (lista.length) chrome.runtime.sendMessage({ tipo: 'enderecos', lista });
+      } catch (_) { /* tenta de novo */ }
+      if (falta.size) await esperar(2500);
+    }
+    if (falta.size) log(`endereço não lido de ${falta.size} pedido(s); sai como o TikTok manda`);
+  }
 
   // ---------- utilidades da página ----------
   async function achar(fn, ms = 20000) {
@@ -201,6 +238,7 @@
     const criar = await achar(() => botaoPorTexto(/^Criar e imprimir etiqueta/i), 8000);
     if (!criar) throw new Error('o botão "Criar e imprimir etiqueta" não ficou disponível');
     criar.click();
+    capturarEnderecos(itens.map((i) => i.pedido)); // em paralelo: a ponte espera o endereço até 20 s
     // primeira vez o TikTok pergunta como imprimir: confirma o padrão já configurado
     const padrao = await achar(() => botaoPorTexto(/Imprimir etiquetas no momento do envio/i), 5000);
     if (padrao) padrao.click();
@@ -249,6 +287,7 @@
       // 1) primeiro imprime o que já tem NF-e: um pedido com problema nunca segura os outros
       const ja = feitos();
       const prontos = linhasDePedido().filter((i) => statusNfe(i.linha) === 'emitida' && !ja[i.pedido]).slice(0, MAX_POR_RODADA);
+      if (!ligado()) throw new Error('desligada no meio da rodada; nada foi feito');
       if (prontos.length) await criarEtiquetas(prontos);
       // 2) depois tenta emitir a NF-e dos pedidos "Sem NF-e", um por um; o que falhar vira pendência
       //    pedido travado por cadastro não é tentado de novo até a pessoa avisar que corrigiu
@@ -262,6 +301,7 @@
       let emitidas = 0;
       const avisos = [];
       for (const it of semNota) {
+        if (!ligado()) { log('desligada: parei antes de emitir as próximas NF-e'); break; }
         try { await emitirNfe(it); emitidas++; } catch (e) {
           if (e.cadastro) {
             trav[it.pedido] = { quando: Date.now(), motivo: e.message };
@@ -284,5 +324,15 @@
       setTimeout(() => { if (ligado()) location.href = URL_PEDIDOS; }, INTERVALO);
     }
   }
-  if (ligado()) setTimeout(rodada, 3000);
+  // estado global: carrega e acompanha (desligar em outra aba ou no ícone para esta na hora)
+  try {
+    chrome.storage.onChanged.addListener((mud, area) => {
+      if (area !== 'local' || !mud[GLOBAL]) return;
+      const antes = ligado();
+      dono = (mud[GLOBAL].newValue || {}).dono || null;
+      if (antes && !ligado()) log(dono ? 'ligada em outra aba; esta parou' : 'desligada');
+      desenhar();
+    });
+    chrome.storage.local.get(GLOBAL).then((r) => { dono = (r[GLOBAL] || {}).dono || null; desenhar(); if (ligado()) setTimeout(rodada, 3000); });
+  } catch (_) { /* extensão recarregada: fica desligada */ }
 })();

@@ -18,6 +18,12 @@ async function atualizar() {
   await chrome.action.setTitle({ title: lista.length ? `Etiqueta Térmica: ${lista.length} pendência(s)` : 'Etiqueta Térmica: tudo certo' });
 }
 
+// endereços dos pedidos do TikTok (rua, número, complemento...) para a ponte escrever na ordem certa
+chrome.runtime.onMessage.addListener((msg) => {
+  if (!msg || msg.tipo !== 'enderecos' || !Array.isArray(msg.lista)) return;
+  fetch(`${PONTE}/api/tiktok/enderecos`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lista: msg.lista.slice(0, 50) }) }).catch(() => {});
+});
+
 // a automação do TikTok (página) avisa quando para ou volta a funcionar
 chrome.runtime.onMessage.addListener((msg) => {
   if (!msg || msg.tipo !== 'pendencia') return;

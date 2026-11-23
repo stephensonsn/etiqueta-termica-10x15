@@ -88,7 +88,7 @@ const servidor = http.createServer(async (req, res) => {
       const host = (req.headers.host || '').toLowerCase();
       const proprio = [`127.0.0.1:${cfg.porta}`, `localhost:${cfg.porta}`];
       // a extensão do Chrome (ícone de pendências) só pode ler e avisar pendências; o resto é só do painel
-      const daExtensao = /^chrome-extension:\/\/[a-p]{32}$/.test(origem) && (rota === '/api/pendencias' || rota === '/api/pendencias/extensao');
+      const daExtensao = /^chrome-extension:\/\/[a-p]{32}$/.test(origem) && (rota === '/api/pendencias' || rota === '/api/pendencias/extensao' || rota === '/api/tiktok/enderecos');
       if (!proprio.includes(host) || (origem && !daExtensao && !proprio.map((x) => `http://${x}`).includes(origem))) {
         res.writeHead(403, { 'Content-Type': 'text/plain' }); return res.end('acesso negado');
       }
@@ -154,6 +154,12 @@ const servidor = http.createServer(async (req, res) => {
           if (rota === '/api/ml-etiquetas/autorizar') { await mlEtiquetas.adicionarConta(JSON.parse(txt || '{}').colado); return json(mlEtiquetas.estado()); }
           if (rota === '/api/ml-etiquetas/config') { mlEtiquetas.salvarConfig(JSON.parse(txt || '{}')); return json(mlEtiquetas.estado()); }
           if (rota === '/api/ml-etiquetas/rodada') { await mlEtiquetas.rodada(); return json(mlEtiquetas.estado()); }
+          // endereços dos pedidos do TikTok (só na memória, 1 h), para escrever rua e número antes do complemento
+          if (rota === '/api/tiktok/enderecos') {
+            const n = require('./etiqueta').registrarEnderecosTikTok(JSON.parse(txt || '{}').lista);
+            log(`TikTok: ${n} endereço(s) recebido(s) da extensão`);
+            return json({ recebidos: n });
+          }
           if (rota === '/api/pendencias/extensao') {
             const { fonte, texto } = JSON.parse(txt || '{}');
             if (fonte) { if (texto) pendenciasExtensao.set(String(fonte).slice(0, 40), { texto: String(texto).slice(0, 300), quando: Date.now() }); else pendenciasExtensao.delete(String(fonte)); }
