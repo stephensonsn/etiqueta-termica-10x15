@@ -633,7 +633,7 @@ function registrarEnderecosTikTok(lista) {
   for (const e of [].concat(lista || [])) {
     const rastreio = limpo(e && e.rastreio, 40).replace(/\D/g, '');
     if (rastreio.length < 8) continue;
-    const c = { rua: limpo(e.rua), numero: limpo(e.numero, 20), complemento: limpo(e.complemento), bairro: limpo(e.bairro, 60), cidade: limpo(e.cidade, 60), uf: limpo(e.uf, 30), cep: limpo(e.cep, 12).replace(/\D/g, '') };
+    const c = { nome: limpo(e.nome, 60), rua: limpo(e.rua), numero: limpo(e.numero, 20), complemento: limpo(e.complemento), bairro: limpo(e.bairro, 60), cidade: limpo(e.cidade, 60), uf: limpo(e.uf, 30), cep: limpo(e.cep, 12).replace(/\D/g, '') };
     if (!c.rua || !c.cidade || c.cep.length !== 8) continue;
     enderecosTikTok.set(rastreio, { campos: c, quando: agora });
     n++;
@@ -684,7 +684,8 @@ function caixaEnderecoTikTok(folha) {
   if (ultima[1] - ultima[0] < 28) return null;
   const y0 = fx[0][1] + 8, y1 = ultima[0] - 6;
   if (y1 - y0 < 90) return null;
-  return { x0, x1, y0, y1 };
+  // yNome: começo da linha do nome (para trocar o apelido do usuário pelo nome do destinatário)
+  return { x0, x1, y0, y1, yNome: Math.max(topo + 4, fx[0][0] - 3) };
 }
 async function reescreverEnderecoTikTok(folha, { esperarMs = 0 } = {}) {
   const { lerCodigos } = require('./code128');
@@ -695,17 +696,27 @@ async function reescreverEnderecoTikTok(folha, { esperarMs = 0 } = {}) {
   if (!e) return { img: null, motivo: `endereço do rastreio ${rastreio} não chegou da extensão` };
   const cx = caixaEnderecoTikTok(folha);
   if (!cx) return { img: null, motivo: 'caixa do destinatário fora do padrão da iMile' };
-  const larg = cx.x1 - cx.x0, alt = cx.y1 - cx.y0;
-  const corpo = textoEndereco(e.campos).map(codificarFH).join('\\&');
-  for (const [h, w] of [[26, 24], [24, 22], [22, 20], [20, 18]]) {
-    const img = await bloco(`^FO0,0^A0N,${h},${w}^FB${larg},9,3,L^FH^FD${corpo}^FS`, 320);
-    const fim = ultimaLinha(img);
-    const lim = limites(img);
-    if (fim < 0 || fim + 1 > alt || (lim && lim.x1 >= larg)) continue;
-    const out = { l: folha.l, a: folha.a, bits: folha.bits.slice() };
-    for (let y = cx.y0; y < cx.y1; y++) out.bits.fill(0, y * out.l + cx.x0, y * out.l + cx.x1 + 1);
-    colar(out, recortar(img, fim + 1), cx.x0 + 4, cx.y0 + Math.max(0, Math.floor((alt - fim - 1) / 2)), larg, alt);
-    return { img: out, rastreio };
+  const larg = cx.x1 - cx.x0;
+  const end = textoEndereco(e.campos).map(codificarFH).join('\\&');
+  // 1º tenta com o nome do destinatário (nome da NF-e) no lugar do apelido; se não couber, mantém o nome original
+  const opcoes = e.campos.nome ? [[cx.yNome, codificarFH(e.campos.nome)], [cx.y0, null]] : [[cx.y0, null]];
+  for (const [y0, nome] of opcoes) {
+    const alt = cx.y1 - y0;
+    for (const [h, w] of [[26, 24], [24, 22], [22, 20], [20, 18]]) {
+      const zNome = nome ? `^FO0,0^A0N,${h + 2},${w + 2}^FB${larg},2,2,L^FH^FD${nome}^FS` : '';
+      const img0 = nome ? await bloco(zNome, 120) : null;
+      const yEnd = img0 ? ultimaLinha(img0) + 8 : 0;
+      if (img0 && yEnd < 8) continue;
+      const img = await bloco(`${zNome}\n^FO0,${yEnd}^A0N,${h},${w}^FB${larg},9,3,L^FH^FD${end}^FS`, 360);
+      const fim = ultimaLinha(img);
+      const lim = limites(img);
+      if (fim < 0 || fim + 1 > alt || (lim && lim.x1 >= larg)) continue;
+      const out = { l: folha.l, a: folha.a, bits: folha.bits.slice() };
+      for (let y = y0; y < cx.y1; y++) out.bits.fill(0, y * out.l + cx.x0, y * out.l + cx.x1 + 1);
+      const sobra = nome ? Math.min(6, alt - fim - 1) : Math.floor((alt - fim - 1) / 2);
+      colar(out, recortar(img, fim + 1), cx.x0 + 4, y0 + Math.max(0, sobra), larg, alt);
+      return { img: out, rastreio, nome: !!nome };
+    }
   }
   return { img: null, motivo: 'endereço não coube na caixa' };
 }
@@ -802,7 +813,7 @@ async function montar(zpl, modo = 'junto', opcoes = {}) {
         // endereço na ordem certa (rua e número antes do complemento), com os dados que a extensão mandou
         const end = await reescreverEnderecoTikTok(img, { esperarMs: opcoes.esperarEnderecoMs || 0 });
         if (end.img) img = end.img;
-        const aviso = end.img ? `endereço reescrito (rastreio ${end.rastreio})` : `endereço como veio do TikTok: ${end.motivo}`;
+        const aviso = end.img ? `endereço${end.nome ? ' e nome do destinatário' : ''} reescritos (rastreio ${end.rastreio})` : `endereço como veio do TikTok: ${end.motivo}`;
         const casada = modo !== 'junto' ? null : ((opcoes.danfes && await casarTikTokCompleto(img, opcoes.danfes)) || await casarTikTok(img));
         saidaImg.push(casada
           ? { id: 'TikTok NF ' + casada.numero, tipo: 'envio + Danfe (TikTok)', img: casada.img, chave: casada.chave, aviso }

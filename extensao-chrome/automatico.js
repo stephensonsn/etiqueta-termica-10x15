@@ -1,5 +1,6 @@
 // TikTok Shop: impressão automática dos pedidos novos.
-// Liga numa aba própria do Seller Center (o estado fica só nesta aba). A cada 5 minutos:
+// Liga numa aba própria do Seller Center (vale para o Chrome todo; roda numa aba só). A cada 2 minutos
+// (45 s logo depois de emitir NF-e, para já imprimir):
 //   1) abre Pedidos > Para enviar (Aguardando envio);
 //   2) nos pedidos "Sem NF-e": abre a NF-e, escolhe "Emitir" e emite pelo emissor do TikTok;
 //   3) nos pedidos com NF-e emitida: marca e clica em "Criar e imprimir etiqueta";
@@ -9,7 +10,8 @@
 (() => {
   'use strict';
   const URL_PEDIDOS = 'https://seller-br.tiktok.com/order?order_status[]=1&selected_sort=1&tab=to_ship';
-  const INTERVALO = 5 * 60 * 1000;
+  const INTERVALO = 2 * 60 * 1000;
+  const LOGO_APOS_EMITIR = 45 * 1000; // NF-e emitida: confere de novo em 45 s para já imprimir
   const MAX_POR_RODADA = 10;
   const CHAVE = 'etiqueta-termica-auto';
   // Liga/desliga vale para o Chrome todo (chrome.storage), não só para esta aba: desligar em qualquer
@@ -110,7 +112,7 @@
     botao.textContent = lig ? 'Desligar' : 'Ligar';
     botao.style.background = lig ? '#FEE2E2' : '#2563EB';
     botao.style.color = lig ? '#B91C1C' : '#fff';
-    estado.textContent = msg || (ligado() ? 'Ligada nesta aba: confere a cada 5 minutos. Deixe esta aba aberta.'
+    estado.textContent = msg || (ligado() ? 'Ligada nesta aba: confere a cada 2 minutos. Deixe esta aba aberta.'
       : ligadoOutra() ? 'Ligada em outra aba do TikTok. Desligar aqui desliga lá também.'
         : 'Desligada: não emite NF-e nem imprime. Ligue numa aba só para isso.');
     mostrar();
@@ -141,7 +143,7 @@
           const rastreio = ((o.delivery_module || [])[0] || {}).tracking_no;
           if (!rastreio) continue;
           const c = Object.fromEntries((((o.buyer_info_module || {}).shipping_address || {}).items || []).map((i) => [i.key, i.value]));
-          lista.push({ rastreio, rua: c.street_name, numero: c.street_number, complemento: c.address_detail, bairro: c.neighborhood, cidade: c.geo_l2, uf: c.geo_l1, cep: c.zipcode });
+          lista.push({ rastreio, nome: (o.buyer_info_module || {}).cpf_name || c.name, rua: c.street_name, numero: c.street_number, complemento: c.address_detail, bairro: c.neighborhood, cidade: c.geo_l2, uf: c.geo_l1, cep: c.zipcode });
           falta.delete(String(o.main_order_id));
         }
         if (lista.length) chrome.runtime.sendMessage({ tipo: 'enderecos', lista });
@@ -271,6 +273,7 @@
 
   // ---------- rodada ----------
   let rodando = false;
+  let emitiuAgora = false;
   async function rodada() {
     if (!ligado() || rodando) return;
     if (!location.href.startsWith('https://seller-br.tiktok.com/order') || !/tab=to_ship/.test(location.href)) {
@@ -311,17 +314,18 @@
       }
       gravarTravados(trav);
       desenharTravados();
-      if (emitidas) log(`${emitidas} NF-e em processamento; as etiquetas saem na próxima rodada`);
+      emitiuAgora = emitidas > 0;
+      if (emitidas) log(`${emitidas} NF-e em processamento; as etiquetas saem em cerca de 1 minuto`);
       if (!semNota.length && !prontos.length) log(Object.keys(trav).length ? 'nenhum pedido novo; há pedido esperando correção do cadastro' : 'nenhum pedido novo');
       avisarTravados(avisos.length >= 3 ? avisos : null); // lentidão isolada não acende o vermelho
-      desenhar(`Última conferência ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}. Próxima em 5 minutos.`);
+      desenhar(`Última conferência ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}. Próxima em 2 minutos.`);
     } catch (e) {
       log('PAROU: ' + e.message);
       avisarTravados([e.message]);
-      desenhar('Parou nesta rodada: ' + e.message + '. Tenta de novo em 5 minutos.');
+      desenhar('Parou nesta rodada: ' + e.message + '. Tenta de novo em 2 minutos.');
     } finally {
       rodando = false;
-      setTimeout(() => { if (ligado()) location.href = URL_PEDIDOS; }, INTERVALO);
+      setTimeout(() => { if (ligado()) location.href = URL_PEDIDOS; }, emitiuAgora ? LOGO_APOS_EMITIR : INTERVALO);
     }
   }
   // estado global: carrega e acompanha (desligar em outra aba ou no ícone para esta na hora)

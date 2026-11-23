@@ -49,7 +49,7 @@
           const rastreio = ((o.delivery_module || [])[0] || {}).tracking_no;
           if (!rastreio) continue;
           const c = Object.fromEntries((((o.buyer_info_module || {}).shipping_address || {}).items || []).map((i) => [i.key, i.value]));
-          saida.push({ rastreio, rua: c.street_name, numero: c.street_number, complemento: c.address_detail, bairro: c.neighborhood, cidade: c.geo_l2, uf: c.geo_l1, cep: c.zipcode });
+          saida.push({ rastreio, nome: (o.buyer_info_module || {}).cpf_name || c.name, rua: c.street_name, numero: c.street_number, complemento: c.address_detail, bairro: c.neighborhood, cidade: c.geo_l2, uf: c.geo_l1, cep: c.zipcode });
           enderecoEnviado.add(String(o.main_order_id));
           lista.splice(lista.indexOf(String(o.main_order_id)), 1);
         }
