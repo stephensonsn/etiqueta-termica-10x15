@@ -5,7 +5,8 @@
 #   macOS:   https://www.cnfujun.com/en/init.php/index/down?id=73  -> Driver software for Mac-73.zip
 #   Windows: https://www.cnfujun.com/en/init.php/index/down?id=72  -> Label Printer Driver software for Windows-72.exe
 # Uso: bash driver-mac/baixar-driver-fabricante.sh [pasta]   (padrão: ~/Downloads/driver-etiqueta)
-#      SO_BAIXAR=1 ... só baixa e confere, não abre o instalador
+#      SO_BAIXAR=1 ... só baixa e confere o zip e o DMG
+#      SO_VALIDAR=1 ... baixa e confere tudo (assinatura e conteúdo do pacote), não abre o instalador
 # Idempotente: driver já instalado = não faz nada; zip já baixado e conferido = não baixa de novo;
 # download interrompido continua de onde parou. A instalação em si é o instalador da Apple
 # (pede a senha de administrador na tela; este script nunca pede nem guarda senha).
@@ -21,7 +22,7 @@ mkdir -p "$PASTA"
 passo() { echo "$(date '+%Y-%m-%d %H:%M:%S') $*" | tee -a "$REG"; }
 falhar() { passo "ERRO: $*"; exit 1; }
 
-if [ -z "${SO_BAIXAR:-}" ] && { [ -e /Library/Printers/LabelPOS/rastertodlabel ] || ls /Library/Printers/PPDs/Contents/Resources/Label_TSPL* >/dev/null 2>&1; }; then
+if [ -z "${SO_BAIXAR:-}${SO_VALIDAR:-}" ] && { [ -e /Library/Printers/LabelPOS/rastertodlabel ] || ls /Library/Printers/PPDs/Contents/Resources/Label_TSPL* >/dev/null 2>&1; }; then
   passo "driver do fabricante já instalado; nada a fazer"; exit 0
 fi
 
@@ -67,6 +68,28 @@ if [ -n "$PKG" ]; then
     falhar "pacote sem a assinatura do fabricante ou recusado pela Apple; não abri"
   fi
   passo "assinatura conferida: $ASSINATURA, aceito pela Apple"
+  # conteúdo: tem que ser o driver de etiqueta TSPL (filtro CUPS + modelos 10x15 a 203 dpi), sem
+  # nada fora de /Library/Printers. Conferido em 23/11/2026: 5 modelos "Label -8X00/8X10/9X00/9X10/9X20",
+  # filtro rastertodlabel (x86_64+arm64) que gera SIZE/GAP/BITMAP/PRINT, scripts só em /Library/Printers.
+  ABERTO="$PASTA/pacote-aberto-$$"
+  pkgutil --expand "$PKG" "$ABERTO" >/dev/null 2>&1 || { hdiutil detach "$VOL" >/dev/null 2>&1 || true; falhar "não deu para abrir o pacote para conferir"; }
+  validar() {
+    local info scripts arqs
+    info="$(cat "$ABERTO"/*.pkg/PackageInfo 2>/dev/null)"
+    echo "$info" | grep -q 'install-location="/Library/Printers"' || { echo "instala fora de /Library/Printers"; return 1; }
+    arqs="$(pkgutil --payload-files "$PKG" 2>/dev/null)"
+    echo "$arqs" | grep -q 'LabelPOS/rastertodlabel' || { echo "sem o filtro rastertodlabel"; return 1; }
+    echo "$arqs" | grep -q 'PPDs/Contents/Resources/Label_TSPL-.*\.ppd\.gz' || { echo "sem os modelos Label_TSPL"; return 1; }
+    # scripts de instalação: só podem mexer em /Library/Printers (nada de rede, launchd ou desligar o Gatekeeper)
+    scripts="$(cat "$ABERTO"/*.pkg/Scripts/* 2>/dev/null | grep -v '^[[:space:]]*#')"
+    if echo "$scripts" | grep -qiE 'curl|wget|https?://|launchctl|LaunchDaemons|LaunchAgents|spctl|csrutil|/etc/|osascript|python|perl|base64'; then echo "script de instalação faz algo além de copiar o driver"; return 1; fi
+    echo "$scripts" | grep -E '^[[:space:]]*(rm|cp|mv|chmod|sudo)' | grep -vq '/Library/Printers' && { echo "script mexe fora de /Library/Printers"; return 1; }
+    return 0
+  }
+  MOTIVO="$(validar)" || { rm -rf "$ABERTO"; hdiutil detach "$VOL" >/dev/null 2>&1 || true; falhar "o pacote não parece o driver de etiqueta: $MOTIVO; não abri"; }
+  rm -rf "$ABERTO"
+  passo "conteúdo conferido: filtro rastertodlabel + modelos Label_TSPL, scripts só em /Library/Printers"
+  if [ -n "${SO_VALIDAR:-}" ]; then hdiutil detach "$VOL" >/dev/null 2>&1 || true; passo "só validar: pacote aprovado, instalador não aberto"; exit 0; fi
   passo "abrindo o instalador da Apple: $(basename "$PKG") (ele pede a senha de administrador)"
   open -W "$PKG" || true
   hdiutil detach "$VOL" >/dev/null 2>&1 || true
