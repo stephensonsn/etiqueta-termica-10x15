@@ -25,6 +25,12 @@
   const ligado = () => dono !== null && dono === meuId;
   const ligadoOutra = () => dono !== null && dono !== meuId;
   const gravarDono = (v) => { try { return v ? chrome.storage.local.set({ [GLOBAL]: { dono: v, quando: Date.now() } }) : chrome.storage.local.remove(GLOBAL); } catch (_) { return Promise.resolve(); } };
+  // pulso: a aba dona regrava a hora a cada 30 s. Se a dona foi fechada (ou o Chrome reiniciou), a
+  // marca fica velha; passados 3 min sem pulso, qualquer aba do TikTok aberta assume sozinha.
+  // Antes disso o quadrinho mostrava "Ligada em outra aba" para sempre, sem aba nenhuma rodando.
+  const PULSO = 30 * 1000;
+  const ORFA = 3 * 60 * 1000;
+  const donaSumiu = (reg, agora = Date.now()) => !!(reg && reg.dono) && agora - (Number(reg.quando) || 0) > ORFA;
   try { sessionStorage.removeItem(CHAVE); } catch (_) { /* marca antiga, por aba */ }
   const esperar = (ms) => new Promise((ok) => setTimeout(ok, ms));
   const texto = (el) => (el && (el.innerText || el.textContent) || '').trim();
@@ -487,8 +493,23 @@
       if (antes && !ligado()) log(dono ? 'ligada em outra aba; esta parou' : 'desligada');
       desenhar();
     });
-    chrome.storage.local.get(GLOBAL).then((r) => { dono = (r[GLOBAL] || {}).dono || null; desenhar(); if (ligado()) setTimeout(rodada, 3000); });
+    chrome.storage.local.get(GLOBAL).then((r) => { dono = (r[GLOBAL] || {}).dono || null; desenhar(); if (ligado()) { gravarDono(meuId); setTimeout(rodada, 3000); } else conferirDona(); });
+    setInterval(() => { if (ligado()) gravarDono(meuId); else if (dono !== null) conferirDona(); }, PULSO);
   } catch (_) { /* extensão recarregada: fica desligada */ }
+  // a dona parou de dar sinal: esta aba assume (espera um tempo aleatório e confere de novo para
+  // duas abas abertas não assumirem juntas; se outra assumiu antes, o pulso dela já está novo)
+  async function conferirDona() {
+    try {
+      if (!donaSumiu((await chrome.storage.local.get(GLOBAL))[GLOBAL])) return;
+      await esperar(1000 + Math.floor(Math.random() * 4000));
+      const reg = (await chrome.storage.local.get(GLOBAL))[GLOBAL];
+      if (!donaSumiu(reg) || ligado()) return;
+      const min = Math.round((Date.now() - (Number(reg.quando) || 0)) / 60000);
+      dono = meuId; await gravarDono(meuId);
+      log(`a aba que estava ligada não dá sinal há ${min} min (foi fechada); esta assumiu`);
+      desenhar(); rodada();
+    } catch (_) { /* extensão recarregada */ }
+  }
   // testes automáticos (teste/ambiente-extensao.js): expõe as funções puras; no Chrome não existe __TESTE__
-  if (globalThis.__TESTE__) globalThis.__teste = { listaCarregada, contador, linhasDePedido, statusNfe, emitirNfeApi, faltandoImprimir, aConferir, lerConferir, travados, feitos, URL_PEDIDOS, URL_COLETA };
+  if (globalThis.__TESTE__) globalThis.__teste = { donaSumiu, ORFA, meuId, listaCarregada, contador, linhasDePedido, statusNfe, emitirNfeApi, faltandoImprimir, aConferir, lerConferir, travados, feitos, URL_PEDIDOS, URL_COLETA };
 })();

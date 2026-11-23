@@ -39,7 +39,7 @@ function el(tag, texto = '', filhos = []) {
 // linha de pedido como o TikTok desenha: caixa de seleção + número do pedido + status da NF-e
 const linhaPedido = (pedido, status) => el('div', '', [el('input'), el('span', pedido), el('span', 'Aguardando envio'), el('span', status)]);
 
-function criar() {
+function criar(opcoes = {}) {
   let agora = 1_800_000_000_000;
   const inicio = agora;
   // o teste define a tela em função do tempo (ms desde o começo): { texto, linhas }
@@ -57,6 +57,7 @@ function criar() {
   };
   const DataFalsa = class extends Date { constructor(...a) { super(...(a.length ? a : [agora])); } static now() { return agora; } };
   const chamadas = { fetch: [], mensagens: [] };
+  const armazem = typeof opcoes.armazem === 'function' ? opcoes.armazem(agora) : (opcoes.armazem || {});
   const ctl = {
     tela, chamadas, linhaPedido,
     respostaFetch: async () => ({ code: 0, data: {} }),
@@ -68,7 +69,12 @@ function criar() {
     location: { href: 'https://seller-br.tiktok.com/order?order_status[]=1&selected_sort=1&tab=to_ship' },
     sessionStorage: armazenamento(), localStorage: armazenamento(),
     chrome: {
-      storage: { local: { get: () => Promise.resolve({}), set: () => Promise.resolve(), remove: () => Promise.resolve() }, onChanged: { addListener() {} } },
+      // chrome.storage.local em memória (o teste pode começar com algo gravado: opcoes.armazem)
+      storage: { local: {
+        get: (k) => Promise.resolve(k in armazem ? { [k]: JSON.parse(JSON.stringify(armazem[k])) } : {}),
+        set: (o) => { Object.assign(armazem, JSON.parse(JSON.stringify(o))); return Promise.resolve(); },
+        remove: (k) => { delete armazem[k]; return Promise.resolve(); },
+      }, onChanged: { addListener() {} } },
       runtime: { sendMessage: (msg, cb) => { chamadas.mensagens.push(msg); if (cb) cb(ctl.respostaMensagem(msg)); } },
     },
     // relógio virtual: cada espera avança o relógio e roda logo em seguida
@@ -89,6 +95,7 @@ function criar() {
   ctl.agora = () => agora;
   ctl.decorrido = () => agora - inicio;
   ctl.avancar = (ms) => { agora += ms; };
+  ctl.armazem = armazem;
   return ctl;
 }
 
