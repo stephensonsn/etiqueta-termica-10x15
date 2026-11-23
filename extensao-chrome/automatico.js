@@ -489,4 +489,6 @@
     });
     chrome.storage.local.get(GLOBAL).then((r) => { dono = (r[GLOBAL] || {}).dono || null; desenhar(); if (ligado()) setTimeout(rodada, 3000); });
   } catch (_) { /* extensão recarregada: fica desligada */ }
+  // testes automáticos (teste/ambiente-extensao.js): expõe as funções puras; no Chrome não existe __TESTE__
+  if (globalThis.__TESTE__) globalThis.__teste = { listaCarregada, contador, linhasDePedido, statusNfe, emitirNfeApi, faltandoImprimir, aConferir, lerConferir, travados, feitos, URL_PEDIDOS, URL_COLETA };
 })();

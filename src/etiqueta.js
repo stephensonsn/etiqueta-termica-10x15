@@ -993,4 +993,4 @@ function paraTsplSku(etiquetas, opts = {}) {
   return Buffer.from(cmds.join('\r\n') + '\r\n', 'latin1');
 }
 
-module.exports = { registrarEnderecosTikTok, reescreverEnderecoTikTok, caixaEnderecoTikTok, casarTikTok, casarTikTokCompleto, ehTikTok, ehImagemPronta, paraTsplZlib, LAYOUT_SKU, chaveValida, acharChave, montar, separarEnvios, separarPaginas, paraPng, paraTspl, paraTsplCompacto, paraTsplSku, lerFiscal, etiquetaRegua, PREAMBULO };
+module.exports = { textoEnderecoTikTok: textoEndereco, registrarEnderecosTikTok, reescreverEnderecoTikTok, caixaEnderecoTikTok, casarTikTok, casarTikTokCompleto, ehTikTok, ehImagemPronta, paraTsplZlib, LAYOUT_SKU, chaveValida, acharChave, montar, separarEnvios, separarPaginas, paraPng, paraTspl, paraTsplCompacto, paraTsplSku, lerFiscal, etiquetaRegua, PREAMBULO };

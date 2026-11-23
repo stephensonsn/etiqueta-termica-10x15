@@ -57,6 +57,23 @@ const recorte = (img, x0, x1, y0, y1) => { let n = 0; for (let y = y0; y < y1; y
   assert(iguais(520, 800, 0, 1200), 'lado do QR intacto');
   // a caixa foi redesenhada
   assert.notEqual(recorte(folha, 150, 520, 512, 657), recorte(r.img, 150, 520, 512, 657));
+  // casos reais (dados inventados no mesmo formato): sem complemento e nome bem longo
+  const R2 = '3320100000002';
+  const folha2 = await imagem(ZPL.replace(RASTREIO, R2));
+  et.registrarEnderecosTikTok([{ rastreio: R2, nome: 'MARIA APARECIDA DE FATIMA DOS SANTOS OLIVEIRA PEREIRA', nick: 'Maria Aparecida Santos', usuario: 'mariaaparecida.santos.oliveira', rua: 'Avenida Presidente Juscelino Kubitschek de Oliveira', numero: '1909', complemento: '', bairro: 'Jardim Presidente Dutra', cidade: 'São José dos Pinhais', uf: 'PR', cep: '83090-310' }]);
+  const r2 = await et.reescreverEnderecoTikTok(folha2);
+  assert(r2.img, 'nome longo e sem complemento ainda cabe: ' + r2.motivo);
+  assert(r2.nome, 'nome da NF-e sempre aparece');
+  assert.equal(r2.rastreio, R2);
+  const iguais2 = (x0, x1, y0, y1) => recorte(folha2, x0, x1, y0, y1) === recorte(r2.img, x0, x1, y0, y1);
+  assert(iguais2(0, 800, 657, 1200), 'nome longo não invade o código de barras');
+  assert(iguais2(520, 800, 0, 1200), 'nome longo não invade o QR');
+  // texto montado: rua e número primeiro, complemento por último e só quando existe
+  const linhas = et.textoEnderecoTikTok ? et.textoEnderecoTikTok({ rua: 'Rua A', numero: '10', complemento: '', bairro: 'B', cidade: 'C', uf: 'SP', cep: '01310100' }) : null;
+  assert(linhas, 'textoEnderecoTikTok exportado');
+  assert(!linhas.some((l) => /Compl/.test(l)), 'sem complemento, sem linha "Compl."');
+  const comp = et.textoEnderecoTikTok({ rua: 'Rua Nelson', numero: '39', complemento: 'casa', bairro: 'Sao Marcos', cidade: 'Sao Jose', uf: 'PR', cep: '83090310' });
+  assert.deepEqual(comp, ['Rua Nelson, 39', 'Sao Marcos - Sao Jose/PR', 'CEP 83090-310', 'Compl.: casa'], 'rua e número primeiro; bairro - cidade/UF; CEP; complemento por último');
   console.log('ok: endereço do TikTok com rua e número antes do complemento, trava pelo rastreio');
   process.exit(0);
 })().catch((e) => { console.error('FALHOU', e); process.exit(1); });

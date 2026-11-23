@@ -24,17 +24,25 @@ function falso() {
 const armazenamento = () => { const m = {}; return { getItem: (k) => (k in m ? m[k] : null), setItem: (k, v) => { m[k] = String(v); }, removeItem: (k) => { delete m[k]; } }; };
 
 let falhou = false;
-for (const nome of ['tiktok.js', 'automatico.js']) {
+// manifesto: todo arquivo citado existe e carrega; versão no formato x.y.z
+const PASTA = path.join(__dirname, '..', 'extensao-chrome');
+const man = JSON.parse(fs.readFileSync(path.join(PASTA, 'manifest.json'), 'utf8'));
+if (!/^\d+\.\d+\.\d+$/.test(man.version)) { console.error('FALHOU versão do manifest: ' + man.version); process.exit(1); }
+const citados = [...new Set([...man.content_scripts.flatMap((c) => c.js), man.background.service_worker, 'popup.js'])];
+for (const f of [...citados, man.action.default_popup]) if (!fs.existsSync(path.join(PASTA, f))) { console.error('FALHOU: manifest cita ' + f + ' que não existe'); process.exit(1); }
+if (!man.content_scripts.some((c) => c.matches.includes('https://seller-br.tiktok.com/*'))) { console.error('FALHOU: extensão não roda no TikTok Seller'); process.exit(1); }
+if (!(man.host_permissions || []).includes('http://127.0.0.1:9100/*')) { console.error('FALHOU: extensão sem acesso à ponte'); process.exit(1); }
+for (const nome of citados) {
   const codigo = fs.readFileSync(path.join(__dirname, '..', 'extensao-chrome', nome), 'utf8');
   const ctx = {
     document: falso(), location: { href: 'https://seller-br.tiktok.com/order?tab=to_ship' },
     sessionStorage: armazenamento(), localStorage: armazenamento(),
-    chrome: { storage: { local: { get: () => Promise.resolve({}), set: () => Promise.resolve(), remove: () => Promise.resolve() }, onChanged: { addListener() {} } }, runtime: { sendMessage() {} } },
+    chrome: falso(),
     MutationObserver: function () { return { observe() {}, disconnect() {} }; },
     setTimeout: () => 0, setInterval: () => 0, clearTimeout() {}, clearInterval() {},
     fetch: () => Promise.resolve(falso()), console, Promise, JSON, Date, Math, Object, Array, Set, Map, Number, String, RegExp, Error,
   };
   ctx.window = ctx;
-  try { vm.runInNewContext(codigo, ctx, { filename: nome }); console.log('ok: ' + nome + ' carrega'); } catch (e) { falhou = true; console.error('FALHOU ' + nome + ': ' + e.message); }
+  try { vm.runInNewContext(codigo, ctx, { filename: nome }); console.log('ok: ' + nome + ' carrega (extensão ' + man.version + ')'); } catch (e) { falhou = true; console.error('FALHOU ' + nome + ': ' + e.message); }
 }
 process.exit(falhou ? 1 : 0);
