@@ -14,9 +14,9 @@
   const INTERVALO = 60 * 1000;        // pedido novo: confere a cada 1 minuto
   const RAPIDO = 15 * 1000;           // NF-e pedida ou "Processando NF-e": confere a cada 15 s e imprime assim que sair
   const RAPIDO_MAX = 16;              // no máximo 4 minutos no ritmo rápido; depois volta para 1 minuto
+  const CHAVE = 'etiqueta-termica-auto';
   const CH_RAPIDO = CHAVE + '-rapido';
   const MAX_POR_RODADA = 10;
-  const CHAVE = 'etiqueta-termica-auto';
   // Liga/desliga vale para o Chrome todo (chrome.storage), não só para esta aba: desligar em qualquer
   // aba ou no quadrinho para a automação em todas. Só UMA aba roda (a "dona", que ligou por último).
   const GLOBAL = 'ttAuto';
