@@ -97,7 +97,23 @@ No TikTok Shop (Seller Center Brasil) cada venda sai em **uma etiqueta só**, no
 - **Configuração no TikTok:** Logística → Envio → Opções de formato de documento: etiqueta A6, *Imprimir em 1 página*, formato **ZPL**. Na impressão, marque *Etiqueta de envio* e *NF-e*.
 - **Como junta:** a etiqueta da iMile já traz a chave da NF-e em código de barras; a ponte lê a chave da imagem (leitor Code 128 próprio, `src/code128.js`) e monta a faixa. O arquivo `<data>_NF-e.txt` do mesmo lote não imprime separado (se a etiqueta não chegar em 10 minutos, ele imprime sozinho).
 - **Impressão direta (sem clicar em baixar):** o TikTok não fala com impressora local; ele gera os arquivos e espera o clique em *Baixar todos os arquivos*. A extensão em `extensao-chrome/` faz esse clique sozinha quando a janela *Imprimir resultado* aparece, e a ponte imprime. Para instalar no Chrome: abra `chrome://extensions`, ligue o *Modo do desenvolvedor*, clique em *Carregar sem compactação* e escolha a pasta `extensao-chrome`. Na primeira vez o Chrome pode perguntar se o site pode baixar vários arquivos: responda *Permitir*.
-- **Impressão automática (opcional):** com a extensão, aparece no canto da página o quadro *Impressão automática*. Ligue numa aba do Seller Center aberta só para isso (vale só para aquela aba). A cada 5 minutos ela abre *Pedidos → Para enviar*, emite a NF-e dos pedidos *Sem NF-e* pelo emissor do TikTok e, nos que já têm NF-e, clica em *Criar e imprimir etiqueta*: a etiqueta sai na térmica sem nenhum clique. No máximo 10 pedidos por rodada; se um botão esperado não aparecer (por exemplo, produto sem dados fiscais), ela para e mostra o motivo no quadro.
+- **Impressão automática (opcional):** com a extensão, aparece no canto da página o quadro *Impressão automática*. Ligue numa aba do Seller Center aberta só para isso. Ligar ou desligar vale para o Chrome todo, mas só uma aba roda (a que ligou por último); desligada, não emite NF-e nem imprime nada.
+  - **Ritmo:** confere *Pedidos → Para enviar* a cada 1 minuto, e a cada 15 segundos enquanto uma NF-e está saindo, para imprimir assim que ela fica pronta.
+  - **Lista carregada de verdade:** o TikTok pode levar 20 segundos para mostrar os pedidos. A automação só confia na lista quando o contador *N pedidos encontrados* bate com as linhas na tela; lista vazia só vale se continuar vazia por mais 8 segundos.
+  - **NF-e pela API do Seller Center:** a NF-e dos pedidos *Sem NF-e* sai numa chamada só (`/api/fulfillment/invoice/create_by_platform`, a mesma do botão *Emitir NF-e*, achada no código da página), em menos de 1 segundo. Se a API recusar, a automação volta a usar os cliques na tela.
+  - **Cadastro fiscal incompleto (erro 33009007):** o pedido vira pendência vermelha no quadro (*Corrija o cadastro fiscal*). Depois de completar os dados fiscais do produto no TikTok, clique *Corrigi, tentar de novo*.
+  - **Etiquetas:** nos pedidos com NF-e, clica em *Criar e imprimir etiqueta* e espera até 1,5 minuto a janela de arquivos.
+  - **Conferência com a ponte:** a ponte guarda por 3 dias os rastreios que saíram na térmica (`GET /api/tiktok/impressos`). 3 minutos depois de criar uma etiqueta, a extensão confere; se não saiu (TikTok lento, arquivo não baixou), reimprime pela lista *Aguardando coleta* (*Imprimir documento* → *Continuar imprimindo*), até 3 vezes, e depois avisa para imprimir à mão.
+  - No máximo 10 pedidos por rodada; se um botão esperado não aparecer, ela para e mostra o motivo no quadro.
+- **Destinatário reescrito:** a iMile imprime o endereço numa linha corrida, com o complemento antes da rua e o CEP partido. A extensão lê no TikTok o endereço em campos e o nome da NF-e e manda para a ponte (`POST /api/tiktok/enderecos`, só na memória por 1 hora; telefone e e-mail nunca saem do TikTok). A ponte acha o rastreio no código de barras e redesenha só a caixa do destinatário, no padrão dos Correios:
+  - nome completo da NF-e, com o nick do comprador logo abaixo;
+  - `Rua, número`;
+  - `Bairro - Cidade/UF`;
+  - `CEP 00000-000`;
+  - `Compl.: …` (só quando existe).
+  
+  A letra diminui em degraus até tudo caber. Se o endereço não chegar em 20 segundos, a etiqueta sai como o TikTok mandou. Isso vale também para impressão feita à mão no TikTok, com a extensão instalada.
+- **Atualizou a extensão?** Recarregue em `chrome://extensions` e depois recarregue a aba do TikTok. Confira a versão no cartão da extensão.
 - Fora da impressão automática, a extensão só roda em `seller-br.tiktok.com`, não envia nada para fora do computador e não mexe em pedido.
 
 ## Mercado Livre: impressão automática (várias contas)
@@ -200,6 +216,18 @@ O pareamento clássico trava antes de pedir o código. Por isso o projeto usa Bl
 **Vários trabalhos saem de uma vez ao ligar o cabo.**
 A fila do macOS aceita trabalhos com a impressora desligada. A ponte cancela o trabalho que não sai em tempo.
 
+**TikTok: "nenhum pedido novo" com pedidos na tela.**
+A lista do TikTok demorava e a automação lia a tela antes das linhas aparecerem. Agora ela espera o contador bater com as linhas (teste: `teste-automatico-lista.js`).
+
+**TikTok: etiqueta criada que não saiu na térmica.**
+A janela de arquivos levou mais de 30 segundos e o pedido foi dado como feito. Agora a espera é de 1,5 minuto e a conferência com a ponte reimprime sozinha (teste: `teste-automatico-nfe.js`).
+
+**TikTok: a automação "ligada" não fazia nada.**
+Uma constante usada antes de ser declarada derrubava o script inteiro ao abrir a página (teste: `teste-extensao-carrega.js`).
+
+**O teste foi para a impressora do escritório.**
+A ponte nunca escolhe impressora de escritório (Brother, HP, Epson, Canon e outras), nem pelo nome nem pela URI (teste: `teste-impressora-escolha.js`).
+
 **O número encosta na borda da caixa preta.**
 A letra do renderizador é mais larga que a da Zebra. A ponte mede o texto e centraliza com folga.
 
@@ -240,7 +268,12 @@ Continua valendo se você preferir. Ele não vem neste projeto:
   - macOS: <https://www.cnfujun.com/en/init.php/index/down?id=73> (arquivo `Driver software for Mac-73.zip`, com o `LabelPrinter2.3.3.dmg` dentro)
   - Windows: <https://www.cnfujun.com/en/init.php/index/down?id=72> (`Label Printer Driver software for Windows-72.exe`)
   - A página `cnfujun.com/d/73` só redireciona e não baixa nada; os links acima são os do arquivo (achados lendo a página em 23/11/2026).
-  - No Mac, o botão *Baixar e instalar* do painel (ou `bash driver-mac/baixar-driver-fabricante.sh`) baixa pelo link direto, com nova tentativa e continuação, confere o zip e o DMG, só abre o pacote assinado por `Developer ID Installer: gonghai wang (W9EBWVXHKB)` e aceito pela Apple, e chama o instalador da Apple, que pede a senha na tela. O registro fica em `~/Downloads/driver-etiqueta/baixar-driver.log`.
+  - Conferido em 23/11/2026, o pacote é o driver de etiqueta de verdade. Ele instala só em `/Library/Printers` e traz:
+    - o filtro `rastertodlabel`, para Mac Intel e Apple Silicon, que gera os comandos TSPL `SIZE`, `GAP`, `BITMAP` e `PRINT`;
+    - 5 modelos genéricos `Label -8X00/8X10/9X00/9X10/9X20`, todos 100x150 mm a 203 dpi.
+    
+    Os scripts de instalação só apagam o driver antigo e escolhem o filtro pela versão do macOS. Há uma linha que desligaria o Gatekeeper, mas ela está comentada e não roda.
+  - No Mac, o botão *Baixar e instalar* do painel (ou `bash driver-mac/baixar-driver-fabricante.sh`) baixa pelo link direto, com nova tentativa e continuação, confere o zip e o DMG, só abre o pacote assinado por `Developer ID Installer: gonghai wang (W9EBWVXHKB)` e aceito pela Apple, confere o conteúdo e chama o instalador da Apple, que pede a senha na tela. O conteúdo conferido é: só instala em `/Library/Printers`, traz o filtro e os modelos, e os scripts não acessam a internet, não criam serviço do sistema nem mexem no Gatekeeper. `SO_VALIDAR=1` confere tudo sem instalar. O registro fica em `~/Downloads/driver-etiqueta/baixar-driver.log`.
 - O assistente de configuração e o instalador verificam se ele está instalado e avisam. Se estiver, usam a fila dele; se não estiver, seguem sem ele e mostram o link.
 
 ## Impressoras compatíveis
@@ -265,6 +298,8 @@ Ainda não há instalador para Windows, e nada foi testado nele. O que falta:
 
 O que já deve servir sem mudança: a montagem da etiqueta, o painel e o **Bluetooth pelo Chrome**. Quem quiser ajudar a testar é bem-vindo.
 
+Driver do fabricante para Windows, com link direto do arquivo: <https://www.cnfujun.com/en/init.php/index/down?id=72> (`Label Printer Driver software for Windows-72.exe`). Ele ainda não foi conferido como o do Mac (assinatura e conteúdo).
+
 ## Privacidade
 
 - A conversão é feita no computador. Nenhuma etiqueta vai para serviço externo.
@@ -274,9 +309,32 @@ O que já deve servir sem mudança: a montagem da etiqueta, o painel e o **Bluet
 ## Desenvolvimento
 
 ```bash
-npm test                     # monta a etiqueta de exemplo e confere margens, barras e o comando
+npm test                     # testes rápidos (sem impressora, sem tocar a instalação)
+npm run teste:grupo          # ponta a ponta, ~1 min: Downloads → ponte → saída falsa
 node src/imprimir.js arquivo.txt --previa   # gera a prévia em previa/ sem imprimir
 ```
+
+Cada erro real que apareceu virou um teste. Para provar que o teste funciona, o erro foi recolocado de propósito e o teste falhou.
+
+| Teste | O que confere |
+|---|---|
+| `teste.js` | Etiqueta do ML: margens, barras, TSPL, EAN, páginas do TikTok, chave da NF-e |
+| `teste-ml-login.js` | Login do ML (PKCE, state único) |
+| `teste-tiktok-endereco.js` | Destinatário reescrito: ordem, nome longo, sem complemento, trava pelo rastreio, nada fora da caixa muda |
+| `teste-extensao-carrega.js` | Todos os scripts da extensão carregam; manifesto e versão |
+| `teste-automatico-lista.js` | Lista do TikTok só vale carregada |
+| `teste-automatico-nfe.js` | NF-e pela API (lote, 33009007, recusa volta aos cliques) e conferência com reimpressão |
+| `teste-impressora-escolha.js` | Impressora de escritório nunca é escolhida |
+| `teste-ponte.js` | Rotas e acesso, ML pelo site, repetido ignorado, imprimir 1, reimprimir 1 e várias em sequência |
+| `teste-grupo.js` | Lote do TikTok com endereço antes e depois do arquivo, ML por Downloads, repetido, reimpressão |
+
+Os testes que sobem a ponte usam pastas temporárias por variável de ambiente:
+- `ETIQUETA_DADOS`: config, logs e prévias;
+- `ETIQUETA_DOWNLOADS`: pasta vigiada;
+- `ETIQUETA_SAIDA_TESTE`: os bytes vão para arquivos, não para a impressora;
+- `ETIQUETA_PORTA` e `ETIQUETA_PORTA_DRIVER`: portas.
+
+A instalação e a impressora de verdade nunca são tocadas.
 
 | Arquivo | O que faz |
 |---|---|
@@ -287,7 +345,9 @@ node src/imprimir.js arquivo.txt --previa   # gera a prévia em previa/ sem impr
 | `conector-bluetooth/main.swift` | Conector Bluetooth do macOS. |
 | `exemplos/` | Etiquetas de exemplo com dados fictícios, nos formatos do Mercado Livre e da Shopee. |
 | `empacotar-mac.sh` | Monta o instalador `.dmg` do macOS. |
-| `driver-mac/` | Driver de sistema: filtro TSPL, modelo de impressora e instalador. |
+| `driver-mac/` | Driver de sistema (filtro TSPL, modelo, instalador) e `baixar-driver-fabricante.sh`. |
+| `extensao-chrome/` | Extensão do TikTok: baixa os arquivos, impressão automática, NF-e pela API, endereço, conferência. |
+| `teste/` | Testes (ver tabela acima); `ambiente-extensao.js` e `ponte-teste.js` montam os ambientes falsos. |
 
 ## Créditos
 
