@@ -72,7 +72,7 @@
     const falta = [];
     for (const id of ids) {
       if (rast[id] && ponte.has(rast[id])) { delete m[id]; continue; } // saiu na térmica
-      if (m[id].tentativas >= 3) { log(`pedido ${id.slice(-6)}: etiqueta não chegou na térmica depois de 3 tentativas; imprima à mão`); delete m[id]; continue; }
+      if (m[id].tentativas >= 3) { log(`Pedido …${id.slice(-6)}: a etiqueta não saiu depois de 3 tentativas. Imprima à mão.`); delete m[id]; continue; }
       falta.push(id);
     }
     gravarConferir(m);
@@ -131,7 +131,7 @@
       b.type = 'button';
       b.textContent = 'Corrigi, tentar de novo';
       b.style.cssText = 'border:0;border-radius:6px;padding:4px 8px;background:#fff;color:#B91C1C;font-weight:600;cursor:pointer;border:1px solid #FCA5A5';
-      b.onclick = () => { const mm = travados(); delete mm[id]; gravarTravados(mm); desenharTravados(); log(`pedido ${id.slice(-6)}: vai tentar emitir de novo`); avisarTravados(); if (ligado()) rodada(); };
+      b.onclick = () => { const mm = travados(); delete mm[id]; gravarTravados(mm); desenharTravados(); log(`Pedido …${id.slice(-6)}: tentando de novo`); avisarTravados(); if (ligado()) rodada(); };
       linha.append(t, b);
       box.appendChild(linha);
     }
@@ -143,7 +143,10 @@
     if (extra) msgs.push(...extra);
     try { chrome.runtime.sendMessage({ tipo: 'pendencia', fonte: 'TikTok', texto: msgs.length ? msgs.join(' | ') : null }); } catch (_) { /* extensão recarregada */ }
   }
+  let ultimaLinha = '';
   function log(msg) {
+    if (msg === ultimaLinha) return; // a mesma frase seguida não repete
+    ultimaLinha = msg;
     const linha = document.createElement('div');
     linha.textContent = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) + ' ' + msg;
     registro.prepend(linha);
@@ -155,15 +158,16 @@
     botao.textContent = lig ? 'Desligar' : 'Ligar';
     botao.style.background = lig ? '#FEE2E2' : '#2563EB';
     botao.style.color = lig ? '#B91C1C' : '#fff';
-    estado.textContent = msg || (ligado() ? 'Ligada nesta aba: confere a cada 1 minuto (15 s enquanto a NF-e sai). Deixe esta aba aberta.'
+    estado.textContent = msg || (ligado() ? 'Ligada nesta aba. Deixe esta aba aberta.'
       : ligadoOutra() ? 'Ligada em outra aba do TikTok. Desligar aqui desliga lá também.'
-        : 'Desligada: não emite NF-e nem imprime. Ligue numa aba só para isso.');
+        : 'Desligada: não emite nota nem imprime.');
     mostrar();
   }
   botao.onclick = async () => {
-    if (dono !== null) { dono = null; await gravarDono(null); desenhar(); log('desligada (em todas as abas)'); return; }
-    dono = meuId; await gravarDono(meuId); desenhar(); log('ligada'); rodada();
+    if (dono !== null) { dono = null; await gravarDono(null); desenhar(); log('Desligada'); return; }
+    dono = meuId; await gravarDono(meuId); desenhar(); log('Ligada'); rodada();
   };
+  try { const h = JSON.parse(sessionStorage.getItem(CHAVE + '-log') || '[]').filter((l) => !/nenhum pedido novo/.test(l)); sessionStorage.setItem(CHAVE + '-log', JSON.stringify(h)); } catch (_) { /* nada */ }
   try { for (const l of JSON.parse(sessionStorage.getItem(CHAVE + '-log') || '[]').reverse()) { const d = document.createElement('div'); d.textContent = l; registro.prepend(d); } } catch (_) { /* nada */ }
   document.body.appendChild(caixa);
   document.body.appendChild(pilula);
@@ -193,7 +197,7 @@
       } catch (_) { /* tenta de novo */ }
       if (falta.size) await esperar(2500);
     }
-    if (falta.size) log(`endereço não lido de ${falta.size} pedido(s); sai como o TikTok manda`);
+    if (falta.size) log(`Endereço de ${falta.size} pedido(s) sai como o TikTok manda`);
   }
 
   // ---------- utilidades da página ----------
@@ -275,7 +279,7 @@
       if (!lista.length) return null;
       const r2 = await fetch('/api/fulfillment/invoice/create_by_platform' + q, { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ platform_invoice_list: lista }) });
       const j2 = await r2.json();
-      if (!j2 || j2.code !== 0) { log('API da NF-e recusou (' + ((j2 && (j2.message || j2.code)) || r2.status) + '); uso os cliques'); return null; }
+      if (!j2 || j2.code !== 0) { /* recusa da API: segue pelos cliques, sem avisar */ void 0; return null; }
       const res = { ok: [], cadastro: {}, outro: {} };
       const falhas = {};
       for (const f of (j2.data && j2.data.platform_invoice_list) || []) {
@@ -290,7 +294,7 @@
         else res.outro[id] = m;
       }
       return res;
-    } catch (e) { log('API da NF-e falhou (' + e.message + '); uso os cliques'); return null; }
+    } catch (e) { /* falha da API: segue pelos cliques, sem avisar */ void 0; return null; }
   }
 
   async function emitirNfe(item) {
@@ -324,7 +328,7 @@
     if (resultado && resultado.cadastro) throw erro(`pedido ${item.pedido}: faltam dados fiscais do produto no cadastro do TikTok (erro 33009007)`, true);
     if (resultado && resultado.outro) throw erro(`pedido ${item.pedido}: o TikTok recusou agora (${resultado.outro.slice(0, 120)}); tento na próxima rodada`);
     if (!resultado) throw erro(`pedido ${item.pedido}: o TikTok não respondeu ao emitir; confiro na próxima rodada`);
-    log(`NF-e pedida: pedido ${item.pedido}`);
+    log(`Nota fiscal pedida: pedido …${item.pedido.slice(-6)}`);
   }
 
   // ---------- criar e imprimir etiquetas ----------
@@ -365,7 +369,7 @@
     if (fechar) fechar.click();
     await esperar(800);
     if (botaoPorTexto(/^Imprimir etiqueta de envio$/i)) await fecharGaveta(); // fecha "Resultado de envio"
-    log(`etiquetas criadas e enviadas para a térmica: ${itens.map((i) => i.pedido.slice(-6)).join(', ')}`);
+    log(`Etiqueta impressa: ${itens.map((i) => 'pedido …' + i.pedido.slice(-6)).join(', ')}`);
   }
 
   // ---------- reimprimir o que não chegou na térmica (lista "Aguardando coleta") ----------
@@ -376,7 +380,7 @@
     const m = lerConferir();
     for (const id of ids) if (m[id]) m[id].tentativas = (m[id].tentativas || 0) + 1;
     gravarConferir(m);
-    if (!linhas.length) { log('reimpressão: pedidos não estão em "Aguardando coleta"'); return; }
+    if (!linhas.length) { log('Não achei os pedidos em "Aguardando coleta" para imprimir de novo'); return; }
     for (const it of linhas) { const cb = it.linha.querySelector('input[type="checkbox"]'); if (cb && !cb.checked) { (cb.closest('label') || cb).click(); await esperar(300); } }
     const doc = await achar(() => botaoPorTexto(/^Imprimir documentos?$/i), 8000);
     if (!doc) throw new Error('o botão "Imprimir documento" não apareceu');
@@ -392,7 +396,7 @@
     if (!janela) throw new Error('a janela com os arquivos não apareceu na reimpressão');
     await esperar(4000); // o tiktok.js baixa os arquivos; a ponte imprime
     const fechar = botaoPorTexto(/^Fechar$/i); if (fechar) fechar.click();
-    log(`reimpresso (não tinha chegado na térmica): ${linhas.map((i) => i.pedido.slice(-6)).join(', ')}`);
+    log(`Impresso de novo (não tinha saído na térmica): ${linhas.map((i) => 'pedido …' + i.pedido.slice(-6)).join(', ')}`);
   }
 
   // ---------- rodada ----------
@@ -405,7 +409,7 @@
     if (pend && pend.length) {
       if (!/order_status(%5B%5D|\[\])=2/.test(location.href)) { location.href = URL_COLETA; return; }
       rodando = true;
-      try { sessionStorage.removeItem(REIMPRIMIR); desenhar('Reimprimindo o que não chegou na térmica…'); await reimprimir(pend); } catch (e) { log('AVISO: ' + e.message); }
+      try { sessionStorage.removeItem(REIMPRIMIR); desenhar('Reimprimindo o que não chegou na térmica…'); await reimprimir(pend); } catch (e) { log(e.message); }
       finally { rodando = false; setTimeout(() => { if (ligado()) location.href = URL_PEDIDOS; }, 3000); }
       return;
     }
@@ -420,7 +424,7 @@
       // 0) etiqueta criada há 3 min ou mais e que não saiu na térmica: vai reimprimir
       const falta = await faltandoImprimir(3 * 60 * 1000);
       if (falta && falta.length) {
-        log(`etiqueta não chegou na térmica: ${falta.map((i) => i.slice(-6)).join(', ')}; reimprimindo`);
+        log(`A etiqueta não saiu na térmica; imprimindo de novo: ${falta.map((i) => 'pedido …' + i.slice(-6)).join(', ')}`);
         try { sessionStorage.setItem(REIMPRIMIR, JSON.stringify(falta.slice(0, MAX_POR_RODADA))); } catch (_) { /* nada */ }
         location.href = URL_COLETA;
         return;
@@ -448,20 +452,20 @@
         const api = await emitirNfeApi(semNota.map((i) => i.pedido));
         if (api) {
           emitidas += api.ok.length;
-          if (api.ok.length) log(`NF-e pedida pela API: ${api.ok.map((i) => i.slice(-6)).join(', ')}`);
-          for (const [id, m] of Object.entries(api.cadastro)) { trav[id] = { quando: Date.now(), motivo: m }; log(`PENDENTE: pedido ${id}: faltam dados fiscais do produto no cadastro do TikTok (${m}). Não tento de novo até corrigir o cadastro.`); }
-          for (const [id, m] of Object.entries(api.outro)) { avisos.push(m); log(`AVISO: pedido ${id}: o TikTok recusou agora (${m.slice(0, 120)}); tento na próxima rodada`); }
+          if (api.ok.length) log(`Nota fiscal pedida: ${api.ok.map((i) => 'pedido …' + i.slice(-6)).join(', ')}`);
+          for (const [id, m] of Object.entries(api.cadastro)) { trav[id] = { quando: Date.now(), motivo: m }; log(`Pedido …${id.slice(-6)}: falta dado fiscal no cadastro do produto. Corrija no TikTok e clique "Corrigi, tentar de novo".`); }
+          for (const [id, m] of Object.entries(api.outro)) { avisos.push(m); log(`Pedido …${id.slice(-6)}: o TikTok recusou a nota agora; tento de novo em 1 minuto`); }
           const resolvidos = new Set([...api.ok, ...Object.keys(api.cadastro), ...Object.keys(api.outro)]);
           viaCliques = semNota.filter((i) => !resolvidos.has(i.pedido));
         }
       }
       for (const it of viaCliques) {
-        if (!ligado()) { log('desligada: parei antes de emitir as próximas NF-e'); break; }
+        if (!ligado()) { log('Desligada antes de terminar; o resto fica para quando ligar'); break; }
         try { await emitirNfe(it); emitidas++; } catch (e) {
           if (e.cadastro) {
             trav[it.pedido] = { quando: Date.now(), motivo: e.message };
-            log('PENDENTE: ' + e.message + '. Não tento de novo até corrigir o cadastro.');
-          } else { avisos.push(e.message); log('AVISO: ' + e.message); }
+            log(e.message + '. Corrija o cadastro no TikTok.');
+          } else { avisos.push(e.message); log(e.message); }
         }
       }
       gravarTravados(trav);
@@ -471,12 +475,11 @@
       let n = 0; try { n = Number(sessionStorage.getItem(CH_RAPIDO) || 0); } catch (_) { /* nada */ }
       emitiuAgora = (emitidas > 0 || processando > 0) && n < RAPIDO_MAX;
       try { sessionStorage.setItem(CH_RAPIDO, emitidas > 0 ? '1' : emitiuAgora ? String(n + 1) : '0'); } catch (_) { /* nada */ }
-      if (emitidas) log(`${emitidas} NF-e pedida(s); confiro a cada 15 s e imprimo assim que sair`);
-      if (!semNota.length && !prontos.length) log(Object.keys(trav).length ? 'nenhum pedido novo; há pedido esperando correção do cadastro' : 'nenhum pedido novo');
+      // nada novo não vira linha no histórico (só a frase de estado abaixo): o histórico é só do que aconteceu
       avisarTravados(avisos.length >= 3 ? avisos : null); // lentidão isolada não acende o vermelho
-      desenhar(`Última conferência ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}. Próxima em ${emitiuAgora ? '15 s' : '1 minuto'}.`);
+      desenhar(emitiuAgora ? 'Esperando a nota fiscal sair para imprimir.' : `Tudo em dia. Conferido às ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}.`);
     } catch (e) {
-      log('PAROU: ' + e.message);
+      log('Parei: ' + e.message);
       avisarTravados([e.message]);
       desenhar('Parou nesta rodada: ' + e.message + '. Tenta de novo em 1 minuto.');
     } finally {
@@ -490,7 +493,7 @@
       if (area !== 'local' || !mud[GLOBAL]) return;
       const antes = ligado();
       dono = (mud[GLOBAL].newValue || {}).dono || null;
-      if (antes && !ligado()) log(dono ? 'ligada em outra aba; esta parou' : 'desligada');
+      if (antes && !ligado()) log(dono ? 'Ligada em outra aba; esta parou' : 'Desligada');
       desenhar();
     });
     chrome.storage.local.get(GLOBAL).then((r) => { dono = (r[GLOBAL] || {}).dono || null; desenhar(); if (ligado()) { gravarDono(meuId); setTimeout(rodada, 3000); } else conferirDona(); });
@@ -506,7 +509,7 @@
       if (!donaSumiu(reg) || ligado()) return;
       const min = Math.round((Date.now() - (Number(reg.quando) || 0)) / 60000);
       dono = meuId; await gravarDono(meuId);
-      log(`a aba que estava ligada não dá sinal há ${min} min (foi fechada); esta assumiu`);
+      log(`A aba que estava ligada foi fechada; esta assumiu`);
       desenhar(); rodada();
     } catch (_) { /* extensão recarregada */ }
   }

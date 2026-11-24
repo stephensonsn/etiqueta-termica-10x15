@@ -2,6 +2,8 @@
 // com as linhas na tela. Erro de 23/11/2026: o TikTok lento mostrava a tela sem linhas e a rodada
 // dizia "nenhum pedido novo" com 3 pedidos esperando.
 'use strict';
+// o histórico do quadrinho é só do que aconteceu: conferência sem novidade não vira linha (23/11/2026)
+if (/log\([^)]*nenhum pedido novo/.test(require('fs').readFileSync(require('path').join(__dirname, '..', 'extensao-chrome', 'automatico.js'), 'utf8'))) { console.error('FALHOU: "nenhum pedido novo" voltou a encher o histórico'); process.exit(1); }
 const assert = require('assert');
 const { criar, linhaPedido } = require('./ambiente-extensao');
 
