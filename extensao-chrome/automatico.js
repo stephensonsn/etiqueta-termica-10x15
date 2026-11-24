@@ -143,10 +143,20 @@
     if (extra) msgs.push(...extra);
     try { chrome.runtime.sendMessage({ tipo: 'pendencia', fonte: 'TikTok', texto: msgs.length ? msgs.join(' | ') : null }); } catch (_) { /* extensão recarregada */ }
   }
+  // Pedido impresso: some do histórico o que já se resolveu (avisos daquele pedido e as paradas
+  // passageiras, como "Parei", "tentando de novo", "esta assumiu"). Fica só "Etiqueta impressa".
+  const PASSAGEIRO = /Parei: |esta assumiu|tentando de novo|imprimindo de novo|Reimprimindo|janela com os arquivos|não ficou disponível|o TikTok recusou a nota agora/;
+  function semResolvidos(linhas, msg) {
+    if (!/^(Etiqueta impressa|Impresso de novo)/.test(msg)) return linhas;
+    const ids = [...msg.matchAll(/…(\d{6})/g)].map((m) => m[1]);
+    return linhas.filter((l) => !PASSAGEIRO.test(l) && !ids.some((id) => l.includes('…' + id)));
+  }
   let ultimaLinha = '';
   function log(msg) {
     if (msg === ultimaLinha) return; // a mesma frase seguida não repete
     ultimaLinha = msg;
+    for (const d of [...registro.children]) if (!semResolvidos([d.textContent], msg).length) d.remove();
+    try { sessionStorage.setItem(CHAVE + '-log', JSON.stringify(semResolvidos(JSON.parse(sessionStorage.getItem(CHAVE + '-log') || '[]'), msg))); } catch (_) { /* sem armazenamento */ }
     const linha = document.createElement('div');
     linha.textContent = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) + ' ' + msg;
     registro.prepend(linha);
@@ -514,5 +524,5 @@
     } catch (_) { /* extensão recarregada */ }
   }
   // testes automáticos (teste/ambiente-extensao.js): expõe as funções puras; no Chrome não existe __TESTE__
-  if (globalThis.__TESTE__) globalThis.__teste = { donaSumiu, ORFA, meuId, listaCarregada, contador, linhasDePedido, statusNfe, emitirNfeApi, faltandoImprimir, aConferir, lerConferir, travados, feitos, URL_PEDIDOS, URL_COLETA };
+  if (globalThis.__TESTE__) globalThis.__teste = { semResolvidos, donaSumiu, ORFA, meuId, listaCarregada, contador, linhasDePedido, statusNfe, emitirNfeApi, faltandoImprimir, aConferir, lerConferir, travados, feitos, URL_PEDIDOS, URL_COLETA };
 })();
