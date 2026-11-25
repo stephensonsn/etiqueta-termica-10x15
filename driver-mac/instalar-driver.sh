@@ -20,6 +20,29 @@ remover() {
 }
 if [ "${1:-}" = "remover" ]; then remover; exit 0; fi
 
+# backup do que já está instalado: se a conferência falhar, volta exatamente como estava
+# (antes, a falha removia a impressora que funcionava; 25/11/2026)
+BKP="$(mktemp -d /tmp/etiqueta-driver-backup.XXXXXX)"
+TINHA_FILA=0
+if lpstat -p "$FILA" >/dev/null 2>&1 && [ -f "/etc/cups/ppd/$FILA.ppd" ]; then
+  TINHA_FILA=1; cp "/etc/cups/ppd/$FILA.ppd" "$BKP/fila.ppd"
+  lpoptions -p "$FILA" 2>/dev/null | grep -o "device-uri=[^ ]*" | cut -d= -f2- > "$BKP/uri" || true
+fi
+[ -d "$DIR" ] && cp -R "$DIR" "$BKP/dir"
+[ -f "$PPD" ] && cp "$PPD" "$BKP/modelo.ppd"
+passo "backup do driver atual em $BKP"
+desfazer() {
+  passo "desfazendo: voltando o driver anterior"
+  lpadmin -x "$FILA" 2>/dev/null || true
+  rm -rf "$DIR"; rm -f "$PPD"
+  [ -d "$BKP/dir" ] && cp -R "$BKP/dir" "$DIR"
+  [ -f "$BKP/modelo.ppd" ] && cp "$BKP/modelo.ppd" "$PPD"
+  if [ "$TINHA_FILA" = 1 ]; then
+    lpadmin -p "$FILA" -E -v "$(cat "$BKP/uri" 2>/dev/null || echo socket://127.0.0.1:9102)" -P "$BKP/fila.ppd" -D "Etiqueta Termica 10x15" -o printer-error-policy=abort-job -o fit-to-page-default=true 2>>"$REG" \
+      && passo "impressora anterior restaurada" || passo "ERRO: não deu para restaurar a impressora anterior; cópia em $BKP"
+  fi
+}
+
 passo "copiando o filtro e o modelo"
 [ -x "$AQUI/rastertotspl" ] || clang -O2 -Wno-deprecated-declarations "$AQUI/rastertotspl.c" -o "$AQUI/rastertotspl" -lcups
 mkdir -p "$DIR" "$(dirname "$PPD")"
@@ -32,19 +55,19 @@ install -o root -g wheel -m 755 "$AQUI/etiquetatexto" "$DIR/etiquetatexto"
 install -o root -g wheel -m 644 "$AQUI/EtiquetaTermica-TSPL.ppd" "$PPD"
 
 passo "criando a impressora $FILA"
-lpadmin -p "$FILA" -E -v "socket://127.0.0.1:9102" -P "$PPD" -D "Etiqueta Termica 10x15" -o PageSize=w283h425 -o printer-error-policy=abort-job -o fit-to-page-default=true 2>>"$REG" || { passo "ERRO ao criar a impressora"; remover; exit 1; }
+lpadmin -p "$FILA" -E -v "socket://127.0.0.1:9102" -P "$PPD" -D "Etiqueta Termica 10x15" -o PageSize=w283h425 -o printer-error-policy=abort-job -o fit-to-page-default=true 2>>"$REG" || { passo "ERRO ao criar a impressora"; desfazer; exit 1; }
 
 # conferência: a fila existe e aceita trabalhos, e o filtro separa ZPL de documento comum
 CONF="$(mktemp -d)"
 printf '^XA^FO50,50^A0N,40,40^FDteste^FS^XZ\n' > "$CONF/zpl.txt"; printf 'documento comum\n' > "$CONF/comum.txt"
 FILTRO_OK=1
-cupsfilter -p "$PPD" -m printer/Etiqueta_Termica "$CONF/zpl.txt" 2>/dev/null | head -c 20 | grep -q 'ETIQUETA-ZPL' || FILTRO_OK=0
-cupsfilter -p "$PPD" -m printer/Etiqueta_Termica "$CONF/comum.txt" 2>/dev/null | grep -aq 'SIZE ' || FILTRO_OK=0
+cupsfilter -e -p "$PPD" -m printer/Etiqueta_Termica "$CONF/zpl.txt" 2>/dev/null | head -c 20 | grep -q 'ETIQUETA-ZPL' || FILTRO_OK=0
+cupsfilter -e -p "$PPD" -m printer/Etiqueta_Termica "$CONF/comum.txt" 2>/dev/null | grep -aq 'SIZE ' || FILTRO_OK=0
 rm -rf "$CONF"
-[ "$FILTRO_OK" = 1 ] || { passo "ERRO: o filtro não separou ZPL de documento comum; desfazendo"; remover; exit 1; }
+[ "$FILTRO_OK" = 1 ] || { passo "ERRO: o filtro não separou ZPL de documento comum"; desfazer; exit 1; }
 if lpstat -p "$FILA" >/dev/null 2>&1 && lpstat -a "$FILA" >/dev/null 2>&1; then
   passo "pronto: a impressora \"Etiqueta Termica 10x15\" aparece no Imprimir de qualquer programa"
   passo "ela envia pela conexão escolhida no painel (http://127.0.0.1:9100/painel)"
 else
-  passo "ERRO: a impressora não ficou disponível; desfazendo"; remover; exit 1
+  passo "ERRO: a impressora não ficou disponível"; desfazer; exit 1
 fi
