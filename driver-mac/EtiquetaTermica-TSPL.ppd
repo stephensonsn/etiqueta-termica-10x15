@@ -21,6 +21,10 @@
 *cupsVersion: 1.4
 *cupsModelNumber: 0
 *cupsManualCopies: False
+*% PDF e texto passam primeiro pelo etiquetatexto: se o documento for codigo ZPL (arquivo de etiqueta
+*% aberto e mandado imprimir), vai como etiqueta para a ponte; senao segue para o rastertotspl.
+*cupsFilter: "application/pdf 0 /Library/Printers/EtiquetaTermica/etiquetatexto"
+*cupsFilter: "text/plain 0 /Library/Printers/EtiquetaTermica/etiquetatexto"
 *cupsFilter: "application/vnd.cups-raster 0 /Library/Printers/EtiquetaTermica/rastertotspl"
 
 *OpenUI *PageSize/Tamanho da etiqueta: PickOne

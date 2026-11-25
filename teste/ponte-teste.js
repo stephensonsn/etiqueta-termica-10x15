@@ -41,7 +41,7 @@ async function subir(config = {}) {
     await new Promise((r) => setTimeout(r, 200));
   }
   const p = {
-    porta, dados, downloads, saida,
+    porta, portaDriver, dados, downloads, saida,
     pedir: (m, r, c, cab) => pedir(porta, m, r, c, cab),
     estado: async () => (await pedir(porta, 'GET', '/api/estado')).json,
     impressos: () => fs.readdirSync(saida).sort(),

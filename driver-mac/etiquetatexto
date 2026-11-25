@@ -1,0 +1,30 @@
+#!/bin/sh
+# Filtro do driver para PDF e texto. Se o documento é código ZPL (o .txt de etiqueta do TikTok ou do
+# Mercado Livre aberto e mandado imprimir pelo Mac), entrega o ZPL para a ponte, que desenha a
+# etiqueta; antes saía o código impresso como texto (25/11/2026). Qualquer outro documento segue o
+# caminho de sempre: o macOS desenha a página (cgpdftoraster) e o rastertotspl converte para TSPL.
+# Argumentos do CUPS: trabalho usuário título cópias opções [arquivo]
+DIR="$(cd "$(dirname "$0")" && pwd)"
+TMP="${TMPDIR:-/tmp}/etiquetatexto-$$"
+mkdir -p "$TMP" || exit 1
+trap 'rm -rf "$TMP"' EXIT
+ENT="$TMP/entrada"
+if [ -n "$6" ]; then cp "$6" "$ENT" || exit 1; else cat > "$ENT" || exit 1; fi
+
+if head -c 5 "$ENT" | grep -q '%PDF'; then
+  if "$DIR/zpldopdf" "$ENT" > "$TMP/zpl" 2>/dev/null && [ -s "$TMP/zpl" ]; then
+    echo "INFO: documento com código ZPL; vai como etiqueta" >&2
+    printf '%%ETIQUETA-ZPL\n'; cat "$TMP/zpl"; exit 0
+  fi
+  PDF="$ENT"
+else
+  # texto puro: ZPL vai direto; outro texto vira PDF pelo próprio macOS
+  if grep -q '\^XA' "$ENT" && grep -q '\^XZ' "$ENT"; then
+    echo "INFO: texto com código ZPL; vai como etiqueta" >&2
+    printf '%%ETIQUETA-ZPL\n'; cat "$ENT"; exit 0
+  fi
+  FINAL_CONTENT_TYPE=application/vnd.cups-raster /usr/libexec/cups/filter/cgtexttopdf "$1" "$2" "$3" "$4" "$5" "$ENT" > "$TMP/texto.pdf" || exit 1
+  PDF="$TMP/texto.pdf"
+fi
+FINAL_CONTENT_TYPE=application/vnd.cups-raster /usr/libexec/cups/filter/cgpdftoraster "$1" "$2" "$3" "$4" "$5" "$PDF" > "$TMP/raster" || exit 1
+exec "$DIR/rastertotspl" "$1" "$2" "$3" "$4" "$5" "$TMP/raster"

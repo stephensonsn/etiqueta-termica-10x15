@@ -10,3 +10,4 @@ dist/
 driver-mac/rastertotspl
 ferramentas/*.tspl
 conector-usb/conector-usb
+driver-mac/zpldopdf

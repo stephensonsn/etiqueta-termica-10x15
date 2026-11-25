@@ -24,12 +24,24 @@ passo "copiando o filtro e o modelo"
 [ -x "$AQUI/rastertotspl" ] || clang -O2 -Wno-deprecated-declarations "$AQUI/rastertotspl.c" -o "$AQUI/rastertotspl" -lcups
 mkdir -p "$DIR" "$(dirname "$PPD")"
 install -o root -g wheel -m 755 "$AQUI/rastertotspl" "$DIR/rastertotspl"
+# ZPL aberto e mandado imprimir sai como etiqueta: filtro de PDF/texto + leitor de PDF (Swift/PDFKit).
+# Sem o compilador Swift, o texto puro já funciona; o PDF segue como antes (sai a página desenhada).
+[ -x "$AQUI/zpldopdf" ] || swiftc -O "$AQUI/zpldopdf.swift" -o "$AQUI/zpldopdf" 2>>"$REG" || passo "aviso: sem o Swift; ZPL dentro de PDF não será reconhecido"
+install -o root -g wheel -m 755 "$AQUI/etiquetatexto" "$DIR/etiquetatexto"
+[ -x "$AQUI/zpldopdf" ] && install -o root -g wheel -m 755 "$AQUI/zpldopdf" "$DIR/zpldopdf"
 install -o root -g wheel -m 644 "$AQUI/EtiquetaTermica-TSPL.ppd" "$PPD"
 
 passo "criando a impressora $FILA"
 lpadmin -p "$FILA" -E -v "socket://127.0.0.1:9102" -P "$PPD" -D "Etiqueta Termica 10x15" -o PageSize=w283h425 -o printer-error-policy=abort-job -o fit-to-page-default=true 2>>"$REG" || { passo "ERRO ao criar a impressora"; remover; exit 1; }
 
-# conferência: a fila existe e aceita trabalhos
+# conferência: a fila existe e aceita trabalhos, e o filtro separa ZPL de documento comum
+CONF="$(mktemp -d)"
+printf '^XA^FO50,50^A0N,40,40^FDteste^FS^XZ\n' > "$CONF/zpl.txt"; printf 'documento comum\n' > "$CONF/comum.txt"
+FILTRO_OK=1
+cupsfilter -p "$PPD" -m printer/Etiqueta_Termica "$CONF/zpl.txt" 2>/dev/null | head -c 20 | grep -q 'ETIQUETA-ZPL' || FILTRO_OK=0
+cupsfilter -p "$PPD" -m printer/Etiqueta_Termica "$CONF/comum.txt" 2>/dev/null | grep -aq 'SIZE ' || FILTRO_OK=0
+rm -rf "$CONF"
+[ "$FILTRO_OK" = 1 ] || { passo "ERRO: o filtro não separou ZPL de documento comum; desfazendo"; remover; exit 1; }
 if lpstat -p "$FILA" >/dev/null 2>&1 && lpstat -a "$FILA" >/dev/null 2>&1; then
   passo "pronto: a impressora \"Etiqueta Termica 10x15\" aparece no Imprimir de qualquer programa"
   passo "ela envia pela conexão escolhida no painel (http://127.0.0.1:9100/painel)"

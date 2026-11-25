@@ -534,7 +534,8 @@ function semOffsetSeContinua(bytes) {
 }
 
 // Recebe ZPL (um ou vários envios), monta as etiquetas 10x15 e imprime ou segura para conferência.
-async function receberZpl(zpl, { origem = 'manual', imprimir = cfg.imprimir === 'direto', modo = cfg.modo, danfesTikTok = null, esperarImpressao = true } = {}) {
+async function receberZpl(zpl, { origem = 'manual', imprimir = cfg.imprimir === 'direto', modo = cfg.modo, danfesTikTok = null, esperarImpressao = true, repetir = false } = {}) {
+  // repetir: a pessoa mandou imprimir de propósito (pelo Imprimir do Mac); não passa pela trava de repetido
   const envios = separarEnvios(zpl);
   if (!envios.length) throw new Error('ZPL sem etiqueta (^XA...^XZ)');
   const feitos = [];
@@ -549,7 +550,7 @@ async function receberZpl(zpl, { origem = 'manual', imprimir = cfg.imprimir === 
     const hash = crypto.createHash('sha1').update(normalizado).digest('hex').slice(0, 10);
     const antes = recentes.get(hash);
     // Janela de 180s para TODOS os caminhos: ML manda por API e Downloads quase simultaneamente
-    if (antes && Date.now() - antes < 180000) {
+    if (!repetir && antes && Date.now() - antes < 180000) {
       log(`ignorado envio repetido (SHA1 ${hash}) via ${origem} — já recebido há ${Math.round((Date.now() - antes) / 1000)}s`);
       feitos.ignorados = (feitos.ignorados || 0) + 1;
       continue;
@@ -558,7 +559,7 @@ async function receberZpl(zpl, { origem = 'manual', imprimir = cfg.imprimir === 
     // Extrai o número do envio para dedup secundária (caso o SHA1 difira por dados variáveis)
     const numero = (envio.match(/"id"\s*:\s*"(\d+)"/) || envio.match(/ID:(\d+)/i) || envio.match(/Envio\s+(\d{10,})/i) || [])[1];
     const outro = numero && porNumero.get(numero);
-    if (outro && Date.now() - outro.quando < 180000) {
+    if (!repetir && outro && Date.now() - outro.quando < 180000) {
       log(`envio ${numero} já veio por ${outro.origem}; ignorada a cópia que chegou por ${origem}`);
       feitos.ignorados = (feitos.ignorados || 0) + 1;
       continue;
@@ -819,6 +820,14 @@ function paginasDoTspl(bytes) {
 let seqBruto = 0;
 async function enviarBruto(bytes) {
   const inicio = bytes.toString('latin1', 0, Math.min(bytes.length, 4096));
+  // o filtro do driver achou código ZPL no documento (arquivo .txt de etiqueta aberto e mandado
+  // imprimir pelo Mac): desenha a etiqueta em vez de imprimir o código como texto
+  if (inicio.startsWith('%ETIQUETA-ZPL')) {
+    const zpl = bytes.toString('utf8').replace(/^%ETIQUETA-ZPL\r?\n/, '');
+    const feitos = await receberZpl(zpl, { origem: 'Imprimir do Mac', repetir: true });
+    log(`documento com código ZPL impresso pelo Mac: ${feitos.length} etiqueta(s) desenhada(s)`);
+    return;
+  }
   if (bytes.length < 20 || !/SIZE \d/.test(inicio)) throw new Error('o trabalho não é TSPL');
   const paginas = paginasDoTspl(bytes);
   if (!paginas.length) { // comando sem imagem: manda como veio
