@@ -16,10 +16,19 @@
   button { flex: 1; border: 1px solid #E2E8F0; background: #fff; border-radius: 8px; padding: 8px; font-weight: 600; cursor: pointer; }
   button.prim { background: #2563EB; border-color: #2563EB; color: #fff; }
   small { color: #64748B; }
+  .tt { padding: 12px 14px; border-bottom: 1px solid #E2E8F0; }
+  .tt-linha { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .tt-estado { color: #64748B; font-size: 12px; margin-top: 2px; }
+  .tt button { flex: 0 0 auto; min-width: 96px; }
+  .tt button.desl { background: #FEE2E2; border-color: #FECACA; color: #B91C1C; }
+  .tt.sem-acesso { background: #FFFBEB; }
 </style>
 </head>
 <body>
 <header><h1>Etiqueta Térmica 10x15</h1><span id="selo" class="selo ok">Tudo certo</span></header>
+<section id="tiktok" class="tt">
+  <div class="tt-linha"><div><strong>Impressão automática do TikTok</strong><div id="ttEstado" class="tt-estado"></div></div><button id="ttBotao" type="button"></button></div>
+</section>
 <ul id="lista"></ul>
 <div id="vazio" class="vazio" hidden>Nenhuma pendência. As etiquetas estão saindo normalmente.</div>
 <footer><button id="painel" class="prim">Abrir painel</button><button id="conferir">Conferir agora</button></footer>

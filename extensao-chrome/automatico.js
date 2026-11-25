@@ -30,7 +30,8 @@
   // Antes disso o quadrinho mostrava "Ligada em outra aba" para sempre, sem aba nenhuma rodando.
   const PULSO = 30 * 1000;
   const ORFA = 3 * 60 * 1000;
-  const donaSumiu = (reg, agora = Date.now()) => !!(reg && reg.dono) && agora - (Number(reg.quando) || 0) > ORFA;
+  const PELO_ICONE = 'icone'; // o ícone da extensão liga sem ser aba: grava esta marca e uma aba do TikTok assume
+  const donaSumiu = (reg, agora = Date.now()) => !!(reg && reg.dono) && (reg.dono === PELO_ICONE || agora - (Number(reg.quando) || 0) > ORFA);
   try { sessionStorage.removeItem(CHAVE); } catch (_) { /* marca antiga, por aba */ }
   const esperar = (ms) => new Promise((ok) => setTimeout(ok, ms));
   const texto = (el) => (el && (el.innerText || el.textContent) || '').trim();
@@ -505,6 +506,7 @@
       dono = (mud[GLOBAL].newValue || {}).dono || null;
       if (antes && !ligado()) log(dono ? 'Ligada em outra aba; esta parou' : 'Desligada');
       desenhar();
+      if (dono === PELO_ICONE) conferirDona(); // ligada pelo ícone da extensão: uma aba do TikTok assume
     });
     chrome.storage.local.get(GLOBAL).then((r) => { dono = (r[GLOBAL] || {}).dono || null; desenhar(); if (ligado()) { gravarDono(meuId); setTimeout(rodada, 3000); } else conferirDona(); });
     setInterval(() => { if (ligado()) gravarDono(meuId); else if (dono !== null) conferirDona(); }, PULSO);
@@ -517,12 +519,11 @@
       await esperar(1000 + Math.floor(Math.random() * 4000));
       const reg = (await chrome.storage.local.get(GLOBAL))[GLOBAL];
       if (!donaSumiu(reg) || ligado()) return;
-      const min = Math.round((Date.now() - (Number(reg.quando) || 0)) / 60000);
       dono = meuId; await gravarDono(meuId);
-      log(`A aba que estava ligada foi fechada; esta assumiu`);
+      log(reg.dono === PELO_ICONE ? 'Ligada' : 'A aba que estava ligada foi fechada; esta assumiu');
       desenhar(); rodada();
     } catch (_) { /* extensão recarregada */ }
   }
   // testes automáticos (teste/ambiente-extensao.js): expõe as funções puras; no Chrome não existe __TESTE__
-  if (globalThis.__TESTE__) globalThis.__teste = { semResolvidos, donaSumiu, ORFA, meuId, listaCarregada, contador, linhasDePedido, statusNfe, emitirNfeApi, faltandoImprimir, aConferir, lerConferir, travados, feitos, URL_PEDIDOS, URL_COLETA };
+  if (globalThis.__TESTE__) globalThis.__teste = { semResolvidos, PELO_ICONE, donaSumiu, ORFA, meuId, listaCarregada, contador, linhasDePedido, statusNfe, emitirNfeApi, faltandoImprimir, aConferir, lerConferir, travados, feitos, URL_PEDIDOS, URL_COLETA };
 })();

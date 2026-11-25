@@ -202,6 +202,8 @@ A etiqueta vai sempre pela conexão que você escolheu no painel; a ponte não t
 
 ## Problemas conhecidos e como foram resolvidos
 
+- **O quadrinho (Ligar/Desligar) sumiu do TikTok.** O Chrome deixou a extensão sem acesso ao site (acesso "ao clicar"). Clique no ícone da extensão e em **Permitir**; o Ligar/Desligar também fica ali no ícone. Pelo Chrome: `chrome://extensions` > Detalhes > Acesso ao site > "Em sites específicos".
+
 - **"Ligada em outra aba do TikTok" sem nenhuma outra aba aberta** (até a 1.5.0): a aba que estava ligada foi fechada e nenhuma outra assumia. Desde a 1.5.1 a aba ligada dá sinal a cada 30 s; sem sinal por mais de 3 min, a aba do TikTok aberta assume sozinha (`teste/teste-automatico-dona.js`). Na versão antiga: clique Desligar e depois Ligar na aba aberta.
 
 Estas são as armadilhas reais que apareceram. Se a sua impressora se comportar assim, a causa provavelmente é a mesma.

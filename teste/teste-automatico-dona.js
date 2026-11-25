@@ -13,6 +13,12 @@ const esperarFila = () => new Promise((r) => setTimeout(r, 50));
   assert.equal(donaSumiu({ dono: 'x', quando: 1e6 - 30000 }, 1e6), false, 'sinal recente: a outra aba está viva');
   assert.equal(donaSumiu({ dono: 'x', quando: 1e6 - ORFA - 1 }, 1e6), true, 'sem sinal há mais de 3 min');
   assert.equal(donaSumiu({ dono: 'x' }, 1e6), true, 'marca antiga, sem hora');
+  // ligada pelo ícone da extensão (quadrinho sem acesso ao site, 25/11/2026): a aba assume na hora
+  const { PELO_ICONE } = criar().f;
+  assert.equal(donaSumiu({ dono: PELO_ICONE, quando: 1e6 }, 1e6), true, 'ligada pelo ícone: uma aba assume já');
+  const pi = criar({ armazem: (agora) => ({ ttAuto: { dono: PELO_ICONE, quando: agora } }) });
+  for (let i = 0; i < 20 && pi.armazem.ttAuto.dono === PELO_ICONE; i++) await esperarFila();
+  assert.equal(pi.armazem.ttAuto.dono, pi.f.meuId, 'ligada pelo ícone: esta aba assumiu');
 
   // dona fechada há 10 min: a aba que abriu assume
   const a = criar({ armazem: (agora) => ({ ttAuto: { dono: 'aba-fechada', quando: agora - 10 * 60000 } }) });
