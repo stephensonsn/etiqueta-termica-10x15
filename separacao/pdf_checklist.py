@@ -15,6 +15,13 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import Flowable, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
+# Margens de impressão (26/11/2026: com 10 mm o conteúdo e o rodapé ficavam colados na borda e
+# a impressora cortava). Toda impressora comum imprime com folga a partir de ~6 mm da borda.
+LADO = 15 * mm     # esquerda e direita
+TOPO = 15 * mm
+RODAPE = 12 * mm   # linha de texto do rodapé (a régua fica 4 mm acima)
+BASE = 24 * mm     # fim do conteúdo: acima da régua do rodapé, com folga
+
 
 INK = colors.HexColor('#172B35')
 MUTED = colors.HexColor('#465D67')
@@ -93,7 +100,7 @@ def gerar_pdf(itens, parciais=()):
         detalhe = (seguro(item['variation']) + '<br/>' if item['variation'] else '') + seguro(referencia)
         produto = [p(seguro(item['title'])), Spacer(1, 3), p(detalhe, pequeno)]
         dados.append([rotulo, produto, p(str(item['quantity']), numero), Check(), Check()])
-    largura = A4[0] - 20 * mm
+    largura = A4[0] - 2 * LADO
     tabela = Table(dados, colWidths=[148, largura - 268, 30, 50, 40], repeatRows=1, hAlign='LEFT')
     comandos = [('BACKGROUND', (0, 0), (-1, 0), INK), ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
                 ('LEFTPADDING', (0, 0), (-1, -1), 6), ('RIGHTPADDING', (0, 0), (-1, -1), 6),
@@ -110,14 +117,14 @@ def gerar_pdf(itens, parciais=()):
 
     def rodape(canvas, doc):
         canvas.setStrokeColor(LINE)
-        canvas.line(10 * mm, 13 * mm, A4[0] - 10 * mm, 13 * mm)
+        canvas.line(LADO, RODAPE + 4 * mm, A4[0] - LADO, RODAPE + 4 * mm)
         canvas.setFillColor(MUTED)
         canvas.setFont(normal, 7)
-        canvas.drawString(10 * mm, 9 * mm, f'Gerado em {agora:%d/%m/%Y %H:%M}. Dados das planilhas; confira a etiqueta física.')
-        canvas.drawRightString(A4[0] - 10 * mm, 9 * mm, f'Página {doc.page}')
+        canvas.drawString(LADO, RODAPE, f'Gerado em {agora:%d/%m/%Y %H:%M}. Dados das planilhas; confira a etiqueta física.')
+        canvas.drawRightString(A4[0] - LADO, RODAPE, f'Página {doc.page}')
 
     buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=10 * mm, leftMargin=10 * mm,
-                            topMargin=10 * mm, bottomMargin=18 * mm, title='Checklist de separação', author='')
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=LADO, leftMargin=LADO,
+                            topMargin=TOPO, bottomMargin=BASE, title='Checklist de separação', author='')
     doc.build(historia, onFirstPage=rodape, onLaterPages=rodape)
     return buffer.getvalue()
