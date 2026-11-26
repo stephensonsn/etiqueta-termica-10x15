@@ -71,3 +71,45 @@ const { subir, RAIZ } = require('./ponte-teste');
     console.log(`teste-app-web: ${ok} verificações ok`);
   } finally { p.parar(); }
 })().catch((e) => { console.error('FALHOU teste-app-web:', e.message); process.exit(1); });
+
+// Histórico da fila sobrevive a reiniciar a ponte, reimprime pela prévia e respeita os dias da configuração.
+(async () => {
+  await new Promise((r) => setTimeout(r, 100));
+  const p1 = await subir();
+  try {
+    const zpl = fs.readFileSync(path.join(RAIZ, 'exemplos', 'mercado-livre-exemplo.txt')).toString('latin1');
+    const env = await p1.pedir('POST', '/api/zpl', zpl, { 'content-type': 'application/octet-stream' });
+    const jid = env.json[0].jid;
+    await p1.pedir('POST', `/api/pedido/${jid}/imprimir`, {});
+    assert.strictEqual((await p1.estado()).pedidos.find((x) => x.jid === jid).estado, 'impresso');
+    await p1.parar(true);
+    const p2 = await subir({}, { base: p1.base });
+    try {
+      const volta = (await p2.estado()).pedidos.find((x) => x.jid === jid);
+      assert.ok(volta, 'a etiqueta sumiu do histórico ao reiniciar');
+      assert.strictEqual(volta.estado, 'impresso');
+      assert.strictEqual(volta.impressoes, 1);
+      const r = await p2.pedir('POST', `/api/pedido/${jid}/imprimir`, {});
+      assert.strictEqual(r.status, 200, r.txt);
+      assert.strictEqual(r.json.impressoes, 2);
+      console.log('  ok histórico sobrevive a reiniciar e reimprime pela prévia');
+      assert.strictEqual((await p2.pedir('POST', '/api/config', { historicoDias: 0 })).status, 400);
+      const c = await p2.pedir('POST', '/api/config', { historicoDias: 5 });
+      assert.strictEqual(c.json.historicoDias ?? (await p2.estado()).config.historicoDias, 5);
+      console.log('  ok dias do histórico: aceita 1 a 30, recusa fora disso');
+      // arquivo antigo: pedido com mais de N dias some ao reiniciar, junto da prévia
+      const arq = path.join(p2.dados, 'logs', 'historico-fila.json');
+      await new Promise((r2) => setTimeout(r2, 3500));
+      const h = JSON.parse(fs.readFileSync(arq, 'utf8'));
+      h[0].hora = new Date(Date.now() - 6 * 864e5).toISOString();
+      await p2.parar(true);
+      fs.writeFileSync(arq, JSON.stringify(h));
+      const p3 = await subir({}, { base: p1.base });
+      try {
+        assert.ok(!(await p3.estado()).pedidos.some((x) => x.jid === jid), 'pedido de 6 dias deveria ter saído do histórico');
+        assert.ok(!fs.existsSync(path.join(p3.dados, 'previa', `${jid}.png`)), 'a prévia antiga deveria ter saído');
+        console.log('  ok mais velho que o prazo sai do histórico e a prévia é apagada');
+      } finally { await p3.parar(); }
+    } finally { await p2.parar(true); }
+  } catch (e) { console.error('FALHOU histórico da fila:', e.message); process.exitCode = 1; }
+})();

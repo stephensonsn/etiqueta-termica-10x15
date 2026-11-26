@@ -69,7 +69,7 @@ const EXT = 'chrome-extension://gnlbmakkaeblkpldbimblkgjoldhnjkl';
     // item que não existe (ponte reiniciada): erro claro, não trava
     r = await p.pedir('POST', '/api/pedido/20000101000000-999/imprimir');
     assert.notEqual(r.status, 200);
-    assert(/não encontrado/.test(r.txt));
+    assert(/não encontrad/.test(r.txt));
 
     console.log(`ok: ponte isolada (rotas, acesso, ML pelo site, repetido ignorado, imprimir 1, reimprimir 1 e ${ordem.length} em sequência)`);
   } finally { p.parar(); }

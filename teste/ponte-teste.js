@@ -24,8 +24,9 @@ function pedir(porta, metodo, rota, corpo, cab = {}) {
   });
 }
 
-async function subir(config = {}) {
-  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'etiqueta-teste-'));
+// opcoes.base: reaproveita a pasta de uma ponte anterior (testa o que sobrevive a reiniciar)
+async function subir(config = {}, opcoes = {}) {
+  const base = opcoes.base || fs.mkdtempSync(path.join(os.tmpdir(), 'etiqueta-teste-'));
   const dados = path.join(base, 'dados'); const downloads = path.join(base, 'Downloads'); const saida = path.join(base, 'saida');
   for (const d of [dados, downloads, saida]) fs.mkdirSync(d, { recursive: true });
   const cfg = { ...JSON.parse(fs.readFileSync(path.join(RAIZ, 'config.exemplo.json'), 'utf8')), configurado: true, imprimir: 'conferir', ...config };
@@ -41,13 +42,18 @@ async function subir(config = {}) {
     await new Promise((r) => setTimeout(r, 200));
   }
   const p = {
-    porta, portaDriver, dados, downloads, saida,
+    base, porta, portaDriver, dados, downloads, saida,
     pedir: (m, r, c, cab) => pedir(porta, m, r, c, cab),
     estado: async () => (await pedir(porta, 'GET', '/api/estado')).json,
     impressos: () => fs.readdirSync(saida).sort(),
     log: async () => (await p.estado()).log.join('\n'),
     esperar: async (cond, ms = 30000) => { const f = Date.now() + ms; for (;;) { const v = await cond(); if (v) return v; if (Date.now() > f) return null; await new Promise((r) => setTimeout(r, 250)); } },
-    parar: () => { filho.kill(); try { fs.rmSync(base, { recursive: true, force: true }); } catch (_) { /* fica no tmp */ } },
+    parar: (manter = false) => new Promise((ok) => {
+      const fim = () => { if (!manter) { try { fs.rmSync(base, { recursive: true, force: true }); } catch (_) { /* fica no tmp */ } } ok(); };
+      if (filho.exitCode !== null || filho.signalCode) return fim(); // já parada
+      filho.once('exit', fim);
+      filho.kill();
+    }),
   };
   return p;
 }

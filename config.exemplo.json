@@ -24,6 +24,7 @@
   },
   "vigiarDownloads": true,
   "guardarHistorico": false,
+  "historicoDias": 2,
   "limparDownloads": true,
   "configurado": false
 }

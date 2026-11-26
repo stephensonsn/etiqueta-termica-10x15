@@ -19,8 +19,9 @@ const cfg = JSON.parse(fs.readFileSync(ARQ_CFG, 'utf8'));
 if (Number(process.env.ETIQUETA_PORTA)) cfg.porta = Number(process.env.ETIQUETA_PORTA); // testes: porta própria (não grava)
 if (!cfg.conexao) cfg.conexao = { tipo: 'usb', dispositivo: '', host: '', portaRede: 9100 };
 for (const d of ['logs', 'recebidos', 'previa']) fs.mkdirSync(path.join(DADOS, d), { recursive: true });
-// prévias são temporárias: ao iniciar sem histórico, limpa as que sobraram da vez anterior
-if (!cfg.guardarHistorico) for (const f of fs.readdirSync(path.join(DADOS, 'previa'))) fs.rmSync(path.join(DADOS, 'previa', f), { force: true });
+// Histórico da fila (o que chegou e o que imprimiu) fica em disco por cfg.historicoDias (padrão 2),
+// com a prévia de cada etiqueta, para reimprimir mesmo depois de a ponte reiniciar.
+if (!Number.isInteger(cfg.historicoDias)) cfg.historicoDias = 2;
 
 const ultimasLinhas = [];
 // Registro: sempre fica na memória (o painel mostra as últimas linhas). Só vai para arquivo
@@ -44,6 +45,12 @@ function salvarConfig(novo) {
   if (['junto', 'cheio'].includes(novo.modo)) cfg.modo = novo.modo;
   if (typeof novo.vigiarDownloads === 'boolean') cfg.vigiarDownloads = novo.vigiarDownloads;
   if (typeof novo.guardarHistorico === 'boolean') cfg.guardarHistorico = novo.guardarHistorico;
+  if (novo.historicoDias !== undefined) {
+    const d = Number(novo.historicoDias);
+    if (!Number.isInteger(d) || d < 1 || d > 30) throw new Error('o histórico de impressão guarda de 1 a 30 dias');
+    cfg.historicoDias = d;
+    setTimeout(() => { podarHistorico(); gravarHistorico(true); }, 0);
+  }
   if (typeof novo.configurado === 'boolean') cfg.configurado = novo.configurado;
   if (typeof novo.limparDownloads === 'boolean') cfg.limparDownloads = novo.limparDownloads;
   if (novo.calib && typeof novo.calib === 'object') {
@@ -451,24 +458,83 @@ function carimbo() {
   return new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().replace(/[-:T]/g, '').slice(0, 14);
 }
 
+// ---------- histórico em disco (logs/historico-fila.json + previa/<jid>.png) ----------
+const ARQ_HIST = path.join(DADOS, 'logs', 'historico-fila.json');
+const MAX_HIST = 5000; // trava de segurança além dos dias
+let gravado = '';
+function podarHistorico() {
+  const limite = Date.now() - cfg.historicoDias * 864e5;
+  for (let i = pedidos.length - 1; i >= 0; i--) {
+    const p = pedidos[i];
+    // fila viva (aguardando/imprimindo/falhou com nova tentativa) nunca some por idade
+    const viva = p.estado === 'aguardando' || p.estado === 'enviando';
+    if ((new Date(p.hora).getTime() < limite && !viva) || i >= MAX_HIST) {
+      pedidos.splice(i, 1); imagens.delete(p.jid);
+      fs.rmSync(path.join(DADOS, 'previa', `${p.jid}.png`), { force: true });
+    }
+  }
+  // memória: só as 40 mais recentes ficam com a imagem carregada; o resto lê da prévia ao reimprimir
+  for (const p of pedidos.slice(40)) imagens.delete(p.jid);
+}
+function gravarHistorico(forcar = false) {
+  try {
+    const txt = JSON.stringify(pedidos);
+    if (!forcar && txt === gravado) return;
+    const tmp = `${ARQ_HIST}.tmp`;
+    fs.writeFileSync(tmp, txt); fs.renameSync(tmp, ARQ_HIST); // troca atômica: nunca fica meio arquivo
+    gravado = txt;
+  } catch (e) { log(`ERRO ao gravar o histórico da fila: ${e.message}`); }
+}
+(function carregarHistorico() {
+  let lidos = [];
+  try { lidos = JSON.parse(fs.readFileSync(ARQ_HIST, 'utf8')); } catch (_) { /* primeira vez ou arquivo ruim: começa vazio */ }
+  if (!Array.isArray(lidos)) lidos = [];
+  for (const p of lidos) {
+    if (!p || typeof p.jid !== 'string' || !/^[0-9]+-[0-9]+$/.test(p.jid)) continue;
+    if (!fs.existsSync(path.join(DADOS, 'previa', `${p.jid}.png`))) continue; // sem a imagem não dá para reimprimir
+    // interrompida no meio pela reinicialização: não reenvia sozinha (evita etiqueta dobrada)
+    if (p.estado === 'enviando') { p.estado = 'erro'; p.erro = 'a ponte reiniciou durante a impressão; confira o papel e reimprima se faltou'; }
+    p.repetir = false;
+    pedidos.push(p);
+  }
+  pedidos.sort((a, b) => (a.hora < b.hora ? 1 : -1));
+  podarHistorico();
+  // prévias sem pedido (sobras de versões antigas) saem
+  const vivos = new Set(pedidos.map((p) => `${p.jid}.png`));
+  for (const f of fs.readdirSync(path.join(DADOS, 'previa'))) if (!vivos.has(f)) fs.rmSync(path.join(DADOS, 'previa', f), { force: true });
+  gravarHistorico(true);
+  setInterval(() => gravarHistorico(), 3000).unref();
+  setInterval(podarHistorico, 3600000).unref();
+  process.on('exit', () => gravarHistorico());
+})();
+
+// imagem para reimprimir: da memória ou da prévia em disco (PNG 1 bit, sem perda)
+function imagemDo(jid) {
+  if (imagens.has(jid)) return imagens.get(jid);
+  const arq = path.join(DADOS, 'previa', `${jid}.png`);
+  if (!fs.existsSync(arq)) return null;
+  const { PNG } = require('pngjs');
+  const png = PNG.sync.read(fs.readFileSync(arq));
+  const bits = new Uint8Array(png.width * png.height);
+  for (let i = 0; i < bits.length; i++) bits[i] = png.data[i * 4] < 128 ? 1 : 0;
+  return { l: png.width, a: png.height, bits };
+}
+
 function registrar(id, tipo, origem, img) {
   const jid = `${carimbo()}-${++seq}`;
   const p = { jid, id, tipo, origem, hora: new Date().toISOString(), estado: 'aguardando', erro: '', impressoes: 0 };
   fs.writeFileSync(path.join(DADOS, 'previa', `${jid}.png`), paraPng(img));
   pedidos.unshift(p);
   imagens.set(jid, img);
-  while (pedidos.length > 40) {
-    const velho = pedidos.pop();
-    imagens.delete(velho.jid);
-    fs.rmSync(path.join(DADOS, 'previa', `${velho.jid}.png`), { force: true });
-  }
+  podarHistorico();
+  gravarHistorico();
   return p;
 }
 
 async function imprimirPedido(jid) {
   const p = pedidos.find((x) => x.jid === jid);
-  const img = imagens.get(jid);
-  if (!p || !img) throw new Error('pedido não encontrado (a ponte foi reiniciada?)');
+  const img = p && imagemDo(jid);
+  if (!p || !img) throw new Error('etiqueta não encontrada no histórico (passou do prazo de guarda?)');
   if (p.tipo === 'erro') throw new Error('esta etiqueta não foi montada: imprima de novo pelo Mercado Livre ou pela Shopee (a ponte já aceita a nova tentativa)');
   p.estado = 'enviando';
   try {
@@ -482,8 +548,7 @@ async function imprimirPedido(jid) {
     p.estado = 'impresso'; p.erro = ''; p.impressoes++;
     if (p.rastreio) marcarImpressoTikTok(p.rastreio);
     apagarSeImprimiu(p.arquivo);
-    // as últimas enviadas ficam na memória (até 40) para reimprimir depois de um papel travado;
-    // sem "guardar histórico", nada disso vai para o disco além da prévia temporária
+    // fica no histórico (cfg.historicoDias) para reimprimir depois de um papel travado
   } catch (e) {
     p.estado = 'erro'; p.erro = e.message;
     if (cfg.imprimir === 'direto') p.repetir = true;
