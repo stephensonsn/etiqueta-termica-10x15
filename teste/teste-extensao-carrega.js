@@ -40,6 +40,8 @@ for (const nome of citados) {
     chrome: falso(),
     MutationObserver: function () { return { observe() {}, disconnect() {} }; },
     setTimeout: () => 0, setInterval: () => 0, clearTimeout() {}, clearInterval() {},
+    addEventListener() {}, postMessage() {},
+    EventTarget: class { dispatchEvent() { return true; } }, HTMLAnchorElement: class { click() {} },
     fetch: () => Promise.resolve(falso()), console, Promise, JSON, Date, Math, Object, Array, Set, Map, Number, String, RegExp, Error,
   };
   ctx.window = ctx;

@@ -1,5 +1,5 @@
 // TikTok Shop (Seller Center Brasil): com a impressão automática ligada nesta aba, quando a janela "Imprimir resultado" aparece com os arquivos
-// de etiqueta em ZPL (.txt), clica sozinho em "Baixar todos os arquivos". O arquivo cai em Downloads
+// de etiqueta em ZPL (.txt), clica sozinho em "Baixar todos os arquivos". O captura.js lê os arquivos direto da página (sem baixar)
 // e a ponte local (Etiqueta Térmica 10x15) imprime na térmica: uma etiqueta por venda, com a DANFE.
 // Não envia nada para fora do computador e não mexe em pedido: só faz o clique de baixar.
 (() => {
@@ -79,6 +79,26 @@
     aviso.style.cssText = 'margin:8px 0;padding:8px 12px;border-radius:8px;background:#DCFCE7;color:#166534;font:600 13px/1.4 -apple-system,sans-serif';
     b.parentElement && b.parentElement.insertAdjacentElement('afterend', aviso);
   }
+
+  // Arquivos lidos pelo captura.js (sem baixar): junta os do mesmo clique (NF-e + etiqueta) e manda
+  // à ponte de uma vez; a resposta diz à página se precisa baixar como antes.
+  let lote = [], relogio = null;
+  function enviarLote() {
+    const itens = lote; lote = []; relogio = null;
+    const ids = itens.map((i) => i.id);
+    const responder = (ok) => window.postMessage({ __etiqueta: 'resposta', ids, ok }, location.origin);
+    try {
+      chrome.runtime.sendMessage({ tipo: 'arquivos', arquivos: itens.map((i) => ({ nome: i.nome, conteudo: i.conteudo })) }, (r) => {
+        responder(!chrome.runtime.lastError && !!(r && r.ok));
+      });
+    } catch (_) { responder(false); } // extensão recarregada: a página baixa como antes
+  }
+  window.addEventListener('message', (e) => {
+    const d = e.data;
+    if (e.source !== window || !d || d.__etiqueta !== 'arquivo' || typeof d.conteudo !== 'string') return;
+    lote.push({ id: d.id, nome: String(d.nome || ''), conteudo: d.conteudo });
+    clearTimeout(relogio); relogio = setTimeout(enviarLote, 1500);
+  });
 
   new MutationObserver(() => verificar()).observe(document.documentElement, { childList: true, subtree: true });
   verificar();

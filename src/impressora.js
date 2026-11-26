@@ -882,4 +882,40 @@ function estado() {
   return { config, limites: LIMITES, bleVivo: bleVivo(), bt: Date.now() - bleInfo.quando < 8000 ? bleInfo.bt : undefined, conector: { instalado: fs.existsSync(path.join(RAIZ, 'conector-bluetooth', 'conector-bluetooth')), rodando: Date.now() - bleInfo.quando < 20000 }, driver: driverDoFabricante(), driverProprio: driverProprio(), vigia, fila: situacaoFila(), conexoes: listarConexoes(), pedidos, log: ultimasLinhas.slice(-25).reverse() };
 }
 
-module.exports = { ehTermica, usbEscolhida, conexoesDisponiveis, DADOS, rastreiosImpressosTikTok, enviarBruto, bleInformar, lerZplDeArquivo, iniciarVigia, bleProximo, bleFeito, receberZpl, imprimirPedido, descartarPedido, diagnostico, salvarConfig, estado, log, cfg, RAIZ };
+// TikTok sem baixar: a extensão lê os arquivos da janela "Imprimir resultado" direto da página e manda
+// o conteúdo aqui (nada cai em Downloads). Mesma regra da vigia: a etiqueta de envio sai casada com a
+// DANFE do mesmo lote; NF-e sem etiqueta no lote, ou outro documento, sai sozinho.
+const LOTE_TT = /^(\d{2}-\d{2}_\d{2}-\d{2}-\d{2})_/;
+async function receberArquivosTikTok(arquivos) {
+  const lista = (Array.isArray(arquivos) ? arquivos : []).slice(0, 20)
+    .map((a) => ({ nome: String((a && a.nome) || '').slice(0, 120), zpl: String((a && a.conteudo) || '') }))
+    .filter((a) => /\^XA/i.test(a.zpl) && a.zpl.length <= 8 * 1024 * 1024);
+  if (!lista.length) throw new Error('nenhum arquivo com etiqueta em ZPL');
+  const lote = (a) => (a.nome.match(LOTE_TT) || [])[1] || '';
+  const etiquetas = lista.filter((a) => /_Shipping label/i.test(a.nome));
+  const nfes = lista.filter((a) => /_NF-e/i.test(a.nome));
+  const outros = lista.filter((a) => !etiquetas.includes(a) && !nfes.includes(a));
+  const usadas = new Set();
+  const { separarEnvios: sep } = require('./etiqueta');
+  let n = 0;
+  for (const e of etiquetas) {
+    // NF-e do mesmo lote (nome igual ou até 5 s de diferença); com um só par no envio, casa direto
+    const par = nfes.find((x) => !usadas.has(x) && lote(x) && lote(e) && Math.abs(segundosDoLote(lote(x)) - segundosDoLote(lote(e))) <= 5)
+      || (etiquetas.length === 1 && nfes.length === 1 ? nfes[0] : null);
+    let danfesTikTok = null;
+    if (par) {
+      usadas.add(par);
+      try { danfesTikTok = []; for (const pg of sep(par.zpl)) danfesTikTok.push((await montar(pg, 'cheio'))[0].img); }
+      catch (err) { log(`TikTok: não li as páginas de ${par.nome} (${err.message}); sai a faixa simples`); danfesTikTok = null; }
+    }
+    log(`TikTok (sem baixar): ${e.nome}${par ? ' + ' + par.nome : ''}`);
+    n += (await receberZpl(e.zpl, { origem: 'TikTok', danfesTikTok, esperarImpressao: false })).length;
+  }
+  for (const a of nfes.filter((x) => !usadas.has(x)).concat(outros)) {
+    log(`TikTok (sem baixar): ${a.nome}`);
+    n += (await receberZpl(a.zpl, { origem: 'TikTok', esperarImpressao: false })).length;
+  }
+  return { arquivos: lista.length, etiquetas: n };
+}
+
+module.exports = { receberArquivosTikTok, ehTermica, usbEscolhida, conexoesDisponiveis, DADOS, rastreiosImpressosTikTok, enviarBruto, bleInformar, lerZplDeArquivo, iniciarVigia, bleProximo, bleFeito, receberZpl, imprimirPedido, descartarPedido, diagnostico, salvarConfig, estado, log, cfg, RAIZ };

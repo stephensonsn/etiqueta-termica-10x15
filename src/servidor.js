@@ -88,7 +88,7 @@ const servidor = http.createServer(async (req, res) => {
       const host = (req.headers.host || '').toLowerCase();
       const proprio = [`127.0.0.1:${cfg.porta}`, `localhost:${cfg.porta}`];
       // a extensão do Chrome (ícone de pendências) só pode ler e avisar pendências; o resto é só do painel
-      const daExtensao = /^chrome-extension:\/\/[a-p]{32}$/.test(origem) && (rota === '/api/pendencias' || rota === '/api/pendencias/extensao' || rota === '/api/tiktok/enderecos' || rota === '/api/tiktok/impressos');
+      const daExtensao = /^chrome-extension:\/\/[a-p]{32}$/.test(origem) && (rota === '/api/pendencias' || rota === '/api/pendencias/extensao' || rota === '/api/tiktok/enderecos' || rota === '/api/tiktok/impressos' || rota === '/api/tiktok/arquivos');
       if (!proprio.includes(host) || (origem && !daExtensao && !proprio.map((x) => `http://${x}`).includes(origem))) {
         res.writeHead(403, { 'Content-Type': 'text/plain' }); return res.end('acesso negado');
       }
@@ -142,6 +142,13 @@ const servidor = http.createServer(async (req, res) => {
           log(`ERRO no painel (${rota}): ${e.message}`);
           return json({ erro: e.message }, 400);
         } finally { fs.rmSync(tmp, { force: true }); }
+      }
+      if (req.method === 'POST' && rota === '/api/tiktok/arquivos') {
+        // arquivos da janela "Imprimir resultado" do TikTok, lidos pela extensão sem baixar
+        try {
+          const { arquivos } = JSON.parse(await corpo(req, 24 * 1024 * 1024) || '{}');
+          return json(await require('./impressora').receberArquivosTikTok(arquivos));
+        } catch (e) { log(`ERRO TikTok sem baixar: ${e.message}`); return json({ erro: e.message }, 400); }
       }
       if (req.method === 'POST') {
         const txt = await corpo(req);

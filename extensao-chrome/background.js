@@ -24,6 +24,15 @@ chrome.runtime.onMessage.addListener((msg) => {
   fetch(`${PONTE}/api/tiktok/enderecos`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lista: msg.lista.slice(0, 50) }) }).catch(() => {});
 });
 
+// arquivos de etiqueta do TikTok lidos da página (sem baixar): a ponte imprime; ok=false faz a página baixar
+chrome.runtime.onMessage.addListener((msg, _de, responder) => {
+  if (!msg || msg.tipo !== 'arquivos' || !Array.isArray(msg.arquivos)) return;
+  fetch(`${PONTE}/api/tiktok/arquivos`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ arquivos: msg.arquivos.slice(0, 20) }) })
+    .then((r) => r.json().then((j) => responder({ ok: r.ok && !j.erro, ...j })))
+    .catch(() => responder({ ok: false }));
+  return true; // resposta assíncrona
+});
+
 // a automação pergunta quais rastreios do TikTok já saíram na térmica (para reimprimir o que faltou)
 chrome.runtime.onMessage.addListener((msg, _de, responder) => {
   if (!msg || msg.tipo !== 'impressos') return;

@@ -5,7 +5,7 @@
   "main": "src/servidor.js",
   "scripts": {
     "start": "node src/servidor.js",
-    "test": "node teste/teste.js && node teste/teste-ml-login.js && node teste/teste-tiktok-endereco.js && node teste/teste-extensao-carrega.js && node teste/teste-automatico-lista.js && node teste/teste-automatico-nfe.js && node teste/teste-automatico-dona.js && node teste/teste-automatico-historico.js && node teste/teste-impressora-escolha.js && node teste/teste-ponte.js && node teste/teste-driver-zpl.js",
+    "test": "node teste/teste.js && node teste/teste-ml-login.js && node teste/teste-tiktok-endereco.js && node teste/teste-extensao-carrega.js && node teste/teste-captura.js && node teste/teste-automatico-lista.js && node teste/teste-automatico-nfe.js && node teste/teste-automatico-dona.js && node teste/teste-automatico-historico.js && node teste/teste-impressora-escolha.js && node teste/teste-ponte.js && node teste/teste-driver-zpl.js && node teste/teste-tiktok-sem-baixar.js",
     "teste:grupo": "node teste/teste-grupo.js"
   },
   "keywords": [
