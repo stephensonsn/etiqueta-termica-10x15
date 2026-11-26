@@ -1,0 +1,1 @@
+import{t as e}from"./index-lWAMPdMy.js";var t=e;export{t as component};

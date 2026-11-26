@@ -15,7 +15,19 @@ async function desenhar() {
   selo.className = 'selo ' + (pendencias.length ? 'erro' : 'ok');
   if (conferido) selo.title = 'Conferido às ' + new Date(conferido).toLocaleTimeString('pt-BR');
 }
-document.getElementById('painel').onclick = () => chrome.tabs.create({ url: 'http://127.0.0.1:9100/painel' });
+// Menu da ponte: abre o app (ou reaproveita a aba dele já aberta) direto na tela escolhida.
+const APP = 'http://127.0.0.1:9100';
+async function abrir(rota) {
+  const url = APP + rota;
+  try {
+    const [aba] = await chrome.tabs.query({ url: APP + '/*' });
+    if (aba) { await chrome.tabs.update(aba.id, { url, active: true }); await chrome.windows.update(aba.windowId, { focused: true }); return window.close(); }
+  } catch (_) { /* sem permissão de abas: abre nova */ }
+  chrome.tabs.create({ url });
+  window.close();
+}
+document.querySelectorAll('[data-ir]').forEach((a) => { a.onclick = () => abrir(a.dataset.ir); });
+document.getElementById('painel').onclick = () => abrir('/');
 document.getElementById('conferir').onclick = async () => {
   try {
     const r = await fetch('http://127.0.0.1:9100/api/pendencias', { cache: 'no-store' });

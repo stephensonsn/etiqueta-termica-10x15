@@ -42,7 +42,7 @@ if [ "${NODE_EMBUTIDO:-0}" = 1 ]; then
   done
   cp -p "$CACHE/node-$NODE_V-darwin-arm64/LICENSE" "$PALCO/runtime/LICENCA-NODE.txt"
 fi
-( cd "$RAIZ" && git ls-files -z | grep -zv -E '^(empacotar|docs|teste)/|^empacotar-mac\.sh$|^\.gitignore$' | xargs -0 -I{} rsync -R {} "$PALCO/app/" )
+( cd "$RAIZ" && git ls-files -z | grep -zv -E '^(empacotar|docs|teste|web)/|^empacotar-mac\.sh$|^\.gitignore$' | xargs -0 -I{} rsync -R {} "$PALCO/app/" )
 ( cd "$PALCO/app" && "$(command -v npm)" ci --omit=dev --no-audit --no-fund >>"$REG" 2>&1 )
 
 passo "conector Bluetooth universal (Apple Silicon + Intel)"

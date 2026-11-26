@@ -6,6 +6,7 @@ import binascii
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
+import os
 from pathlib import Path
 import secrets
 import subprocess
@@ -20,7 +21,8 @@ from pdf_checklist import gerar_pdf
 from tela import PAGINA
 
 APP = 'separacao-etiqueta-ml'
-TOKEN = secrets.token_urlsafe(32)
+# A ponte (src/separacao.js) passa o token pelo ambiente para poder repassar as chamadas.
+TOKEN = os.environ.get('SEPARACAO_TOKEN') or secrets.token_urlsafe(32)
 LOCK = threading.Lock()
 STATE = {'items': [], 'files': [], 'warnings': []}
 
@@ -136,6 +138,15 @@ class Handler(BaseHTTPRequestHandler):
         raise ErroImportacao('Operação não reconhecida.')
 
 
+def vigiar_pai(pai):
+    # Aberto pela ponte: se a ponte morrer (o pai vira o launchd), sai junto em vez de ficar órfão.
+    import time
+    while True:
+        time.sleep(3)
+        if os.getppid() != pai:
+            os._exit(0)
+
+
 def main():
     parser = argparse.ArgumentParser(description='Checklist de separação local')
     parser.add_argument('--port', type=int, default=9175)
@@ -157,6 +168,8 @@ def main():
     except OSError:
         print(f'A porta {args.port} está ocupada por outro programa. Execute com --port 9176.')
         raise SystemExit(1)
+    if os.environ.get('SEPARACAO_TOKEN'):
+        threading.Thread(target=vigiar_pai, args=(os.getppid(),), daemon=True).start()
     print(f'\nSeparação de pedidos: {url}\n')
     print('Mantenha esta janela aberta enquanto usa a tela. Para encerrar, pressione Control+C.\n', flush=True)
     if not args.no_browser:

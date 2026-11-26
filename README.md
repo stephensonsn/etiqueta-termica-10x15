@@ -135,6 +135,19 @@ Venda com nota pendente (`invoice_pending`) e erro de conta viram pendência.
 
 A extensão mostra no ícone, em vermelho, quantas pendências existem; clicando, abre a lista. Conta como pendência: impressora ou ponte com problema, etiqueta com erro na fila, pedido parado (sem NF-e, nota pendente no Mercado Livre) e automação que parou (TikTok ou Mercado Livre). A extensão consulta `http://127.0.0.1:9100/api/pendencias` a cada minuto.
 
+## O app (menu, Início, Fila e Separação)
+
+Abra **http://127.0.0.1:9100** (ou pelo ícone da extensão, que agora tem o menu com as telas). É um app só, com menu lateral:
+
+- **Início**: 4 números do dia (na fila, com falha, impressas hoje, pacotes para despachar), situação da impressora com autoteste, pendências e as últimas etiquetas.
+- **Fila de impressão**: abas Na fila / Impressas / Descartadas, busca, prévia da etiqueta, imprimir, reimprimir e descartar uma ou várias de uma vez, enviar arquivo e o registro técnico recolhido no rodapé. Atualiza sozinha a cada 2 segundos. No celular vira cartões.
+- **Separação**: a mesma da pasta `separacao/` (planilhas do Mercado Livre e do TikTok → checklist A4 com Separado e embalado / Despachado), agora dentro da ponte. A ponte sobe o Python sozinha, só em 127.0.0.1, e encerra junto.
+- **Estoque, Mercado Livre e Impressora e ajustes**: as páginas de antes, abertas dentro do app (`/painel` e `/estoque` continuam funcionando sozinhas).
+
+Feito sobre o template [shadcn-admin](https://github.com/satnaing/shadcn-admin) (MIT), com o design system **shadcn/ui** (Radix + Tailwind): azul nas ações, verde/âmbar/vermelho só para estado, sempre com texto; fontes do próprio sistema, nada carregado da internet.
+
+Para mexer no app: `cd web && npm install && npm run dev` (abre com a ponte por trás). Para publicar: `npm run build:web` na raiz (gera `src/web/`, que vai versionado), depois `bash scripts/atualizar-ponte.sh`. Testes: `cd web && npx vitest run --browser.headless` e `npm test` na raiz (inclui `teste/teste-app-web.js`).
+
 ## O painel
 
 Em <http://127.0.0.1:9100/painel>, acessível só do próprio computador.

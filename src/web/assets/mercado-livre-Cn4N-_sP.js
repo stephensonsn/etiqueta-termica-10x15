@@ -1,0 +1,1 @@
+import{t as e}from"./embutida-DA9nzSQD.js";import{V as t}from"./index-lWAMPdMy.js";var n=t(),r=()=>(0,n.jsx)(e,{titulo:`Mercado Livre`,descricao:`Anúncios ligados ao estoque e conta do Mercado Livre`,endereco:`/estoque#ml`});export{r as component};

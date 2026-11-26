@@ -23,16 +23,29 @@
   .tt button { flex: 0 0 auto; min-width: 96px; }
   .tt button.desl { background: #FEE2E2; border-color: #FECACA; color: #B91C1C; }
   .tt.sem-acesso { background: #FFFBEB; }
+  nav { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 10px 14px; border-bottom: 1px solid #E2E8F0; }
+  nav a { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid #E2E8F0; border-radius: 8px; color: #0F172A; text-decoration: none; font-weight: 600; cursor: pointer; }
+  nav a:hover { background: #F8FAFC; border-color: #CBD5E1; }
+  nav a:focus-visible { outline: 2px solid #2563EB; outline-offset: 2px; }
+  nav svg { width: 16px; height: 16px; flex: none; stroke: #2563EB; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 </style>
 </head>
 <body>
 <header><h1>Etiqueta Térmica 10x15</h1><span id="selo" class="selo ok">Tudo certo</span></header>
+<nav aria-label="Menu da ponte">
+  <a data-ir="/"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V21H3z"/><path d="M9 21v-6h6v6"/></svg>Início</a>
+  <a data-ir="/fila"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9V3h12v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M7 14h10v7H7z"/></svg>Fila de impressão</a>
+  <a data-ir="/separacao"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V2h6v2"/><path d="m9 13 2 2 4-4"/></svg>Separação</a>
+  <a data-ir="/estoque"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5M12 13v8"/></svg>Estoque</a>
+  <a data-ir="/mercado-livre"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9 5 3h14l2 6"/><path d="M3 9h18v3a3 3 0 0 1-6 0 3 3 0 0 1-6 0 3 3 0 0 1-6 0z"/><path d="M5 14v7h14v-7"/></svg>Mercado Livre</a>
+  <a data-ir="/impressora"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>Impressora</a>
+</nav>
 <section id="tiktok" class="tt">
   <div class="tt-linha"><div><strong>Impressão automática do TikTok</strong><div id="ttEstado" class="tt-estado"></div></div><button id="ttBotao" type="button"></button></div>
 </section>
 <ul id="lista"></ul>
 <div id="vazio" class="vazio" hidden>Nenhuma pendência. As etiquetas estão saindo normalmente.</div>
-<footer><button id="painel" class="prim">Abrir painel</button><button id="conferir">Conferir agora</button></footer>
+<footer><button id="painel" class="prim">Abrir o app</button><button id="conferir">Conferir agora</button></footer>
 <script src="popup.js"></script>
 </body>
 </html>

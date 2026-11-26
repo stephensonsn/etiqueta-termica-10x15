@@ -1,0 +1,1 @@
+import{t as e}from"./embutida-DA9nzSQD.js";import{V as t}from"./index-lWAMPdMy.js";var n=t(),r=()=>(0,n.jsx)(e,{titulo:`Impressora e ajustes`,descricao:`Conexão, calibração, impressão automática e histórico`,endereco:`/painel`});export{r as component};

@@ -15,6 +15,8 @@ loja.iniciar({ cfg, log, RAIZ: DADOS });
 const ml = require('./ml');
 ml.iniciar({ cfg, log, RAIZ: DADOS, loja });
 ml.aoSalvarConfig(() => salvarConfig({}));
+const separacao = require('./separacao');
+separacao.iniciar({ log, RAIZ });
 const mlEtiquetas = require('./mlEtiquetas');
 mlEtiquetas.iniciar({ cfg, log, RAIZ: DADOS, receberZpl, salvarConfig: () => salvarConfig({}) });
 
@@ -46,6 +48,17 @@ const STATUS_OK = (() => {
   const cab = '\u0002\r\n\r\nPRINTER STATUS'.padEnd(49, ' ') + '\r\n';
   return `${cab}   ERRORS:         0 00000000 00000000\r\n   WARNINGS:       0 00000000 00000000\r\n\u0003`;
 })();
+
+// ---------- app do painel (React, build em src/web) ----------
+const WEB = path.join(__dirname, 'web');
+const ROTAS_APP = new Set(['/', '/fila', '/separacao', '/estoque', '/mercado-livre', '/impressora']);
+const TIPOS = { '.html': 'text/html;charset=UTF-8', '.js': 'text/javascript;charset=UTF-8', '.css': 'text/css;charset=UTF-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon', '.json': 'application/json', '.woff2': 'font/woff2' };
+const SEGURANCA = { 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'SAMEORIGIN', 'Referrer-Policy': 'no-referrer' };
+function arquivoDoApp(rota) {
+  if (!rota.startsWith('/assets/') && !rota.startsWith('/images/')) return null;
+  const arq = path.normalize(path.join(WEB, rota));
+  return arq.startsWith(WEB + path.sep) && fs.existsSync(arq) && fs.statSync(arq).isFile() ? arq : null;
+}
 
 const ORIGENS = /^https:\/\/([a-z0-9-]+\.)*(mercadolivre\.com\.br|mercadolibre\.com(\.[a-z]{2})?)$/i;
 let respostaPendente = '';
@@ -93,7 +106,7 @@ const servidor = http.createServer(async (req, res) => {
     }
 
     // ---------- painel local (só o próprio computador) ----------
-    if (rota === '/' || rota === '/painel' || rota === '/estoque' || rota === '/ml/retorno' || rota.startsWith('/api/')) {
+    if (ROTAS_APP.has(rota) || rota === '/painel' || rota === '/ml/retorno' || rota.startsWith('/api/') || rota.startsWith('/assets/') || rota.startsWith('/images/')) {
       const host = (req.headers.host || '').toLowerCase();
       const proprio = [`127.0.0.1:${cfg.porta}`, `localhost:${cfg.porta}`];
       // a extensão do Chrome (ícone de pendências) só pode ler e avisar pendências; o resto é só do painel
@@ -102,13 +115,37 @@ const servidor = http.createServer(async (req, res) => {
         res.writeHead(403, { 'Content-Type': 'text/plain' }); return res.end('acesso negado');
       }
       const json = (obj, cod = 200) => { res.writeHead(cod, { 'Content-Type': 'application/json;charset=UTF-8', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(obj)); };
-      if (req.method === 'GET' && (rota === '/' || rota === '/painel')) {
-        res.writeHead(200, { 'Content-Type': 'text/html;charset=UTF-8', 'Cache-Control': 'no-store' });
+      // páginas originais: /painel sempre; /estoque quando aberta dentro do app (iframe) ou sem o app compilado
+      const semApp = !fs.existsSync(path.join(WEB, 'index.html'));
+      const embutida = req.headers['sec-fetch-dest'] === 'iframe';
+      if (req.method === 'GET' && (rota === '/painel' || (rota === '/' && semApp))) {
+        res.writeHead(200, { 'Content-Type': 'text/html;charset=UTF-8', 'Cache-Control': 'no-store', ...SEGURANCA });
         return res.end(fs.readFileSync(path.join(__dirname, 'painel.html')));
       }
-      if (req.method === 'GET' && rota === '/estoque') {
-        res.writeHead(200, { 'Content-Type': 'text/html;charset=UTF-8', 'Cache-Control': 'no-store' });
+      if (req.method === 'GET' && rota === '/estoque' && (embutida || semApp)) {
+        res.writeHead(200, { 'Content-Type': 'text/html;charset=UTF-8', 'Cache-Control': 'no-store', ...SEGURANCA });
         return res.end(fs.readFileSync(path.join(__dirname, 'estoque.html')));
+      }
+      if (req.method === 'GET' && ROTAS_APP.has(rota)) {
+        if (embutida) { res.writeHead(302, { Location: '/painel' }); return res.end(); } // app nunca dentro dele mesmo
+        res.writeHead(200, { 'Content-Type': 'text/html;charset=UTF-8', 'Cache-Control': 'no-store', ...SEGURANCA });
+        return res.end(fs.readFileSync(path.join(WEB, 'index.html')));
+      }
+      if (req.method === 'GET' && (rota.startsWith('/assets/') || rota.startsWith('/images/'))) {
+        const arq = arquivoDoApp(rota);
+        if (!arq) { res.writeHead(404); return res.end(); }
+        res.writeHead(200, { 'Content-Type': TIPOS[path.extname(arq)] || 'application/octet-stream', 'Cache-Control': rota.startsWith('/assets/') ? 'public, max-age=31536000, immutable' : 'max-age=86400', 'X-Content-Type-Options': 'nosniff' });
+        return res.end(fs.readFileSync(arq));
+      }
+      // separação do dia: repassa para o app Python (planilhas -> checklist A4)
+      const mSep = rota.match(/^\/api\/separacao\/([a-z]+)$/);
+      if (mSep && (req.method === 'GET' || req.method === 'POST')) {
+        try {
+          const r = await separacao.repassar(req.method, mSep[1], req.method === 'POST' ? await corpo(req, 44 * 1024 * 1024) : null);
+          const cab = { 'Content-Type': r.headers['content-type'] || 'application/json', 'Cache-Control': 'no-store' };
+          for (const k of ['content-disposition', 'x-filename']) if (r.headers[k]) cab[k] = r.headers[k];
+          res.writeHead(r.status, cab); return res.end(r.corpo);
+        } catch (e) { log(`ERRO na separação: ${e.message}`); return json({ erro: e.message }, 502); }
       }
       if (req.method === 'GET' && rota === '/api/estado') return json({ ...estado(), siteVisto });
       if (req.method === 'GET' && rota === '/api/loja') return json(loja.estadoLoja());
