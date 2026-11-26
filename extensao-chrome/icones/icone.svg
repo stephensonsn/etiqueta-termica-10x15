@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <!-- Ícone da etiqueta térmica: impressora com a etiqueta saindo, código de barras -->
+  <rect width="128" height="128" rx="28" fill="#1E40AF"/>
+  <rect x="16" y="18" width="96" height="46" rx="12" fill="#DBEAFE"/>
+  <circle cx="94" cy="34" r="6" fill="#1E40AF"/>
+  <rect x="28" y="54" width="72" height="10" rx="5" fill="#0F172A"/>
+  <rect x="34" y="59" width="60" height="51" rx="4" fill="#FFFFFF"/>
+  <g fill="#0F172A">
+    <rect x="42" y="72" width="6" height="28"/>
+    <rect x="52" y="72" width="3" height="28"/>
+    <rect x="59" y="72" width="7" height="28"/>
+    <rect x="70" y="72" width="3" height="28"/>
+    <rect x="77" y="72" width="9" height="28"/>
+  </g>
+</svg>

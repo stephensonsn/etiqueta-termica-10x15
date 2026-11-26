@@ -83,6 +83,15 @@ const servidor = http.createServer(async (req, res) => {
   const origem = req.headers.origin || '';
   try {
 
+    // ---------- ícone do painel (imagem pública, sem dado nenhum) ----------
+    if (req.method === 'GET' && (rota === '/favicon.ico' || rota === '/icone.svg')) {
+      const svg = rota === '/icone.svg';
+      let img; // lê antes de responder: arquivo faltando vira 404, nunca derruba a ponte
+      try { img = fs.readFileSync(path.join(__dirname, svg ? 'icone.svg' : 'favicon.ico')); } catch { res.writeHead(404); return res.end(); }
+      res.writeHead(200, { 'Content-Type': svg ? 'image/svg+xml' : 'image/x-icon', 'Cache-Control': 'max-age=86400' });
+      return res.end(img);
+    }
+
     // ---------- painel local (só o próprio computador) ----------
     if (rota === '/' || rota === '/painel' || rota === '/estoque' || rota === '/ml/retorno' || rota.startsWith('/api/')) {
       const host = (req.headers.host || '').toLowerCase();

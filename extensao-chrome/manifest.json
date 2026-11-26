@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Etiqueta Térmica 10x15 - impressão direta",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "description": "No TikTok Shop, ligado numa aba, emite a NF-e e cria as etiquetas dos pedidos novos a cada minuto e manda os arquivos direto para a ponte local, sem baixar; a ponte imprime na térmica.",
   "content_scripts": [
     {
@@ -38,6 +38,16 @@
   },
   "action": {
     "default_title": "Etiqueta Térmica 10x15",
-    "default_popup": "popup.html"
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icones/icone-16.png",
+      "32": "icones/icone-32.png"
+    }
+  },
+  "icons": {
+    "16": "icones/icone-16.png",
+    "32": "icones/icone-32.png",
+    "48": "icones/icone-48.png",
+    "128": "icones/icone-128.png"
   }
 }

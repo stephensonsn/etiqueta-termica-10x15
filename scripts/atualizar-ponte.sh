@@ -21,7 +21,9 @@ passo "backup em $B"
 git ls-files src | while read -r f; do mkdir -p "$INST/$(dirname "$f")"; cp "$f" "$INST/$f"; done
 passo "código copiado ($(git rev-parse --short HEAD)); reiniciando"
 launchctl kickstart -k "$SERV"
-if saude; then passo "ponte no ar com o código novo"; exit 0; fi
+# abre as páginas que o navegador pede (painel, ícone) e confere de novo: pega queda que só vem na 1ª visita
+visita() { for r in /painel /favicon.ico /icone.svg; do curl -s --max-time 3 -o /dev/null "http://127.0.0.1:9100$r"; done; sleep 2; curl -sf --max-time 2 http://127.0.0.1:9100/saude >/dev/null; }
+if saude && visita; then passo "ponte no ar com o código novo (painel e ícone conferidos)"; exit 0; fi
 passo "ERRO: a ponte não respondeu em 30 s; restaurando o backup"
 rm -rf "$INST/src" && cp -R "$B/src" "$INST/src"
 launchctl kickstart -k "$SERV"
