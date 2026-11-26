@@ -65,16 +65,13 @@ async function desenharTikTok() {
   }
   const { ttAuto } = await chrome.storage.local.get('ttAuto');
   const lig = !!(ttAuto && ttAuto.dono);
-  est.textContent = lig ? 'Ligada: emite a nota e imprime os pedidos novos.' : 'Desligada: não emite nota nem imprime.';
+  est.textContent = lig ? 'Ligada: emite a nota e imprime os pedidos novos, na aba fixada da automação.' : 'Desligada: não emite nota nem imprime.';
   bt.textContent = lig ? 'Desligar' : 'Ligar';
   bt.classList.add(lig ? 'desl' : 'prim');
   bt.onclick = async () => {
     if (lig) { await chrome.storage.local.remove('ttAuto'); return desenharTikTok(); }
-    // uma aba do TikTok aberta assume; sem nenhuma aberta, abre Pedidos > Para enviar
+    // o background abre a aba própria da automação (fixada, em segundo plano); nenhuma outra aba muda
     await chrome.storage.local.set({ ttAuto: { dono: 'icone', quando: Date.now() } });
-    let abertas = [];
-    try { abertas = await chrome.tabs.query({ url: TIKTOK }); } catch (_) { /* nada */ }
-    if (!abertas.length) chrome.tabs.create({ url: URL_PEDIDOS });
     desenharTikTok();
   };
 }

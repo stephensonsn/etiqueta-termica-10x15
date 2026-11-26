@@ -48,8 +48,43 @@ chrome.runtime.onMessage.addListener((msg) => {
     .catch(() => {}).finally(atualizar);
 });
 
+// ---------- aba própria da automação do TikTok ----------
+// A automação troca de página (Pedidos, Aguardando coleta) a cada minuto. Para nunca levar a aba
+// onde a pessoa trabalha (produtos, pedidos à mão), ela roda só numa aba aberta aqui: fixada e em
+// segundo plano. O id fica no storage.session (some quando o Chrome fecha; id velho não vale).
+const URL_PEDIDOS = 'https://seller-br.tiktok.com/order?order_status[]=1&selected_sort=1&tab=to_ship';
+async function abaAuto() {
+  const { ttAba } = await chrome.storage.session.get('ttAba');
+  if (!ttAba) return null;
+  try { const t = await chrome.tabs.get(ttAba); return t && t.id; } catch (_) { return null; }
+}
+let abrindo = null;
+function garantirAbaAuto() {
+  if (abrindo) return abrindo;
+  abrindo = (async () => {
+    const { ttAuto } = await chrome.storage.local.get('ttAuto');
+    if (!ttAuto || !ttAuto.dono || await abaAuto()) return;
+    const t = await chrome.tabs.create({ url: URL_PEDIDOS, active: false, pinned: true });
+    await chrome.storage.session.set({ ttAba: t.id });
+    await chrome.storage.local.set({ ttAuto: { dono: 'icone', quando: Date.now() } }); // a aba nova assume já
+  })().catch(() => {}).finally(() => { abrindo = null; });
+  return abrindo;
+}
+chrome.runtime.onMessage.addListener((msg, de, responder) => {
+  if (!msg || msg.tipo !== 'souAuto') return;
+  abaAuto().then((id) => responder({ sou: !!id && !!de.tab && de.tab.id === id }));
+  return true;
+});
+// relógio para a aba da automação: em segundo plano o Chrome freia o relógio da página
+chrome.runtime.onMessage.addListener((msg, _de, responder) => {
+  if (!msg || msg.tipo !== 'dormir') return;
+  setTimeout(() => responder(true), Math.max(0, Math.min(Number(msg.ms) || 0, 120000)));
+  return true;
+});
+chrome.storage.onChanged.addListener((m, area) => { if (area === 'local' && m.ttAuto && m.ttAuto.newValue && m.ttAuto.newValue.dono) garantirAbaAuto(); });
+
 chrome.alarms.create('pendencias', { periodInMinutes: 1 });
-chrome.alarms.onAlarm.addListener((a) => { if (a.name === 'pendencias') atualizar(); });
-chrome.runtime.onStartup.addListener(atualizar);
+chrome.alarms.onAlarm.addListener((a) => { if (a.name === 'pendencias') { atualizar(); garantirAbaAuto(); } });
+chrome.runtime.onStartup.addListener(() => { atualizar(); garantirAbaAuto(); });
 chrome.runtime.onInstalled.addListener(atualizar);
 atualizar();

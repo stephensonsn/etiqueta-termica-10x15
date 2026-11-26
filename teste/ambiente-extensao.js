@@ -75,7 +75,7 @@ function criar(opcoes = {}) {
         set: (o) => { Object.assign(armazem, JSON.parse(JSON.stringify(o))); return Promise.resolve(); },
         remove: (k) => { delete armazem[k]; return Promise.resolve(); },
       }, onChanged: { addListener() {} } },
-      runtime: { sendMessage: (msg, cb) => { chamadas.mensagens.push(msg); if (cb) cb(ctl.respostaMensagem(msg)); } },
+      runtime: { sendMessage: (msg, cb) => { if (msg.tipo === 'souAuto') { if (cb) cb({ sou: opcoes.souAuto !== false }); return; } chamadas.mensagens.push(msg); if (cb) cb(ctl.respostaMensagem(msg)); } },
     },
     // relógio virtual: cada espera avança o relógio e roda logo em seguida
     setTimeout: (fn, ms = 0) => { setImmediate(() => { agora += ms; fn(); }); return 0; },

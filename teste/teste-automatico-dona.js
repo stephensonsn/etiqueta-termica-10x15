@@ -30,6 +30,18 @@ const esperarFila = () => new Promise((r) => setTimeout(r, 50));
   for (let i = 0; i < 10; i++) await esperarFila();
   assert.equal(b.armazem.ttAuto.dono, 'aba-viva', 'não assume com a outra aba viva');
 
+  // 26/11/2026: a aba de gerenciar produtos ia para Pedidos a cada minuto. Aba comum (não é a aba
+  // própria da automação) nunca assume nem troca de página, mesmo ligada e com a dona sumida.
+  const produtos = 'https://seller-br.tiktok.com/product/manage';
+  const c = criar({ souAuto: false, armazem: (agora) => ({ ttAuto: { dono: PELO_ICONE, quando: agora } }) });
+  c.ctx.location.href = produtos;
+  for (let i = 0; i < 20; i++) await esperarFila();
+  assert.equal(c.armazem.ttAuto.dono, PELO_ICONE, 'aba comum não assume a automação');
+  assert.equal(c.ctx.location.href, produtos, 'aba comum não é levada para Pedidos');
+  const d = criar({ souAuto: false, armazem: (agora) => ({ ttAuto: { dono: 'aba-fechada', quando: agora - 10 * 60000 } }) });
+  for (let i = 0; i < 20; i++) await esperarFila();
+  assert.equal(d.armazem.ttAuto.dono, 'aba-fechada', 'aba comum não assume nem com a dona sumida');
+
   console.log('ok: aba dona fechada é substituída depois de 3 min sem sinal; dona viva continua');
   process.exit(0);
 })().catch((e) => { console.error('FALHOU', e); process.exit(1); });

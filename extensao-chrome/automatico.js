@@ -1,5 +1,7 @@
 // TikTok Shop: impressão automática dos pedidos novos.
-// Liga numa aba própria do Seller Center (vale para o Chrome todo; roda numa aba só). A cada 1 minuto
+// Roda SÓ na aba própria da automação: a extensão abre Pedidos numa aba fixada, em segundo plano, e
+// só ela troca de página. A aba onde a pessoa trabalha (produtos, pedidos à mão) nunca é levada para
+// Pedidos (26/11/2026: a aba de gerenciar produtos ia para Pedidos a cada minuto). A cada 1 minuto
 // (15 s enquanto a NF-e está saindo, para imprimir assim que ela fica pronta):
 //   1) abre Pedidos > Para enviar (Aguardando envio);
 //   2) nos pedidos "Sem NF-e": abre a NF-e, escolhe "Emitir" e emite pelo emissor do TikTok;
@@ -22,8 +24,11 @@
   const GLOBAL = 'ttAuto';
   let dono = null; // id da aba que está rodando, ou null = desligada
   const meuId = (() => { try { let v = sessionStorage.getItem(CHAVE + '-id'); if (!v) { v = Math.random().toString(36).slice(2) + Date.now().toString(36); sessionStorage.setItem(CHAVE + '-id', v); } return v; } catch (_) { return 'x'; } })();
-  const ligado = () => dono !== null && dono === meuId;
-  const ligadoOutra = () => dono !== null && dono !== meuId;
+  // esta é a aba própria da automação? Quem diz é o background (ele abriu a aba e guarda o id)
+  let souAuto = false;
+  const pedir = (msg) => new Promise((ok) => { try { chrome.runtime.sendMessage(msg, (r) => { void (chrome.runtime && chrome.runtime.lastError); ok(r); }); } catch (_) { ok(undefined); } });
+  const ligado = () => souAuto && dono !== null && dono === meuId;
+  const ligadoOutra = () => dono !== null && !ligado();
   const gravarDono = (v) => { try { return v ? chrome.storage.local.set({ [GLOBAL]: { dono: v, quando: Date.now() } }) : chrome.storage.local.remove(GLOBAL); } catch (_) { return Promise.resolve(); } };
   // pulso: a aba dona regrava a hora a cada 30 s. Se a dona foi fechada (ou o Chrome reiniciou), a
   // marca fica velha; passados 3 min sem pulso, qualquer aba do TikTok aberta assume sozinha.
@@ -33,7 +38,9 @@
   const PELO_ICONE = 'icone'; // o ícone da extensão liga sem ser aba: grava esta marca e uma aba do TikTok assume
   const donaSumiu = (reg, agora = Date.now()) => !!(reg && reg.dono) && (reg.dono === PELO_ICONE || agora - (Number(reg.quando) || 0) > ORFA);
   try { sessionStorage.removeItem(CHAVE); } catch (_) { /* marca antiga, por aba */ }
-  const esperar = (ms) => new Promise((ok) => setTimeout(ok, ms));
+  // espera: na aba da automação (em segundo plano) o relógio da página é freado pelo Chrome; quem conta
+  // o tempo é o background. Sem resposta dele, usa o relógio da página mesmo.
+  const esperar = async (ms) => { if (souAuto && (await pedir({ tipo: 'dormir', ms })) === true) return; await new Promise((ok) => setTimeout(ok, ms)); };
   const texto = (el) => (el && (el.innerText || el.textContent) || '').trim();
   const visivel = (el) => !!el && el.getClientRects().length > 0;
   // pedidos já enviados para a térmica (guardados nesta aba por 2 dias): nunca imprime duas vezes
@@ -169,13 +176,15 @@
     botao.textContent = lig ? 'Desligar' : 'Ligar';
     botao.style.background = lig ? '#FEE2E2' : '#2563EB';
     botao.style.color = lig ? '#B91C1C' : '#fff';
-    estado.textContent = msg || (ligado() ? 'Ligada nesta aba. Deixe esta aba aberta.'
-      : ligadoOutra() ? 'Ligada em outra aba do TikTok. Desligar aqui desliga lá também.'
+    estado.textContent = msg || (ligado() ? 'Esta é a aba da automação. Pode deixá-la fixada; use outras abas para trabalhar.'
+      : ligadoOutra() ? 'Ligada. Roda na aba fixada da automação; esta aba fica livre para você.'
         : 'Desligada: não emite nota nem imprime.');
     mostrar();
   }
   botao.onclick = async () => {
     if (dono !== null) { dono = null; await gravarDono(null); desenhar(); log('Desligada'); return; }
+    // fora da aba da automação: só marca ligada; o background abre a aba própria e ela assume
+    if (!souAuto) { dono = PELO_ICONE; await gravarDono(PELO_ICONE); desenhar(); log('Ligada (roda na aba fixada da automação)'); return; }
     dono = meuId; await gravarDono(meuId); desenhar(); log('Ligada'); rodada();
   };
   try { const h = JSON.parse(sessionStorage.getItem(CHAVE + '-log') || '[]').filter((l) => !/nenhum pedido novo/.test(l)); sessionStorage.setItem(CHAVE + '-log', JSON.stringify(h)); } catch (_) { /* nada */ }
@@ -421,7 +430,7 @@
       if (!/order_status(%5B%5D|\[\])=2/.test(location.href)) { location.href = URL_COLETA; return; }
       rodando = true;
       try { sessionStorage.removeItem(REIMPRIMIR); desenhar('Reimprimindo o que não chegou na térmica…'); await reimprimir(pend); } catch (e) { log(e.message); }
-      finally { rodando = false; setTimeout(() => { if (ligado()) location.href = URL_PEDIDOS; }, 3000); }
+      finally { rodando = false; esperar(3000).then(() => { if (ligado()) location.href = URL_PEDIDOS; }); }
       return;
     }
     if (!location.href.startsWith('https://seller-br.tiktok.com/order') || !/tab=to_ship/.test(location.href) || /order_status(%5B%5D|\[\])=2/.test(location.href)) {
@@ -495,7 +504,7 @@
       desenhar('Parou nesta rodada: ' + e.message + '. Tenta de novo em 1 minuto.');
     } finally {
       rodando = false;
-      setTimeout(() => { if (ligado()) location.href = URL_PEDIDOS; }, emitiuAgora ? RAPIDO : INTERVALO);
+      esperar(emitiuAgora ? RAPIDO : INTERVALO).then(() => { if (ligado()) location.href = URL_PEDIDOS; });
     }
   }
   // estado global: carrega e acompanha (desligar em outra aba ou no ícone para esta na hora)
@@ -508,13 +517,21 @@
       desenhar();
       if (dono === PELO_ICONE) conferirDona(); // ligada pelo ícone da extensão: uma aba do TikTok assume
     });
-    chrome.storage.local.get(GLOBAL).then((r) => { dono = (r[GLOBAL] || {}).dono || null; desenhar(); if (ligado()) { gravarDono(meuId); setTimeout(rodada, 3000); } else conferirDona(); });
+    Promise.all([pedir({ tipo: 'souAuto' }), chrome.storage.local.get(GLOBAL)]).then(([r0, r]) => {
+      souAuto = !!(r0 && r0.sou);
+      dono = (r[GLOBAL] || {}).dono || null;
+      // versão antiga: a dona era esta aba comum; passa para a aba própria na hora
+      if (!souAuto && dono === meuId) { dono = PELO_ICONE; gravarDono(PELO_ICONE); }
+      desenhar();
+      if (ligado()) { gravarDono(meuId); esperar(3000).then(rodada); } else conferirDona();
+    });
     setInterval(() => { if (ligado()) gravarDono(meuId); else if (dono !== null) conferirDona(); }, PULSO);
   } catch (_) { /* extensão recarregada: fica desligada */ }
   // a dona parou de dar sinal: esta aba assume (espera um tempo aleatório e confere de novo para
   // duas abas abertas não assumirem juntas; se outra assumiu antes, o pulso dela já está novo)
   async function conferirDona() {
     try {
+      if (!souAuto) return; // só a aba própria da automação assume
       if (!donaSumiu((await chrome.storage.local.get(GLOBAL))[GLOBAL])) return;
       await esperar(1000 + Math.floor(Math.random() * 4000));
       const reg = (await chrome.storage.local.get(GLOBAL))[GLOBAL];
