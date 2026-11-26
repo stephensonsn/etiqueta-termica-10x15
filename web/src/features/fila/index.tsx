@@ -1,20 +1,12 @@
-import { useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { getRouteApi } from '@tanstack/react-router'
-import {
-  type ColumnDef,
-  type RowSelectionState,
-  flexRender,
-  getCoreRowModel,
-  getFilteredRowModel,
-  getPaginationRowModel,
-  useReactTable,
-} from '@tanstack/react-table'
-import { ChevronDown, Eye, FileUp, Inbox, Printer, RotateCcw, Search, Trash2 } from 'lucide-react'
+import { ChevronDown, FileUp, FolderDown, Inbox, Printer, Search, Trash2, Upload } from 'lucide-react'
 import { toast } from 'sonner'
-import { hora, dataHora, ehHoje, plural } from '@/lib/formato'
-import { api, enviarArquivo, type Pedido, useEstado } from '@/lib/ponte'
+import { hora, plural } from '@/lib/formato'
+import { api, enviarArquivo, type Pedido, salvarConfig, useEstado } from '@/lib/ponte'
 import { cn } from '@/lib/utils'
+import { useIsMobile } from '@/hooks/use-mobile'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -22,52 +14,63 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Input } from '@/components/ui/input'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { DataTableBulkActions, DataTablePagination } from '@/components/data-table'
 import { Pagina } from '@/components/layout/pagina'
-import { naFila, origemLegivel, SeloEstado } from './estado'
+import { type Aba, agruparPorDia, FILTRO, ordemDeImpressao, resumoLote, vezesImpresso } from './agrupar'
+import { DetalheEtiqueta, numeroDoEnvio, PreviaEtiqueta } from './detalhe'
+import { origemLegivel, SeloEstado } from './estado'
 
 const rota = getRouteApi('/_authenticated/fila')
-type Aba = 'fila' | 'impressas' | 'descartadas'
-const FILTRO: Record<Aba, (p: Pedido) => boolean> = {
-  fila: naFila,
-  impressas: (p) => p.estado === 'impresso',
-  descartadas: (p) => p.estado === 'descartado',
-}
+const ABAS: { valor: Aba; rotulo: string }[] = [
+  { valor: 'fila', rotulo: 'Para imprimir' },
+  { valor: 'falhas', rotulo: 'Com falha' },
+  { valor: 'impressas', rotulo: 'Impressas' },
+  { valor: 'descartadas', rotulo: 'Descartadas' },
+]
 
 export function Fila() {
   const { aba = 'fila' } = rota.useSearch()
   const navegar = rota.useNavigate()
   const { data, isLoading } = useEstado()
   const qc = useQueryClient()
+  const celular = useIsMobile()
   const [busca, setBusca] = useState('')
-  const [selecao, setSelecao] = useState<RowSelectionState>({})
-  const [previa, setPrevia] = useState<Pedido | null>(null)
+  const [marcadas, setMarcadas] = useState<Set<string>>(new Set())
+  const [foco, setFoco] = useState<string | null>(null)
+  const [progresso, setProgresso] = useState<{ i: number; n: number } | null>(null)
+  const [arrastando, setArrastando] = useState(false)
   const arquivo = useRef<HTMLInputElement>(null)
 
   const pedidos = useMemo(() => data?.pedidos ?? [], [data])
-  const contagem = useMemo(
-    () => ({ fila: pedidos.filter(FILTRO.fila).length, impressas: pedidos.filter(FILTRO.impressas).length, descartadas: pedidos.filter(FILTRO.descartadas).length }),
-    [pedidos]
-  )
-  const linhas = useMemo(() => pedidos.filter(FILTRO[aba]), [pedidos, aba])
+  const contagem = useMemo(() => Object.fromEntries(ABAS.map((a) => [a.valor, pedidos.filter(FILTRO[a.valor]).length])) as Record<Aba, number>, [pedidos])
+  const linhas = useMemo(() => {
+    const q = busca.trim().toLowerCase()
+    return pedidos.filter(FILTRO[aba]).filter((p) => !q || `${p.id} ${p.rastreio ?? ''} ${p.origem} ${p.tipo} ${origemLegivel(p)}`.toLowerCase().includes(q))
+  }, [pedidos, aba, busca])
+  const grupos = useMemo(() => agruparPorDia(linhas), [linhas])
+  const focado = pedidos.find((p) => p.jid === foco) ?? (celular ? null : linhas[0] ?? null)
+  const selecionadas = linhas.filter((p) => marcadas.has(p.jid))
+  const paraImprimir = pedidos.filter((p) => p.estado === 'aguardando' || p.estado === 'erro')
 
-  // Imprime ou descarta em sequência (a ponte imprime uma de cada vez) e conta o resultado.
-  const acao = useMutation({
-    mutationFn: async ({ tipo, jids }: { tipo: 'imprimir' | 'descartar'; jids: string[] }) => {
-      let ok = 0
-      const erros: string[] = []
-      for (const jid of jids) {
-        try { await api(`/api/pedido/${jid}/${tipo}`, {}); ok++ } catch (e) { erros.push((e as Error).message) }
+  // Imprime uma de cada vez (a ponte usa a impressora em fila única), mostrando o andamento.
+  const lote = useMutation({
+    mutationFn: async ({ tipo, itens }: { tipo: 'imprimir' | 'descartar'; itens: Pedido[] }) => {
+      const ordem = tipo === 'imprimir' ? ordemDeImpressao(itens) : itens
+      let ok = 0, falhas = 0, primeiroErro = ''
+      for (let i = 0; i < ordem.length; i++) {
+        if (tipo === 'imprimir' && ordem.length > 1) setProgresso({ i: i + 1, n: ordem.length })
+        try { await api(`/api/pedido/${ordem[i].jid}/${tipo}`, {}); ok++ } catch (e) { falhas++; primeiroErro ||= (e as Error).message }
+        qc.invalidateQueries({ queryKey: ['estado'] })
       }
-      return { tipo, ok, erros }
+      return { tipo, ok, falhas, primeiroErro }
     },
-    onSuccess: ({ tipo, ok, erros }) => {
-      setSelecao({})
-      qc.invalidateQueries({ queryKey: ['estado'] })
-      if (ok) toast.success(tipo === 'imprimir' ? `${plural(ok, 'etiqueta enviada', 'etiquetas enviadas')} para a impressora` : `${plural(ok, 'etiqueta tirada', 'etiquetas tiradas')} da fila`)
-      if (erros.length) toast.error(`${plural(erros.length, 'falhou', 'falharam')}: ${erros[0]}`)
+    onSettled: () => setProgresso(null),
+    onSuccess: ({ tipo, ok, falhas, primeiroErro }) => {
+      setMarcadas(new Set())
+      if (tipo === 'descartar') return toast.success(`${plural(ok, 'etiqueta tirada', 'etiquetas tiradas')} da fila`)
+      const texto = resumoLote(ok, falhas)
+      if (falhas) toast.error(`${texto}. ${primeiroErro}`)
+      else toast.success(texto)
     },
   })
   const envio = useMutation({
@@ -75,143 +78,92 @@ export function Fila() {
     onSuccess: (n) => {
       qc.invalidateQueries({ queryKey: ['estado'] })
       navegar({ search: { aba: 'fila' } })
-      toast.success(`${plural(n, 'arquivo lido', 'arquivos lidos')}. Confira na fila e clique em Imprimir.`)
+      toast.success(`${plural(n, 'arquivo lido', 'arquivos lidos')}. A etiqueta está na fila.`)
     },
   })
-  const ocupado = acao.isPending || envio.isPending
-  const executar = acao.mutate
-
-  const colunas = useMemo<ColumnDef<Pedido>[]>(() => [
-    {
-      id: 'select',
-      header: ({ table }) => (
-        <Checkbox
-          checked={table.getIsAllPageRowsSelected() || (table.getIsSomePageRowsSelected() && 'indeterminate')}
-          onCheckedChange={(v) => table.toggleAllPageRowsSelected(!!v)}
-          aria-label='Selecionar todas desta página'
-        />
-      ),
-      cell: ({ row }) => (
-        <Checkbox checked={row.getIsSelected()} onCheckedChange={(v) => row.toggleSelected(!!v)} aria-label={`Selecionar ${row.original.id}`} />
-      ),
-      enableSorting: false,
-    },
-    {
-      accessorKey: 'hora',
-      header: 'Hora',
-      cell: ({ row }) => (
-        <span className='tabular-nums whitespace-nowrap' title={dataHora(row.original.hora)}>
-          {ehHoje(row.original.hora) ? hora(row.original.hora) : dataHora(row.original.hora)}
-        </span>
-      ),
-    },
-    {
-      id: 'etiqueta',
-      header: 'Etiqueta',
-      accessorFn: (p) => `${p.id} ${p.rastreio ?? ''} ${p.origem} ${p.tipo}`,
-      cell: ({ row }) => {
-        const p = row.original
-        return (
-          <div className='min-w-0'>
-            <div className='flex items-center gap-2'>
-              <Badge variant='outline' className='font-normal'>{origemLegivel(p)}</Badge>
-              <span className='truncate font-medium tabular-nums'>{p.id.replace(new RegExp(`^${origemLegivel(p)}\\s+`, 'i'), '') || 'Sem número'}</span>
-            </div>
-            <div className='mt-0.5 truncate text-xs text-muted-foreground'>
-              {p.tipo}{p.rastreio ? ` · rastreio ${p.rastreio}` : ''}
-            </div>
-          </div>
-        )
-      },
-    },
-    {
-      accessorKey: 'estado',
-      header: 'Situação',
-      cell: ({ row }) => (
-        <div className='flex flex-col items-start gap-1'>
-          <SeloEstado estado={row.original.estado} />
-          {row.original.erro && <span className='max-w-72 text-xs text-destructive'>{row.original.erro}</span>}
-        </div>
-      ),
-    },
-    {
-      accessorKey: 'impressoes',
-      header: () => <span className='block text-end'>Impressões</span>,
-      cell: ({ row }) => <span className='block text-end tabular-nums'>{row.original.impressoes ?? 0}</span>,
-    },
-    {
-      id: 'acoes',
-      header: () => <span className='sr-only'>Ações</span>,
-      cell: ({ row }) => {
-        const p = row.original
-        const reimprimir = p.estado === 'impresso' || p.estado === 'descartado'
-        return (
-          <div className='flex justify-end gap-1'>
-            <Button size='sm' variant='ghost' onClick={() => setPrevia(p)} aria-label={`Ver prévia de ${p.id}`}>
-              <Eye aria-hidden='true' /> <span className='max-lg:sr-only'>Prévia</span>
-            </Button>
-            <Button size='sm' variant={reimprimir ? 'outline' : 'default'} disabled={ocupado || p.estado === 'enviando'}
-              onClick={() => executar({ tipo: 'imprimir', jids: [p.jid] })}>
-              {reimprimir ? <RotateCcw aria-hidden='true' /> : <Printer aria-hidden='true' />}
-              {reimprimir ? 'Reimprimir' : p.estado === 'erro' ? 'Tentar de novo' : 'Imprimir'}
-            </Button>
-            {(p.estado === 'aguardando' || p.estado === 'erro') && (
-              <Button size='sm' variant='ghost' disabled={ocupado} onClick={() => executar({ tipo: 'descartar', jids: [p.jid] })} aria-label={`Descartar ${p.id}`}>
-                <Trash2 aria-hidden='true' />
-              </Button>
-            )}
-          </div>
-        )
-      },
-    },
-  ], [executar, ocupado])
-
-  const tabela = useReactTable({
-    data: linhas,
-    columns: colunas,
-    getRowId: (p) => p.jid,
-    state: { rowSelection: selecao, globalFilter: busca },
-    onRowSelectionChange: setSelecao,
-    onGlobalFilterChange: setBusca,
-    globalFilterFn: (row, _c, valor) => String(row.getValue('etiqueta')).toLowerCase().includes(String(valor).toLowerCase()),
-    getCoreRowModel: getCoreRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    initialState: { pagination: { pageSize: 20 } },
+  const modo = useMutation({
+    mutationFn: (imprimir: 'direto' | 'conferir') => salvarConfig({ imprimir }),
+    onSuccess: (_r, v) => { qc.invalidateQueries({ queryKey: ['estado'] }); toast.success(v === 'direto' ? 'Etiquetas novas imprimem sozinhas' : 'Etiquetas novas esperam você conferir') },
   })
-  const selecionadas = tabela.getFilteredSelectedRowModel().rows.map((r) => r.original)
-  const aguardando = pedidos.filter((p) => p.estado === 'aguardando' || p.estado === 'erro')
+  const ocupado = lote.isPending || envio.isPending
+  const mutarLote = lote.mutate
+  const mutarEnvio = envio.mutate
+  const imprimir = useCallback((itens: Pedido[]) => mutarLote({ tipo: 'imprimir', itens }), [mutarLote])
+  const descartar = (itens: Pedido[]) => mutarLote({ tipo: 'descartar', itens: itens.filter((p) => p.estado === 'aguardando' || p.estado === 'erro') })
+
+  // Arrastar um arquivo em qualquer lugar da tela.
+  useEffect(() => {
+    const sobre = (e: DragEvent) => { if (e.dataTransfer?.types.includes('Files')) { e.preventDefault(); setArrastando(true) } }
+    const fora = (e: DragEvent) => { if (!e.relatedTarget) setArrastando(false) }
+    const soltar = (e: DragEvent) => {
+      if (!e.dataTransfer?.files.length) return
+      e.preventDefault(); setArrastando(false)
+      mutarEnvio([...e.dataTransfer.files])
+    }
+    window.addEventListener('dragover', sobre); window.addEventListener('dragleave', fora); window.addEventListener('drop', soltar)
+    return () => { window.removeEventListener('dragover', sobre); window.removeEventListener('dragleave', fora); window.removeEventListener('drop', soltar) }
+  }, [mutarEnvio])
+
+  // Setas mudam a etiqueta em foco; Enter imprime (fora de campos de texto).
+  useEffect(() => {
+    const tecla = (e: KeyboardEvent) => {
+      if ((e.target as HTMLElement)?.closest('input, textarea, button, [role="dialog"], [role="tab"]') || !linhas.length) return
+      const i = Math.max(0, linhas.findIndex((p) => p.jid === focado?.jid))
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault()
+        const prox = linhas[Math.min(linhas.length - 1, Math.max(0, i + (e.key === 'ArrowDown' ? 1 : -1)))]
+        setFoco(prox.jid)
+        document.getElementById(`etq-${prox.jid}`)?.scrollIntoView({ block: 'nearest' })
+      }
+      if (e.key === 'Enter' && focado && !ocupado && focado.estado !== 'enviando') { e.preventDefault(); imprimir([focado]) }
+    }
+    window.addEventListener('keydown', tecla)
+    return () => window.removeEventListener('keydown', tecla)
+  }, [linhas, focado, ocupado, imprimir])
+
+  const todasMarcadas = linhas.length > 0 && linhas.every((p) => marcadas.has(p.jid))
+  const algumaMarcada = selecionadas.length > 0
 
   return (
     <Pagina
       titulo='Fila de impressão'
-      descricao='Etiquetas que chegaram do Mercado Livre, Shopee, TikTok ou de arquivo. Atualiza sozinha a cada 2 segundos.'
+      descricao='Etiquetas do Mercado Livre, Shopee, TikTok ou de arquivo, guardadas pelo prazo do histórico para reimprimir.'
       acoes={
         <>
-          <input ref={arquivo} type='file' accept='.zip,.txt,.zpl' multiple hidden
-            onChange={(e) => { const f = [...(e.target.files ?? [])]; e.target.value = ''; if (f.length) envio.mutate(f) }} />
-          <Button variant='outline' onClick={() => arquivo.current?.click()} disabled={ocupado}>
-            <FileUp aria-hidden='true' /> Enviar arquivo
-          </Button>
-          <Button onClick={() => acao.mutate({ tipo: 'imprimir', jids: aguardando.map((p) => p.jid) })} disabled={ocupado || !aguardando.length}>
-            <Printer aria-hidden='true' /> Imprimir a fila ({aguardando.length})
+          <Tabs value={data?.config.imprimir ?? 'direto'} onValueChange={(v) => modo.mutate(v as 'direto' | 'conferir')}>
+            <TabsList aria-label='Quando imprimir'>
+              <TabsTrigger value='direto'>Imprimir direto</TabsTrigger>
+              <TabsTrigger value='conferir'>Conferir antes</TabsTrigger>
+            </TabsList>
+          </Tabs>
+          <input ref={arquivo} type='file' accept='.zip,.txt,.zpl' multiple hidden onChange={(e) => { const f = [...(e.target.files ?? [])]; e.target.value = ''; if (f.length) envio.mutate(f) }} />
+          <Button variant='outline' onClick={() => arquivo.current?.click()} disabled={ocupado}><FileUp aria-hidden='true' /> Enviar arquivo</Button>
+          <Button disabled={ocupado || (!algumaMarcada && !paraImprimir.length)} onClick={() => imprimir(algumaMarcada ? selecionadas : paraImprimir)}>
+            <Printer aria-hidden='true' />
+            {progresso ? `Imprimindo ${progresso.i} de ${progresso.n}…` : algumaMarcada ? `Imprimir selecionadas (${selecionadas.length})` : `Imprimir a fila (${paraImprimir.length})`}
           </Button>
         </>
       }
     >
-      <div className={cn('flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border px-4 py-3 text-sm',
-        data?.fila.ok ? 'border-emerald-600/25 bg-emerald-600/5' : 'border-destructive/30 bg-destructive/5')} role='status'>
-        <Printer className={cn('size-4', data?.fila.ok ? 'text-emerald-700 dark:text-emerald-400' : 'text-destructive')} aria-hidden='true' />
-        <span className='font-medium'>{data ? (data.fila.ok ? 'Impressora pronta' : 'Impressora com problema') : 'Consultando a impressora…'}</span>
-        {data && <span className='text-muted-foreground'>{data.fila.texto}</span>}
-      </div>
+      {/* situação: impressora e entrada automática, lado a lado e com a mesma altura */}
+      <section className='grid grid-cols-1 gap-3 md:grid-cols-2' aria-label='Situação'>
+        <Situacao ok={!!data?.fila.ok} titulo={data ? (data.fila.ok ? 'Impressora pronta' : 'Impressora com problema') : 'Consultando a impressora…'} texto={data?.fila.texto} icone={Printer} />
+        <Situacao ok={!!data?.vigia?.ativo} titulo={data?.vigia?.ativo ? 'Pegando as etiquetas baixadas' : 'Entrada automática parada'}
+          texto={data?.vigia?.ativo ? 'O que cair em Downloads entra sozinho na fila' : data?.vigia?.texto} icone={FolderDown} alerta />
+      </section>
 
       <div className='flex flex-wrap items-center justify-between gap-3'>
-        <Tabs value={aba} onValueChange={(v) => { setSelecao({}); navegar({ search: { aba: v as Aba } }) }}>
+        <Tabs value={aba} onValueChange={(v) => { setMarcadas(new Set()); setFoco(null); navegar({ search: { aba: v as Aba } }) }} className='max-w-full overflow-x-auto'>
           <TabsList>
-            <TabsTrigger value='fila'>Na fila <Contador n={contagem.fila} destaque /></TabsTrigger>
-            <TabsTrigger value='impressas'>Impressas <Contador n={contagem.impressas} /></TabsTrigger>
-            <TabsTrigger value='descartadas'>Descartadas <Contador n={contagem.descartadas} /></TabsTrigger>
+            {ABAS.map((a) => (
+              <TabsTrigger key={a.valor} value={a.valor}>
+                {a.rotulo}
+                <span className={cn('ms-1.5 rounded-full px-1.5 text-xs tabular-nums',
+                  a.valor === 'falhas' && contagem.falhas ? 'bg-destructive text-white' : a.valor === 'fila' && contagem.fila ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground')}>
+                  {contagem[a.valor]}
+                </span>
+              </TabsTrigger>
+            ))}
           </TabsList>
         </Tabs>
         <div className='relative w-full sm:w-72'>
@@ -220,90 +172,63 @@ export function Fila() {
         </div>
       </div>
 
-      {/* celular: cartões, cada um com a ação principal à vista */}
-      <ul className='flex flex-col gap-3 md:hidden' aria-label='Etiquetas'>
-        {tabela.getRowModel().rows.map((r) => {
-          const p = r.original
-          const reimprimir = p.estado === 'impresso' || p.estado === 'descartado'
-          return (
-            <li key={r.id} className={cn('rounded-xl border p-4', p.estado === 'erro' && 'border-destructive/30 bg-destructive/5')}>
-              <div className='flex items-start justify-between gap-3'>
-                <div className='min-w-0'>
-                  <div className='flex items-center gap-2'>
-                    <Badge variant='outline' className='font-normal'>{origemLegivel(p)}</Badge>
-                    <span className='text-sm text-muted-foreground tabular-nums'>{hora(p.hora)}</span>
-                  </div>
-                  <p className='mt-1 truncate font-medium tabular-nums'>{p.id.replace(new RegExp(`^${origemLegivel(p)}\\s+`, 'i'), '') || 'Sem número'}</p>
-                  <p className='truncate text-xs text-muted-foreground'>{p.tipo}</p>
-                </div>
-                <SeloEstado estado={p.estado} />
-              </div>
-              {p.erro && <p className='mt-2 text-xs text-destructive'>{p.erro}</p>}
-              <div className='mt-3 grid grid-cols-2 gap-2'>
-                <Button variant='outline' onClick={() => setPrevia(p)}><Eye aria-hidden='true' /> Prévia</Button>
-                <Button variant={reimprimir ? 'outline' : 'default'} disabled={ocupado || p.estado === 'enviando'} onClick={() => executar({ tipo: 'imprimir', jids: [p.jid] })}>
-                  {reimprimir ? <RotateCcw aria-hidden='true' /> : <Printer aria-hidden='true' />} {reimprimir ? 'Reimprimir' : 'Imprimir'}
-                </Button>
-              </div>
-            </li>
-          )
-        })}
-        {!isLoading && !tabela.getRowModel().rows.length && (
-          <li className='rounded-xl border p-6'><Vazio aba={aba} buscando={!!busca} onArquivo={() => arquivo.current?.click()} /></li>
-        )}
-      </ul>
-
-      <div className='hidden overflow-hidden rounded-xl border md:block'>
-        <Table>
-          <TableHeader>
-            {tabela.getHeaderGroups().map((g) => (
-              <TableRow key={g.id} className='bg-muted/40 hover:bg-muted/40'>
-                {g.headers.map((h) => (
-                  <TableHead key={h.id} className={cn(h.id === 'select' && 'w-10', h.id === 'acoes' && 'text-end')}>
-                    {h.isPlaceholder ? null : flexRender(h.column.columnDef.header, h.getContext())}
-                  </TableHead>
-                ))}
-              </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              Array.from({ length: 4 }, (_, i) => (
-                <TableRow key={i}><TableCell colSpan={colunas.length}><Skeleton className='h-9 w-full' /></TableCell></TableRow>
-              ))
-            ) : tabela.getRowModel().rows.length ? (
-              tabela.getRowModel().rows.map((r) => (
-                <TableRow key={r.id} data-state={r.getIsSelected() && 'selected'} className={cn(r.original.estado === 'erro' && 'bg-destructive/5')}>
-                  {r.getVisibleCells().map((c) => (
-                    <TableCell key={c.id} className={cn('py-2.5 align-middle', c.column.id === 'etiqueta' && 'max-w-[22rem]')}>
-                      {flexRender(c.column.columnDef.cell, c.getContext())}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={colunas.length} className='h-48'>
-                  <Vazio aba={aba} buscando={!!busca} onArquivo={() => arquivo.current?.click()} />
-                </TableCell>
-              </TableRow>
+      <div className='grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(300px,360px)]'>
+        <section className='min-w-0 overflow-hidden rounded-xl border' aria-label='Etiquetas'>
+          <div className='flex min-h-12 items-center gap-3 border-b px-4 py-2 text-sm'>
+            <Checkbox checked={todasMarcadas || (algumaMarcada && 'indeterminate')} disabled={!linhas.length}
+              onCheckedChange={(v) => setMarcadas(v ? new Set(linhas.map((p) => p.jid)) : new Set())} aria-label='Selecionar todas' />
+            <span className='text-muted-foreground'>{algumaMarcada ? `${selecionadas.length} selecionada(s)` : plural(linhas.length, 'etiqueta', 'etiquetas')}</span>
+            {algumaMarcada && (aba === 'fila' || aba === 'falhas') && (
+              <Button size='sm' variant='ghost' className='ms-auto' disabled={ocupado} onClick={() => descartar(selecionadas)}><Trash2 aria-hidden='true' /> Tirar da fila</Button>
             )}
-          </TableBody>
-        </Table>
-      </div>
-      {linhas.length > 20 && <DataTablePagination table={tabela} />}
+          </div>
+          {isLoading ? (
+            <div className='flex flex-col gap-2 p-4'>{Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className='h-14 w-full' />)}</div>
+          ) : grupos.length ? grupos.map((g) => (
+            <div key={g.dia}>
+              <h3 className='border-b bg-muted/50 px-4 py-1.5 text-xs font-semibold tracking-wide text-muted-foreground uppercase'>
+                {g.rotulo} <span className='font-normal normal-case'>· {plural(g.itens.length, 'etiqueta', 'etiquetas')}</span>
+              </h3>
+              <ul>
+                {g.itens.map((p) => {
+                  const vezes = vezesImpresso(p, pedidos)
+                  const ativo = focado?.jid === p.jid
+                  return (
+                    <li key={p.jid} id={`etq-${p.jid}`}
+                      className={cn('flex items-center gap-3 border-b px-4 py-2.5 last:border-b-0 hover:bg-muted/40',
+                        p.estado === 'erro' && 'bg-destructive/5', ativo && 'bg-primary/5 shadow-[inset_3px_0_0_var(--primary)]')}>
+                      <Checkbox checked={marcadas.has(p.jid)} aria-label={`Selecionar ${numeroDoEnvio(p)}`}
+                        onCheckedChange={(v) => setMarcadas((s) => { const n = new Set(s); if (v) n.add(p.jid); else n.delete(p.jid); return n })} />
+                      <button type='button' className='flex min-w-0 flex-1 cursor-pointer items-center gap-3 text-start focus-visible:rounded-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none'
+                        onClick={() => setFoco(p.jid)} aria-current={ativo || undefined}>
+                        <PreviaEtiqueta jid={p.jid} alt='' className='w-9 shrink-0' />
+                        <span className='min-w-0 flex-1'>
+                          <span className='flex items-center gap-2'>
+                            <span className='truncate font-medium tabular-nums'>{numeroDoEnvio(p)}</span>
+                            {vezes > 1 && <Badge variant='secondary' className='px-1.5 tabular-nums' title={`Impressa ${vezes} vezes`}>{vezes}x</Badge>}
+                          </span>
+                          <span className='block truncate text-xs text-muted-foreground'>{hora(p.hora)} · {origemLegivel(p)} · {p.tipo}</span>
+                          {p.erro && <span className='block truncate text-xs text-destructive'>{p.erro}</span>}
+                        </span>
+                        <SeloEstado estado={p.estado} />
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
+          )) : (
+            <Vazio aba={aba} buscando={!!busca} onArquivo={() => arquivo.current?.click()} modoConferir={data?.config.imprimir === 'conferir'} />
+          )}
+        </section>
 
-      <DataTableBulkActions table={tabela} entityName='etiqueta'>
-        <Button size='sm' disabled={ocupado} onClick={() => acao.mutate({ tipo: 'imprimir', jids: selecionadas.map((p) => p.jid) })}>
-          <Printer aria-hidden='true' /> {aba === 'fila' ? 'Imprimir' : 'Reimprimir'}
-        </Button>
-        {aba === 'fila' && (
-          <Button size='sm' variant='outline' disabled={ocupado}
-            onClick={() => acao.mutate({ tipo: 'descartar', jids: selecionadas.filter((p) => p.estado !== 'enviando').map((p) => p.jid) })}>
-            <Trash2 aria-hidden='true' /> Descartar
-          </Button>
+        {!celular && (
+          <aside className='rounded-xl border p-4 lg:sticky lg:top-20 lg:self-start' aria-label='Etiqueta escolhida'>
+            <DetalheEtiqueta p={focado} vezes={focado ? vezesImpresso(focado, pedidos) : 0} calib={data?.config.calib} ocupado={ocupado}
+              onImprimir={(p) => imprimir([p])} onDescartar={(p) => descartar([p])} />
+          </aside>
         )}
-      </DataTableBulkActions>
+      </div>
 
       <Collapsible className='rounded-xl border'>
         <CollapsibleTrigger className='group flex w-full items-center justify-between px-4 py-3 text-sm font-medium'>
@@ -311,54 +236,63 @@ export function Fila() {
           <ChevronDown className='size-4 transition-transform group-data-[state=open]:rotate-180' aria-hidden='true' />
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <pre className='max-h-72 overflow-auto border-t bg-muted/30 px-4 py-3 font-mono text-xs leading-relaxed whitespace-pre-wrap'>
-            {(data?.log ?? []).join('\n') || 'Sem registros recentes.'}
-          </pre>
+          <pre className='max-h-72 overflow-auto border-t bg-muted/30 px-4 py-3 font-mono text-xs leading-relaxed whitespace-pre-wrap'>{(data?.log ?? []).join('\n') || 'Sem registros recentes.'}</pre>
         </CollapsibleContent>
       </Collapsible>
 
-      <Sheet open={!!previa} onOpenChange={(v) => !v && setPrevia(null)}>
-        <SheetContent className='w-full sm:max-w-md'>
-          {previa && (
-            <>
-              <SheetHeader>
-                <SheetTitle>Etiqueta {previa.id || 'sem número'}</SheetTitle>
-                <SheetDescription>{origemLegivel(previa)} · {previa.tipo} · chegou {dataHora(previa.hora)}</SheetDescription>
-              </SheetHeader>
-              <div className='flex flex-1 flex-col gap-4 overflow-auto px-4'>
-                <img src={`/api/previa/${previa.jid}.png`} alt={`Prévia da etiqueta ${previa.id}`} className='mx-auto w-full max-w-xs rounded-md border bg-white' />
-                <Button disabled={ocupado} onClick={() => { acao.mutate({ tipo: 'imprimir', jids: [previa.jid] }); setPrevia(null) }}>
-                  <Printer aria-hidden='true' /> {previa.estado === 'impresso' ? 'Reimprimir' : 'Imprimir'}
-                </Button>
-              </div>
-            </>
-          )}
-        </SheetContent>
-      </Sheet>
+      {celular && (
+        <Sheet open={!!foco} onOpenChange={(v) => !v && setFoco(null)}>
+          <SheetContent side='bottom' className='max-h-[92svh] overflow-y-auto'>
+            <SheetHeader className='sr-only'><SheetTitle>Etiqueta</SheetTitle><SheetDescription>Prévia e histórico da etiqueta</SheetDescription></SheetHeader>
+            <div className='p-4'>
+              <DetalheEtiqueta p={focado} vezes={focado ? vezesImpresso(focado, pedidos) : 0} calib={data?.config.calib} ocupado={ocupado}
+                onImprimir={(p) => imprimir([p])} onDescartar={(p) => descartar([p])} />
+            </div>
+          </SheetContent>
+        </Sheet>
+      )}
+
+      {arrastando && (
+        <div className='pointer-events-none fixed inset-0 z-50 flex items-center justify-center bg-primary/10 backdrop-blur-sm'>
+          <div className='flex flex-col items-center gap-2 rounded-2xl border-2 border-dashed border-primary bg-background px-10 py-8 text-center'>
+            <Upload className='size-8 text-primary' aria-hidden='true' />
+            <p className='font-medium'>Solte o arquivo de etiqueta</p>
+            <p className='text-sm text-muted-foreground'>.zip, .txt ou .zpl do Mercado Livre, Shopee ou TikTok</p>
+          </div>
+        </div>
+      )}
     </Pagina>
   )
 }
 
-function Contador({ n, destaque }: { n: number; destaque?: boolean }) {
+function Situacao({ ok, titulo, texto, icone: Icone, alerta }: { ok: boolean; titulo: string; texto?: string; icone: React.ElementType; alerta?: boolean }) {
+  const tom = ok ? 'border-emerald-600/25 bg-emerald-600/5 text-emerald-700 dark:text-emerald-400'
+    : alerta ? 'border-amber-500/30 bg-amber-500/5 text-amber-700 dark:text-amber-300' : 'border-destructive/30 bg-destructive/5 text-destructive'
   return (
-    <span className={cn('ms-1.5 rounded-full px-1.5 text-xs tabular-nums', destaque && n ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground')}>
-      {n}
-    </span>
+    <div className={cn('flex h-full items-start gap-3 rounded-lg border px-4 py-3', tom)} role='status'>
+      <Icone className='mt-0.5 size-4 shrink-0' aria-hidden='true' />
+      <div className='min-w-0'>
+        <p className='text-sm font-medium'>{titulo}</p>
+        {texto && <p className='truncate text-xs text-muted-foreground'>{texto}</p>}
+      </div>
+    </div>
   )
 }
 
-function Vazio({ aba, buscando, onArquivo }: { aba: Aba; buscando: boolean; onArquivo: () => void }) {
-  if (buscando) return <p className='text-center text-sm text-muted-foreground'>Nada encontrado com essa busca.</p>
+function Vazio({ aba, buscando, onArquivo, modoConferir }: { aba: Aba; buscando: boolean; onArquivo: () => void; modoConferir: boolean }) {
+  if (buscando) return <p className='p-10 text-center text-sm text-muted-foreground'>Nada encontrado com essa busca.</p>
+  const textos: Record<Aba, [string, string]> = {
+    fila: ['Nenhuma etiqueta esperando', modoConferir ? 'Baixe a etiqueta no marketplace: ela entra aqui e espera você conferir.' : 'Baixe a etiqueta no marketplace: ela entra aqui e imprime sozinha.'],
+    falhas: ['Nenhuma falha', 'Etiqueta que não imprimir aparece aqui com o motivo.'],
+    impressas: ['Nenhuma impressa ainda', 'As impressas ficam aqui pelo prazo do histórico, em Configurações.'],
+    descartadas: ['Nenhuma descartada', 'Etiquetas tiradas da fila aparecem aqui.'],
+  }
   return (
-    <div className='mx-auto flex max-w-md flex-col items-center gap-2 text-center'>
+    <div className='mx-auto flex max-w-sm flex-col items-center gap-2 p-10 text-center'>
       <Inbox className='size-8 text-muted-foreground' aria-hidden='true' />
-      <p className='font-medium'>{aba === 'fila' ? 'Nenhuma etiqueta esperando' : aba === 'impressas' ? 'Nenhuma etiqueta impressa ainda' : 'Nenhuma etiqueta descartada'}</p>
-      {aba === 'fila' && (
-        <>
-          <p className='text-sm text-muted-foreground'>Baixe a etiqueta no Mercado Livre, na Shopee ou no TikTok: ela aparece aqui sozinha. Ou envie o arquivo.</p>
-          <Button variant='outline' size='sm' onClick={onArquivo}><FileUp aria-hidden='true' /> Enviar arquivo</Button>
-        </>
-      )}
+      <p className='font-medium'>{textos[aba][0]}</p>
+      <p className='text-sm text-muted-foreground'>{textos[aba][1]}</p>
+      {aba === 'fila' && <Button variant='outline' size='sm' onClick={onArquivo}><FileUp aria-hidden='true' /> Enviar arquivo</Button>}
     </div>
   )
 }

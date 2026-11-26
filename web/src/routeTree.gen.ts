@@ -16,11 +16,13 @@ import { Route as errors404RouteImport } from './routes/(errors)/404'
 import { Route as errors500RouteImport } from './routes/(errors)/500'
 import { Route as errors503RouteImport } from './routes/(errors)/503'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
+import { Route as AuthenticatedConfiguracoesRouteImport } from './routes/_authenticated/configuracoes'
 import { Route as AuthenticatedEstoqueRouteImport } from './routes/_authenticated/estoque'
 import { Route as AuthenticatedFilaRouteImport } from './routes/_authenticated/fila'
-import { Route as AuthenticatedImpressoraRouteImport } from './routes/_authenticated/impressora'
 import { Route as AuthenticatedMercadoLivreRouteImport } from './routes/_authenticated/mercado-livre'
 import { Route as AuthenticatedSeparacaoRouteImport } from './routes/_authenticated/separacao'
+import { Route as AuthenticatedImpressoraIndexRouteImport } from './routes/_authenticated/impressora/index'
+import { Route as AuthenticatedImpressoraConfigurarRouteImport } from './routes/_authenticated/impressora/configurar'
 
 const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
   id: '/_authenticated',
@@ -56,6 +58,12 @@ const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedConfiguracoesRoute =
+  AuthenticatedConfiguracoesRouteImport.update({
+    id: '/configuracoes',
+    path: '/configuracoes',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedEstoqueRoute = AuthenticatedEstoqueRouteImport.update({
   id: '/estoque',
   path: '/estoque',
@@ -64,11 +72,6 @@ const AuthenticatedEstoqueRoute = AuthenticatedEstoqueRouteImport.update({
 const AuthenticatedFilaRoute = AuthenticatedFilaRouteImport.update({
   id: '/fila',
   path: '/fila',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedImpressoraRoute = AuthenticatedImpressoraRouteImport.update({
-  id: '/impressora',
-  path: '/impressora',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedMercadoLivreRoute =
@@ -82,6 +85,18 @@ const AuthenticatedSeparacaoRoute = AuthenticatedSeparacaoRouteImport.update({
   path: '/separacao',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedImpressoraIndexRoute =
+  AuthenticatedImpressoraIndexRouteImport.update({
+    id: '/impressora/',
+    path: '/impressora/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedImpressoraConfigurarRoute =
+  AuthenticatedImpressoraConfigurarRouteImport.update({
+    id: '/impressora/configurar',
+    path: '/impressora/configurar',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
@@ -90,11 +105,13 @@ export interface FileRoutesByFullPath {
   '/404': typeof errors404Route
   '/500': typeof errors500Route
   '/503': typeof errors503Route
+  '/configuracoes': typeof AuthenticatedConfiguracoesRoute
   '/estoque': typeof AuthenticatedEstoqueRoute
   '/fila': typeof AuthenticatedFilaRoute
-  '/impressora': typeof AuthenticatedImpressoraRoute
   '/mercado-livre': typeof AuthenticatedMercadoLivreRoute
   '/separacao': typeof AuthenticatedSeparacaoRoute
+  '/impressora/configurar': typeof AuthenticatedImpressoraConfigurarRoute
+  '/impressora/': typeof AuthenticatedImpressoraIndexRoute
 }
 export interface FileRoutesByTo {
   '/401': typeof errors401Route
@@ -102,12 +119,14 @@ export interface FileRoutesByTo {
   '/404': typeof errors404Route
   '/500': typeof errors500Route
   '/503': typeof errors503Route
+  '/configuracoes': typeof AuthenticatedConfiguracoesRoute
   '/estoque': typeof AuthenticatedEstoqueRoute
   '/fila': typeof AuthenticatedFilaRoute
-  '/impressora': typeof AuthenticatedImpressoraRoute
   '/mercado-livre': typeof AuthenticatedMercadoLivreRoute
   '/separacao': typeof AuthenticatedSeparacaoRoute
   '/': typeof AuthenticatedIndexRoute
+  '/impressora/configurar': typeof AuthenticatedImpressoraConfigurarRoute
+  '/impressora': typeof AuthenticatedImpressoraIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -117,12 +136,14 @@ export interface FileRoutesById {
   '/(errors)/404': typeof errors404Route
   '/(errors)/500': typeof errors500Route
   '/(errors)/503': typeof errors503Route
+  '/_authenticated/configuracoes': typeof AuthenticatedConfiguracoesRoute
   '/_authenticated/estoque': typeof AuthenticatedEstoqueRoute
   '/_authenticated/fila': typeof AuthenticatedFilaRoute
-  '/_authenticated/impressora': typeof AuthenticatedImpressoraRoute
   '/_authenticated/mercado-livre': typeof AuthenticatedMercadoLivreRoute
   '/_authenticated/separacao': typeof AuthenticatedSeparacaoRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
+  '/_authenticated/impressora/configurar': typeof AuthenticatedImpressoraConfigurarRoute
+  '/_authenticated/impressora/': typeof AuthenticatedImpressoraIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -133,11 +154,13 @@ export interface FileRouteTypes {
     | '/404'
     | '/500'
     | '/503'
+    | '/configuracoes'
     | '/estoque'
     | '/fila'
-    | '/impressora'
     | '/mercado-livre'
     | '/separacao'
+    | '/impressora/configurar'
+    | '/impressora/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/401'
@@ -145,12 +168,14 @@ export interface FileRouteTypes {
     | '/404'
     | '/500'
     | '/503'
+    | '/configuracoes'
     | '/estoque'
     | '/fila'
-    | '/impressora'
     | '/mercado-livre'
     | '/separacao'
     | '/'
+    | '/impressora/configurar'
+    | '/impressora'
   id:
     | '__root__'
     | '/_authenticated'
@@ -159,12 +184,14 @@ export interface FileRouteTypes {
     | '/(errors)/404'
     | '/(errors)/500'
     | '/(errors)/503'
+    | '/_authenticated/configuracoes'
     | '/_authenticated/estoque'
     | '/_authenticated/fila'
-    | '/_authenticated/impressora'
     | '/_authenticated/mercado-livre'
     | '/_authenticated/separacao'
     | '/_authenticated/'
+    | '/_authenticated/impressora/configurar'
+    | '/_authenticated/impressora/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -227,6 +254,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/configuracoes': {
+      id: '/_authenticated/configuracoes'
+      path: '/configuracoes'
+      fullPath: '/configuracoes'
+      preLoaderRoute: typeof AuthenticatedConfiguracoesRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/estoque': {
       id: '/_authenticated/estoque'
       path: '/estoque'
@@ -239,13 +273,6 @@ declare module '@tanstack/react-router' {
       path: '/fila'
       fullPath: '/fila'
       preLoaderRoute: typeof AuthenticatedFilaRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/impressora': {
-      id: '/_authenticated/impressora'
-      path: '/impressora'
-      fullPath: '/impressora'
-      preLoaderRoute: typeof AuthenticatedImpressoraRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/mercado-livre': {
@@ -262,25 +289,44 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSeparacaoRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/impressora/': {
+      id: '/_authenticated/impressora/'
+      path: '/impressora'
+      fullPath: '/impressora/'
+      preLoaderRoute: typeof AuthenticatedImpressoraIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/impressora/configurar': {
+      id: '/_authenticated/impressora/configurar'
+      path: '/impressora/configurar'
+      fullPath: '/impressora/configurar'
+      preLoaderRoute: typeof AuthenticatedImpressoraConfigurarRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
 interface AuthenticatedRouteRouteChildren {
+  AuthenticatedConfiguracoesRoute: typeof AuthenticatedConfiguracoesRoute
   AuthenticatedEstoqueRoute: typeof AuthenticatedEstoqueRoute
   AuthenticatedFilaRoute: typeof AuthenticatedFilaRoute
-  AuthenticatedImpressoraRoute: typeof AuthenticatedImpressoraRoute
   AuthenticatedMercadoLivreRoute: typeof AuthenticatedMercadoLivreRoute
   AuthenticatedSeparacaoRoute: typeof AuthenticatedSeparacaoRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
+  AuthenticatedImpressoraConfigurarRoute: typeof AuthenticatedImpressoraConfigurarRoute
+  AuthenticatedImpressoraIndexRoute: typeof AuthenticatedImpressoraIndexRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedConfiguracoesRoute: AuthenticatedConfiguracoesRoute,
   AuthenticatedEstoqueRoute: AuthenticatedEstoqueRoute,
   AuthenticatedFilaRoute: AuthenticatedFilaRoute,
-  AuthenticatedImpressoraRoute: AuthenticatedImpressoraRoute,
   AuthenticatedMercadoLivreRoute: AuthenticatedMercadoLivreRoute,
   AuthenticatedSeparacaoRoute: AuthenticatedSeparacaoRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
+  AuthenticatedImpressoraConfigurarRoute:
+    AuthenticatedImpressoraConfigurarRoute,
+  AuthenticatedImpressoraIndexRoute: AuthenticatedImpressoraIndexRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =

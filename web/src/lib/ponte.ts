@@ -4,6 +4,8 @@ import { useQuery } from '@tanstack/react-query'
 
 export type EstadoPedido = 'aguardando' | 'enviando' | 'impresso' | 'erro' | 'descartado'
 
+export type EventoPedido = { quando: string; tipo: 'chegou' | 'impressa' | 'falhou' | 'descartada'; detalhe?: string }
+
 export type Pedido = {
   jid: string
   id: string
@@ -16,19 +18,48 @@ export type Pedido = {
   rastreio?: string
   arquivo?: string
   repetir?: boolean
+  eventos?: EventoPedido[]
 }
 
+export type Calib = {
+  deslocXmm: number; deslocYmm: number; densidade: number; velocidade: number
+  gapMm: number; offsetMm: number; faixaLinhas: number; crlfInicial: boolean
+}
+
+export type Conexao = { tipo: 'usb' | 'ble' | 'bluetooth' | 'rede' | string; bleNome?: string; host?: string; dispositivo?: string; portaRede?: number; fila?: string; uri?: string }
+
+export type Config = {
+  porta: number
+  fila: string
+  imprimir: 'direto' | 'conferir'
+  modo: 'junto' | 'cheio'
+  vigiarDownloads: boolean
+  limparDownloads: boolean
+  guardarHistorico: boolean
+  historicoDias?: number
+  configurado?: boolean
+  calib: Calib
+  conexao: Conexao
+  ml?: { appId?: string; conectado?: boolean }
+  mlEtiquetas?: { ligado: boolean; contas: string[] }
+}
+
+export type UsbPorta = { fila: string; nome: string; ligada: boolean; semFila?: boolean; uri?: string }
+
 export type Estado = {
-  config: {
-    porta: number
-    conexao: { tipo: string; bleNome?: string; host?: string; dispositivo?: string }
-    configurado?: boolean
-  }
+  config: Config
+  limites: Record<string, [number, number]>
   bleVivo?: boolean
+  bt?: number
+  conector?: { instalado: boolean; rodando: boolean }
+  driver?: { instalado: boolean; modelos?: string[] }
+  driverProprio?: boolean
+  vigia?: { ativo: boolean; texto: string }
   fila: { ok: boolean; texto: string }
+  conexoes: { usb: UsbPorta[]; bluetooth: { dispositivo: string; nome: string }[] }
   pedidos: Pedido[]
   log: string[]
-  conector?: { instalado: boolean; rodando: boolean }
+  siteVisto?: number
 }
 
 export type Pendencia = { tipo: string; texto: string; envio?: string }
@@ -88,3 +119,23 @@ export type EstadoSeparacao = { items: ItemSeparacao[]; files: string[]; warning
 
 export const useSeparacao = () =>
   useQuery({ queryKey: ['separacao'], queryFn: () => api<EstadoSeparacao>('/api/separacao/state'), refetchInterval: 30000 })
+
+// ---------- configuração e Mercado Livre (impressão automática) ----------
+export const salvarConfig = (parcial: Record<string, unknown>) => api<Config>('/api/config', parcial)
+
+export type MlEtiquetas = {
+  ligado: boolean
+  emitirNfe: boolean
+  temApp: boolean
+  contas: { uid: string; apelido: string }[]
+  travados: { envio: string; motivo: string; conta: string }[]
+  ultima: string
+  pendencias: Pendencia[]
+  eventos: { hora: string; txt: string }[]
+}
+export type MlApp = { appId?: string; temSegredo?: boolean; retorno?: string; conectado?: boolean; [k: string]: unknown }
+
+export const useMlEtiquetas = () =>
+  useQuery({ queryKey: ['ml-etiquetas'], queryFn: () => api<MlEtiquetas>('/api/ml-etiquetas'), refetchInterval: 30000 })
+export const useMlApp = () =>
+  useQuery({ queryKey: ['ml-app'], queryFn: () => api<MlApp>('/api/ml'), refetchInterval: 30000 })

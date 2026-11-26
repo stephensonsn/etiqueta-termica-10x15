@@ -493,7 +493,8 @@ function gravarHistorico(forcar = false) {
     if (!p || typeof p.jid !== 'string' || !/^[0-9]+-[0-9]+$/.test(p.jid)) continue;
     if (!fs.existsSync(path.join(DADOS, 'previa', `${p.jid}.png`))) continue; // sem a imagem não dá para reimprimir
     // interrompida no meio pela reinicialização: não reenvia sozinha (evita etiqueta dobrada)
-    if (p.estado === 'enviando') { p.estado = 'erro'; p.erro = 'a ponte reiniciou durante a impressão; confira o papel e reimprima se faltou'; }
+    if (!Array.isArray(p.eventos)) p.eventos = [{ quando: p.hora, tipo: 'chegou', detalhe: p.origem || '' }]; // histórico de antes da linha do tempo
+    if (p.estado === 'enviando') { p.estado = 'erro'; p.erro = 'a ponte reiniciou durante a impressão; confira o papel e reimprima se faltou'; p.eventos.push({ quando: new Date().toISOString(), tipo: 'falhou', detalhe: p.erro }); }
     p.repetir = false;
     pedidos.push(p);
   }
@@ -520,9 +521,17 @@ function imagemDo(jid) {
   return { l: png.width, a: png.height, bits };
 }
 
+// linha do tempo de cada etiqueta (o app mostra no detalhe da fila); até 30 eventos por etiqueta
+function evento(p, tipo, detalhe = '') {
+  if (!Array.isArray(p.eventos)) p.eventos = [];
+  p.eventos.push({ quando: new Date().toISOString(), tipo, detalhe: String(detalhe).slice(0, 200) });
+  if (p.eventos.length > 30) p.eventos.splice(1, p.eventos.length - 30);
+}
+
 function registrar(id, tipo, origem, img) {
   const jid = `${carimbo()}-${++seq}`;
   const p = { jid, id, tipo, origem, hora: new Date().toISOString(), estado: 'aguardando', erro: '', impressoes: 0 };
+  evento(p, 'chegou', origem);
   fs.writeFileSync(path.join(DADOS, 'previa', `${jid}.png`), paraPng(img));
   pedidos.unshift(p);
   imagens.set(jid, img);
@@ -546,11 +555,13 @@ async function imprimirPedido(jid) {
     // por etiqueta); a compacta manda só as faixas com tinta e a etiqueta seguinte sai logo depois
     await enviar((tipo) => semOffsetSeContinua(tipo === 'ble' && cfg.compressao === true ? paraTsplZlib(img, cfg.calib) : cfg.usbCheia === true && tipo !== 'ble' ? paraTspl(img, cfg.calib) : paraTsplCompacto(img, cfg.calib)), `${p.jid}-${p.id || 'teste'}-${p.tipo}`.replace(/[^\w.+-]+/g, '_'));
     p.estado = 'impresso'; p.erro = ''; p.impressoes++;
+    evento(p, 'impressa', p.impressoes > 1 ? `${p.impressoes}ª vez` : '');
     if (p.rastreio) marcarImpressoTikTok(p.rastreio);
     apagarSeImprimiu(p.arquivo);
     // fica no histórico (cfg.historicoDias) para reimprimir depois de um papel travado
   } catch (e) {
     p.estado = 'erro'; p.erro = e.message;
+    evento(p, 'falhou', e.message);
     if (cfg.imprimir === 'direto') p.repetir = true;
     throw e;
   }
@@ -559,7 +570,7 @@ async function imprimirPedido(jid) {
 
 function descartarPedido(jid) {
   const p = pedidos.find((x) => x.jid === jid);
-  if (p && (p.estado === 'aguardando' || p.estado === 'erro')) { p.estado = 'descartado'; p.repetir = false; }
+  if (p && (p.estado === 'aguardando' || p.estado === 'erro')) { p.estado = 'descartado'; p.repetir = false; evento(p, 'descartada'); }
   return p;
 }
 

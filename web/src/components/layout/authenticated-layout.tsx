@@ -6,6 +6,8 @@ import { SearchProvider } from '@/context/search-provider'
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
 import { AppSidebar } from '@/components/layout/app-sidebar'
 import { SkipToMain } from '@/components/skip-to-main'
+import { useBleNavegador } from '@/lib/ble-navegador'
+import { useEstado } from '@/lib/ponte'
 
 type AuthenticatedLayoutProps = {
   children?: React.ReactNode
@@ -13,6 +15,9 @@ type AuthenticatedLayoutProps = {
 
 export function AuthenticatedLayout({ children }: AuthenticatedLayoutProps) {
   const defaultOpen = getCookie('sidebar_state') !== 'false'
+  const { data } = useEstado()
+  // Bluetooth pelo Chrome em qualquer tela (reserva do conector nativo)
+  useBleNavegador(data?.config.conexao.tipo, data ? !!data.conector?.rodando : undefined)
   return (
     <SearchProvider>
       <LayoutProvider>

@@ -12,7 +12,7 @@ const { subir, RAIZ } = require('./ponte-teste');
   const passo = (nome) => { ok++; console.log(`  ok ${nome}`); };
   try {
     // 1. rotas do app devolvem o index do React, com cabeçalhos de segurança
-    for (const rota of ['/', '/fila', '/separacao', '/estoque', '/mercado-livre', '/impressora']) {
+    for (const rota of ['/', '/fila', '/separacao', '/estoque', '/mercado-livre', '/impressora', '/impressora/configurar', '/configuracoes']) {
       const r = await p.pedir('GET', rota);
       assert.strictEqual(r.status, 200, rota);
       assert.match(r.txt, /<div id="root">/, `${rota} não é o app`);
@@ -89,9 +89,12 @@ const { subir, RAIZ } = require('./ponte-teste');
       assert.ok(volta, 'a etiqueta sumiu do histórico ao reiniciar');
       assert.strictEqual(volta.estado, 'impresso');
       assert.strictEqual(volta.impressoes, 1);
+      assert.deepStrictEqual(volta.eventos.map((x) => x.tipo), ['chegou', 'impressa'], 'linha do tempo gravada');
       const r = await p2.pedir('POST', `/api/pedido/${jid}/imprimir`, {});
       assert.strictEqual(r.status, 200, r.txt);
       assert.strictEqual(r.json.impressoes, 2);
+      assert.deepStrictEqual(r.json.eventos.map((x) => x.tipo), ['chegou', 'impressa', 'impressa']);
+      assert.strictEqual(r.json.eventos[2].detalhe, '2ª vez');
       console.log('  ok histórico sobrevive a reiniciar e reimprime pela prévia');
       assert.strictEqual((await p2.pedir('POST', '/api/config', { historicoDias: 0 })).status, 400);
       const c = await p2.pedir('POST', '/api/config', { historicoDias: 5 });

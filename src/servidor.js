@@ -51,7 +51,7 @@ const STATUS_OK = (() => {
 
 // ---------- app do painel (React, build em src/web) ----------
 const WEB = path.join(__dirname, 'web');
-const ROTAS_APP = new Set(['/', '/fila', '/separacao', '/estoque', '/mercado-livre', '/impressora']);
+const ROTAS_APP = new Set(['/', '/fila', '/separacao', '/estoque', '/mercado-livre', '/impressora', '/impressora/configurar', '/configuracoes']);
 const TIPOS = { '.html': 'text/html;charset=UTF-8', '.js': 'text/javascript;charset=UTF-8', '.css': 'text/css;charset=UTF-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon', '.json': 'application/json', '.woff2': 'font/woff2' };
 const SEGURANCA = { 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'SAMEORIGIN', 'Referrer-Policy': 'no-referrer' };
 function arquivoDoApp(rota) {
@@ -152,14 +152,14 @@ const servidor = http.createServer(async (req, res) => {
       // volta do login do Mercado Livre (a página de retorno HTTPS repassa ?code e ?state para cá)
       if (req.method === 'GET' && rota === '/ml/retorno') {
         const q = new URL(req.url, 'http://x').searchParams;
-        let destino = '/painel', aviso;
+        let destino = '/configuracoes?secao=mercado-livre&', aviso; // impressão automática fica em Configurações
         try {
           if (q.get('erro')) throw new Error('o Mercado Livre não autorizou (' + q.get('erro').slice(0, 60) + ')');
           const r = await ml.concluirRetorno(q.get('code'), q.get('state'));
           if (r.destino === 'etiquetas') { const c = await mlEtiquetas.adicionarComTokens(r.tokens); aviso = `ok:Conta ${c.apelido} conectada`; }
-          else { destino = '/estoque'; aviso = 'ok:Conta conectada'; ml.sincronizarAnuncios().catch(() => {}); }
+          else { destino = '/estoque?'; aviso = 'ok:Conta conectada'; ml.sincronizarAnuncios().catch(() => {}); }
         } catch (e) { aviso = 'erro:' + e.message; log(`ML retorno: ${e.message}`); }
-        res.writeHead(302, { Location: `${destino}?ml=${encodeURIComponent(aviso)}#sec-ml`, 'Cache-Control': 'no-store' });
+        res.writeHead(302, { Location: `${destino}ml=${encodeURIComponent(aviso)}#sec-ml`, 'Cache-Control': 'no-store' });
         return res.end();
       }
       if (req.method === 'GET' && rota === '/api/ml') return json(ml.estadoMl());

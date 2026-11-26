@@ -1,4 +1,4 @@
-import { Boxes, ClipboardCheck, House, Printer, Settings2, Store } from 'lucide-react'
+import { Boxes, ClipboardCheck, House, Printer, Settings2, Store, TicketCheck } from 'lucide-react'
 import { type SidebarData } from '../types'
 
 export const sidebarData: SidebarData = {
@@ -20,7 +20,10 @@ export const sidebarData: SidebarData = {
     },
     {
       title: 'Sistema',
-      items: [{ title: 'Impressora e ajustes', url: '/impressora', icon: Settings2 }],
+      items: [
+        { title: 'Impressora', url: '/impressora', icon: TicketCheck },
+        { title: 'Configurações', url: '/configuracoes', icon: Settings2 },
+      ],
     },
   ],
 }

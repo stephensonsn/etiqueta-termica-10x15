@@ -1,0 +1,1 @@
+import{t as e}from"./embutida-DfixDyIp.js";import{B as t}from"./index-DmsKiH_9.js";var n=t(),r=()=>(0,n.jsx)(e,{titulo:`Estoque`,descricao:`Etiquetas de produto, loja e leitor de código de barras`,endereco:`/estoque`});export{r as component};

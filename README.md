@@ -142,7 +142,10 @@ Abra **http://127.0.0.1:9100** (ou pelo ícone da extensão, que agora tem o men
 - **Início**: 4 números do dia (na fila, com falha, impressas hoje, pacotes para despachar), situação da impressora com autoteste, pendências e as últimas etiquetas.
 - **Fila de impressão**: abas Na fila / Impressas / Descartadas, busca, prévia da etiqueta, imprimir, reimprimir e descartar uma ou várias de uma vez, enviar arquivo e o registro técnico recolhido no rodapé. Atualiza sozinha a cada 2 segundos. No celular vira cartões.
 - **Separação**: a mesma da pasta `separacao/` (planilhas do Mercado Livre e do TikTok → checklist A4 com Separado e embalado / Despachado), agora dentro da ponte. A ponte sobe o Python sozinha, só em 127.0.0.1, e encerra junto.
-- **Estoque, Mercado Livre e Impressora e ajustes**: as páginas de antes, abertas dentro do app (`/painel` e `/estoque` continuam funcionando sozinhas).
+- **Fila de impressão**: lista agrupada por dia (Hoje, Ontem…) e, ao lado, a prévia grande da etiqueta com a linha do tempo (chegou, impressa, reimpressa, falhou). Abas Para imprimir / Com falha / Impressas / Descartadas, "2x" quando saiu mais de uma vez, imprimir em lote em sequência com andamento, arrastar arquivo em qualquer lugar e setas + Enter no teclado. O histórico fica guardado em disco (padrão 2 dias) e sobrevive a reiniciar a ponte.
+- **Impressora**: situação, conexões (cabo USB, Bluetooth, Bluetooth pareado, rede) com Usar / Em uso, diagnóstico item a item (Pronto / Pendente com o botão que resolve) e testes (régua, autoteste, sensor de papel, destravar, reiniciar). **Configurar passo a passo** em 5 etapas para a primeira vez.
+- **Configurações**: Impressão (direto ou conferir, formato, pegar etiquetas baixadas, apagar arquivo), Calibração (com prévia do deslocamento e limites conferidos), Histórico ("excluir depois de N dias", 1 a 30) e Mercado Livre automático (aplicativo, contas, NF-e, envios travados, eventos).
+- **Estoque e Mercado Livre (anúncios)**: as páginas de antes, abertas dentro do app. O `/painel` antigo continua no ar como reserva, fora do menu.
 
 Feito sobre o template [shadcn-admin](https://github.com/satnaing/shadcn-admin) (MIT), com o design system **shadcn/ui** (Radix + Tailwind): azul nas ações, verde/âmbar/vermelho só para estado, sempre com texto; fontes do próprio sistema, nada carregado da internet.
 

@@ -1,0 +1,1 @@
+import{n as e}from"./formato-Db8GkwDM.js";function t(t,n=e()){return t.ship_date?t.ship_late||t.ship_date<n?`atrasado`:t.ship_date===n?`hoje`:`futuro`:`sem`}function n(n,r=e()){let i=new Set;for(let e of n)[`hoje`,`atrasado`].includes(t(e,r))&&i.add(e.group);return i}export{t as n,n as t};

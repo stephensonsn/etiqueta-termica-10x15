@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Pagina } from '@/components/layout/pagina'
-import { naFila, origemLegivel, SeloEstado } from '@/features/fila/estado'
+import { origemLegivel, SeloEstado } from '@/features/fila/estado'
 import { gruposDoDia } from '@/features/separacao/prazo'
 
 const saudacao = () => {
@@ -22,7 +22,7 @@ export function Inicio() {
   const pendencias = usePendencias()
   const separacao = useSeparacao()
   const pedidos = estado.data?.pedidos ?? []
-  const fila = pedidos.filter(naFila)
+  const fila = pedidos.filter((p) => p.estado === 'aguardando' || p.estado === 'enviando')
   const erros = pedidos.filter((p) => p.estado === 'erro')
   const impressasHoje = pedidos.filter((p) => p.estado === 'impresso' && ehHoje(p.hora))
   const itensSep = separacao.data?.items ?? []
@@ -42,7 +42,7 @@ export function Inicio() {
         <Indicador titulo='Na fila agora' valor={fila.length} carregando={estado.isLoading}
           detalhe={fila.length ? 'esperando para imprimir' : 'nada esperando'} icone={Clock3} tom={fila.length ? 'ambar' : 'neutro'} para='/fila' />
         <Indicador titulo='Com falha' valor={erros.length} carregando={estado.isLoading}
-          detalhe={erros.length ? 'precisam de nova tentativa' : 'nenhuma falha'} icone={CircleAlert} tom={erros.length ? 'vermelho' : 'neutro'} para='/fila' />
+          detalhe={erros.length ? 'precisam de nova tentativa' : 'nenhuma falha'} icone={CircleAlert} tom={erros.length ? 'vermelho' : 'neutro'} para='/fila' busca={{ aba: 'falhas' }} />
         <Indicador titulo='Impressas hoje' valor={impressasHoje.length} carregando={estado.isLoading}
           detalhe={impressasHoje[0] ? `última às ${hora(impressasHoje[0].hora)}` : 'nenhuma ainda'} icone={CircleCheck} tom='verde' para='/fila' busca={{ aba: 'impressas' }} />
         <Indicador titulo='Pacotes para despachar' valor={doDia.size} carregando={separacao.isLoading}
@@ -125,7 +125,7 @@ const TONS: Record<Tom, string> = {
 
 function Indicador({ titulo, valor, detalhe, icone: Icone, tom, para, busca, carregando }: {
   titulo: string; valor: number; detalhe: string; icone: React.ElementType; tom: Tom
-  para: '/fila' | '/separacao'; busca?: { aba: 'impressas' }; carregando?: boolean
+  para: '/fila' | '/separacao'; busca?: { aba: 'impressas' | 'falhas' }; carregando?: boolean
 }) {
   return (
     <Link to={para} search={busca} className='group rounded-xl focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none'>
