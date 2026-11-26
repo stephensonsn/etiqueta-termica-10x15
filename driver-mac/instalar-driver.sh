@@ -58,11 +58,15 @@ passo "criando a impressora $FILA"
 lpadmin -p "$FILA" -E -v "socket://127.0.0.1:9102" -P "$PPD" -D "Etiqueta Termica 10x15" -o PageSize=w283h425 -o printer-error-policy=abort-job -o fit-to-page-default=true 2>>"$REG" || { passo "ERRO ao criar a impressora"; desfazer; exit 1; }
 
 # conferência: a fila existe e aceita trabalhos, e o filtro separa ZPL de documento comum
-CONF="$(mktemp -d)"
-printf '^XA^FO50,50^A0N,40,40^FDteste^FS^XZ\n' > "$CONF/zpl.txt"; printf 'documento comum\n' > "$CONF/comum.txt"
+# com sudo o CUPS roda o filtro como usuário sem privilégio: a pasta de teste tem que ser legível por todos
+# (antes era 0700 do root e a conferência falhava sempre; 26/11/2026)
+CONF="$(mktemp -d /tmp/etiqueta-conf.XXXXXX)"; chmod 755 "$CONF"
+printf '^XA^FO50,50^A0N,40,40^FDteste^FS^XZ\n' > "$CONF/zpl.txt"; printf 'documento comum\n' > "$CONF/comum.txt"; chmod 644 "$CONF"/*.txt
 FILTRO_OK=1
-cupsfilter -e -p "$PPD" -m printer/Etiqueta_Termica "$CONF/zpl.txt" 2>/dev/null | head -c 20 | grep -q 'ETIQUETA-ZPL' || FILTRO_OK=0
-cupsfilter -e -p "$PPD" -m printer/Etiqueta_Termica "$CONF/comum.txt" 2>/dev/null | grep -aq 'SIZE ' || FILTRO_OK=0
+cupsfilter -e -p "$PPD" -m printer/Etiqueta_Termica "$CONF/zpl.txt" > "$CONF/saida-zpl" 2> "$CONF/erro-zpl" || true
+head -c 20 "$CONF/saida-zpl" | grep -q 'ETIQUETA-ZPL' || { FILTRO_OK=0; passo "conferência ZPL falhou:"; grep -E 'ERROR|erro|denied|negad' "$CONF/erro-zpl" | tail -5 >> "$REG"; }
+cupsfilter -e -p "$PPD" -m printer/Etiqueta_Termica "$CONF/comum.txt" > "$CONF/saida-comum" 2> "$CONF/erro-comum" || true
+grep -aq 'SIZE ' "$CONF/saida-comum" || { FILTRO_OK=0; passo "conferência documento comum falhou:"; grep -E 'ERROR|erro|denied|negad' "$CONF/erro-comum" | tail -5 >> "$REG"; }
 rm -rf "$CONF"
 [ "$FILTRO_OK" = 1 ] || { passo "ERRO: o filtro não separou ZPL de documento comum"; desfazer; exit 1; }
 if lpstat -p "$FILA" >/dev/null 2>&1 && lpstat -a "$FILA" >/dev/null 2>&1; then
