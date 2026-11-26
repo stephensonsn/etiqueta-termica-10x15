@@ -386,6 +386,20 @@ function aviso(txt, tipo) { $('aviso').textContent = txt; $('aviso').className =
 const hora = (iso) => new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 const el = (tag, props = {}, ...filhos) => { const e = Object.assign(document.createElement(tag), props); e.append(...filhos); return e; };
 
+// Quantas vezes este envio já saiu na térmica até esta linha: soma as impressões das linhas
+// anteriores do mesmo envio (cada nova chegada vira linha própria) com as reimpressões desta.
+// Só aparece a partir da segunda: "48637407408 (2x)".
+const vezes = (x) => x.impressoes || (x.estado === 'impresso' ? 1 : 0);
+function vezesTexto(p) {
+  if (!p.id || !vezes(p)) return '';
+  const t = Date.parse(p.hora);
+  const antes = dados.pedidos
+    .filter((x) => x.id === p.id && x.jid !== p.jid && x.estado !== 'descartado' && Date.parse(x.hora) < t)
+    .reduce((s, x) => s + vezes(x), 0);
+  const n = antes + vezes(p);
+  return n >= 2 ? ' (' + n + 'x)' : '';
+}
+
 function desenhar() {
   const { config, pedidos, log, fila } = dados;
   $('modo-conferir').setAttribute('aria-pressed', config.imprimir === 'conferir');
@@ -416,7 +430,7 @@ function desenhar() {
       cb,
       el('img', { src: '/api/previa/' + p.jid + '.png', alt: '' }),
       el('div', { style: 'min-width:0' },
-        el('div', { className: 'linha1 num', textContent: p.id || 'Teste' }),
+        el('div', { className: 'linha1 num', textContent: (p.id || 'Teste') + vezesTexto(p) }),
         el('div', { className: 'linha2', textContent: hora(p.hora) + ' · ' + p.tipo + (p.erro ? ' · ' + p.erro : '') })),
       el('span', { className: 'selo ' + ROTULO[p.estado][1], textContent: ROTULO[p.estado][0] }),
       bt);
