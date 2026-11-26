@@ -16,14 +16,14 @@ saude() { for _ in $(seq 1 30); do curl -sf --max-time 2 http://127.0.0.1:9100/s
 [ -d "$INST/src" ] || { passo "ERRO: ponte não instalada em $INST"; exit 1; }
 cd "$REPO"
 PASTAS="src separacao"
-if git ls-files $PASTAS | while read -r f; do cmp -s "$f" "$INST/$f" || exit 1; done; then passo "já está atualizada; nada a fazer"; exit 0; fi
+if git -c core.quotePath=false ls-files $PASTAS | while read -r f; do cmp -s "$f" "$INST/$f" || exit 1; done; then passo "já está atualizada; nada a fazer"; exit 0; fi
 B="$INST/backup-$(date +%Y%m%d-%H%M%S)"
 mkdir -p "$B" && cp -R "$INST/src" "$B/src" || { passo "ERRO: backup falhou; nada mudou"; exit 1; }
 [ -d "$INST/separacao" ] && cp -R "$INST/separacao" "$B/separacao"
 passo "backup em $B"
 # o build do app troca o nome dos arquivos a cada versão: limpa o antigo (o backup guarda a cópia)
 rm -rf "$INST/src/web"
-git ls-files $PASTAS | while read -r f; do mkdir -p "$INST/$(dirname "$f")"; cp "$f" "$INST/$f"; done
+git -c core.quotePath=false ls-files $PASTAS | while read -r f; do mkdir -p "$INST/$(dirname "$f")"; cp "$f" "$INST/$f"; done
 passo "código copiado ($(git rev-parse --short HEAD)); reiniciando"
 launchctl kickstart -k "$SERV"
 # abre as páginas que o navegador pede (painel, ícone) e confere de novo: pega queda que só vem na 1ª visita
